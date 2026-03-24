@@ -11,18 +11,19 @@ import scalafx.scene.shape.Rectangle
 import scalafx.scene.text.{Font, FontWeight, Text}
 import scalafx.stage.Stage
 import chess.controller.GameController
-import chess.model.{Board, PieceColor}
+import chess.model.{Board, PieceColor, Square, File, Rank}
 import scala.compiletime.uninitialized
 import javafx.application.{Application, Platform}
 import javafx.application.Platform.{setImplicitExit}
 import java.awt.Desktop
 
 class ChessGUI(val controller: GameController) {
-  private var selectedSquare: Option[(Int, Int)] = None
-  private var boardSquares: Array[Array[Rectangle]] = Array.ofDim[Rectangle](8, 8)
+  private var selectedSquare: Option[Square] = None
+  private var boardSquares: Array[Array[Rectangle]] =
+    Array.ofDim[Rectangle](8, 8)
   private var boardLabels: Array[Array[Text]] = Array.ofDim[Text](8, 8)
   private[view] var primaryStage: Stage = uninitialized
-  
+
   // UI components that need to be updated
   private var playerLabel: Label = uninitialized
   private var moveInput: TextField = uninitialized
@@ -35,69 +36,78 @@ class ChessGUI(val controller: GameController) {
       vgap = 0
       alignment = Pos.Center
     }
-    
+
     // Add file labels (a-h) at the bottom
-    for (file <- 1 to 8) {
-      val fileLabel = new Label(('a' + file - 1).toChar.toString) {
+    for (file <- File.all) {
+      val fileLabel = new Label(file.letter.toString) {
         font = Font.font("Arial", FontWeight.Bold, 16)
         prefWidth = 80
         prefHeight = 25
         alignment = Pos.Center
       }
-      boardPane.add(fileLabel, file, 9) // Row 9 is below the board (rows 1-8)
+      boardPane.add(
+        fileLabel,
+        file.index,
+        9
+      ) // Row 9 is below the board (rows 1-8)
     }
-    
+
     // Add rank labels (8-1) on the left
-    for (rank <- 8 to 1 by -1) {
-      val row = 8 - rank
-      val rankLabel = new Label(rank.toString) {
+    for (rank <- Rank.all.reverse) {
+      val row = 8 - rank.index
+      val rankLabel = new Label(rank.index.toString) {
         font = Font.font("Arial", FontWeight.Bold, 16)
         prefWidth = 25
         prefHeight = 80
         alignment = Pos.Center
       }
-      boardPane.add(rankLabel, 0, row + 1) // Column 0 is left of the board (cols 1-8)
+      boardPane.add(
+        rankLabel,
+        0,
+        row + 1
+      ) // Column 0 is left of the board (cols 1-8)
     }
-    
+
     // Create the chess squares
     for {
-      rank <- 8 to 1 by -1
-      file <- 1 to 8
+      rank <- Rank.all.reverse
+      file <- File.all
     } {
-      val row = 8 - rank
-      val col = file - 1
-      
-      val square = new Rectangle {
+      val row = 8 - rank.index
+      val col = file.index - 1
+      val sq = Square(file, rank)
+
+      val squareRect = new Rectangle {
         width = 80
         height = 80
-        val isLight = (file + rank) % 2 == 0
+        val isLight = (file.index + rank.index) % 2 == 0
         fill = if (isLight) Color.web("#f0d9b5") else Color.web("#b58863")
         stroke = Color.Black
         strokeWidth = 1
       }
-      
+
       val text = new Text {
         font = Font.font("Arial", FontWeight.Normal, 50)
         fill = Color.Black
       }
-      
+
       val stackPane = new StackPane {
-        children = Seq(square, text)
+        children = Seq(squareRect, text)
         prefWidth = 80
         prefHeight = 80
-        
+
         onMouseClicked = _ => {
-          handleSquareClick(file, rank)
+          handleSquareClick(sq)
           updateBoard()
         }
       }
-      
+
       // Offset by 1 column and 1 row to make room for labels
       boardPane.add(stackPane, col + 1, row + 1)
-      boardSquares(row)(col) = square
+      boardSquares(row)(col) = squareRect
       boardLabels(row)(col) = text
     }
-    
+
     updateBoard()
     boardPane
   }
@@ -107,38 +117,38 @@ class ChessGUI(val controller: GameController) {
       font = Font.font("Arial", FontWeight.Bold, 16)
       padding = Insets(10)
     }
-    
+
     // Move input section
     val moveLabel = new Label("Enter Move (PGN):") {
       font = Font.font("Arial", FontWeight.Normal, 14)
     }
-    
+
     moveInput = new TextField {
       promptText = "e.g., e4, Nf3, O-O"
       prefWidth = 250
     }
-    
+
     val moveButton = new Button("Make Move") {
       prefWidth = 250
       style = "-fx-font-size: 14px; -fx-padding: 10px;"
       onAction = _ => handleMoveInput()
     }
-    
+
     // Allow Enter key to submit move
     moveInput.onAction = _ => handleMoveInput()
-    
+
     // FEN section
     val fenLabel = new Label("FEN Position:") {
       font = Font.font("Arial", FontWeight.Normal, 14)
       padding = Insets(10, 0, 5, 0)
     }
-    
+
     fenDisplay = new TextArea {
       text = controller.getBoardAsFEN
       prefRowCount = 4
       wrapText = true
     }
-    
+
     val fenLoadButton = new Button("Load FEN") {
       prefWidth = 250
       style = "-fx-font-size: 14px; -fx-padding: 10px;"
@@ -159,7 +169,8 @@ class ChessGUI(val controller: GameController) {
     // New Game button
     val resetButton = new Button("New Game") {
       prefWidth = 250
-      style = "-fx-font-size: 14px; -fx-padding: 10px; -fx-background-color: #ff9800; -fx-text-fill: white;"
+      style =
+        "-fx-font-size: 14px; -fx-padding: 10px; -fx-background-color: #ff9800; -fx-text-fill: white;"
       onAction = _ => {
         // Reset the board state
         controller.board = Board.initial
@@ -171,7 +182,7 @@ class ChessGUI(val controller: GameController) {
         updateBoard()
       }
     }
-    
+
     new VBox(10) {
       padding = Insets(20)
       prefWidth = 300
@@ -198,7 +209,8 @@ class ChessGUI(val controller: GameController) {
       controller.applyPgnMove(move) match {
         case Right(_) =>
           moveInput.text = ""
-          playerLabel.text = if (controller.isWhiteToMove) "White to move" else "Black to move"
+          playerLabel.text =
+            if (controller.isWhiteToMove) "White to move" else "Black to move"
           fenDisplay.text = controller.getBoardAsFEN
           updateBoard()
         case Left(error) =>
@@ -224,53 +236,62 @@ class ChessGUI(val controller: GameController) {
 
   private[view] def updateBoard(): Unit = {
     for {
-      rank <- 1 to 8
-      file <- 1 to 8
+      rank <- Rank.all
+      file <- File.all
     } {
-      val row = 8 - rank
-      val col = file - 1
-      
-      val square = boardSquares(row)(col)
+      val row = 8 - rank.index
+      val col = file.index - 1
+      val sq = Square(file, rank)
+
+      val squareRect = boardSquares(row)(col)
       val text = boardLabels(row)(col)
-      
+
       // Update square color
-      val isLight = (file + rank) % 2 == 0
-      val baseColor = if (isLight) Color.web("#f0d9b5") else Color.web("#b58863")
-      
-      square.fill = selectedSquare match {
-        case Some((sf, sr)) if sf == file && sr == rank => Color.web("#baca44")
-        case _ => baseColor
+      val isLight = (file.index + rank.index) % 2 == 0
+      val baseColor =
+        if (isLight) Color.web("#f0d9b5") else Color.web("#b58863")
+
+      squareRect.fill = selectedSquare match {
+        case Some(sel) if sel == sq => Color.web("#baca44")
+        case _                      => baseColor
       }
-      
+
       // Update piece
-      text.text = controller.board.pieceAt(file, rank) match {
+      text.text = controller.board.pieceAt(sq) match {
         case Some(piece) => piece.toString
-        case None => ""
+        case None        => ""
       }
     }
   }
 
-  private def handleSquareClick(file: Int, rank: Int): Unit = {
+  private def handleSquareClick(square: Square): Unit = {
     selectedSquare match {
       case None =>
-        controller.board.pieceAt(file, rank) match {
-          case Some(piece) if piece.color == (if (controller.isWhiteToMove) PieceColor.White else PieceColor.Black) =>
-            selectedSquare = Some((file, rank))
+        controller.board.pieceAt(square) match {
+          case Some(piece)
+              if piece.color == (if (controller.isWhiteToMove) PieceColor.White
+                                 else PieceColor.Black) =>
+            selectedSquare = Some(square)
           case _ => ()
         }
-      case Some((fromFile, fromRank)) =>
-        if (file == fromFile && rank == fromRank) {
+      case Some(fromSquare) =>
+        if (square == fromSquare) {
           selectedSquare = None
         } else {
-          controller.applyMove(fromFile, fromRank, file, rank) match {
+          controller.applyMove(fromSquare, square) match {
             case Some(_) =>
               selectedSquare = None
-              playerLabel.text = if (controller.isWhiteToMove) "White to move" else "Black to move"
+              playerLabel.text =
+                if (controller.isWhiteToMove) "White to move"
+                else "Black to move"
               fenDisplay.text = controller.getBoardAsFEN
             case None =>
-              controller.board.pieceAt(file, rank) match {
-                case Some(piece) if piece.color == (if (controller.isWhiteToMove) PieceColor.White else PieceColor.Black) =>
-                  selectedSquare = Some((file, rank))
+              controller.board.pieceAt(square) match {
+                case Some(piece)
+                    if piece.color == (if (controller.isWhiteToMove)
+                                         PieceColor.White
+                                       else PieceColor.Black) =>
+                  selectedSquare = Some(square)
                 case _ =>
                   selectedSquare = None
               }
@@ -291,14 +312,14 @@ class ChessGUI(val controller: GameController) {
 
 object ChessGUI {
   private[view] var instance: ChessGUI = uninitialized
-  
+
   def main(args: Array[String]): Unit = {
     if (instance == null) {
       instance = new ChessGUI(new GameController(Board.initial))
     }
     Application.launch(classOf[ChessGUILauncher], args*)
   }
-  
+
   def startInBackground(controller: GameController): Unit = {
     instance = new ChessGUI(controller)
     new Thread(() => Application.launch(classOf[ChessGUILauncher])).start()
@@ -306,29 +327,29 @@ object ChessGUI {
   }
 }
 
-// Launcher class required for proper JavaFX initialization  
+// Launcher class required for proper JavaFX initialization
 class ChessGUILauncher extends javafx.application.Application {
   override def init(): Unit = {
     // Prevent JavaFX from exiting when last window closes (for dual UI mode)
     Platform.setImplicitExit(false)
   }
-  
+
   override def start(jfxStage: javafx.stage.Stage): Unit = {
     println("\n[JavaFX] Application.start() called")
     println(s"[JavaFX] Primary stage: $jfxStage")
-    
+
     // Get the ChessGUI instance
     val gui = ChessGUI.instance
-    
+
     // CRITICAL: Set the stage to always be on top initially to force macOS to show it
     jfxStage.setAlwaysOnTop(true)
     jfxStage.setIconified(false)
-    
+
     println("[JavaFX] Creating scene and board...")
-    
+
     // Wrap the JavaFX Stage with ScalaFX
     gui.primaryStage = new Stage(jfxStage)
-    
+
     // Set up the scene
     gui.primaryStage.title = "Chess Game - ScalaFX"
     gui.primaryStage.scene = new Scene(1000, 800) {
@@ -338,30 +359,30 @@ class ChessGUILauncher extends javafx.application.Application {
         style = "-fx-background-color: #f5f5f5;"
       }
     }
-    
+
     // Listen to board property changes using ScalaFX Reactor pattern
     gui.controller.boardProperty.onChange { (_, _, _) =>
       gui.updateBoard()
     }
-    
+
     // Configure stage properties for visibility
     gui.primaryStage.resizable = true
     gui.primaryStage.centerOnScreen()
-    
+
     // Show the stage and request focus
     gui.primaryStage.show()
     gui.primaryStage.toFront()
     gui.primaryStage.requestFocus()
-    
+
     println("[JavaFX] Window created, attempting to show...")
-    
+
     // Aggressively bring window to front with multiple attempts
     Platform.runLater(() => {
       Thread.sleep(100)
       jfxStage.toFront()
       jfxStage.requestFocus()
     })
-    
+
     Platform.runLater(() => {
       Thread.sleep(500)
       jfxStage.setAlwaysOnTop(false)
@@ -369,20 +390,22 @@ class ChessGUILauncher extends javafx.application.Application {
       jfxStage.requestFocus()
       println("[JavaFX] Window brought to front")
     })
-    
+
     Platform.runLater(() => {
       Thread.sleep(1000)
       jfxStage.toFront()
       jfxStage.requestFocus()
       println("[JavaFX] Final activation attempt")
     })
-    
+
     println("\n" + "=" * 60)
     println("✓ ScalaFX Chess GUI Window Opened!")
     println(s"✓ Stage visible: ${jfxStage.isShowing}")
     println(s"✓ Dimensions: ${jfxStage.getWidth} x ${jfxStage.getHeight}")
     println("✓ You can now play by clicking pieces or entering PGN moves")
     println("=" * 60)
-    println("\n*** If you don't see the window, check your Dock or press Cmd+Tab ***\n")
+    println(
+      "\n*** If you don't see the window, check your Dock or press Cmd+Tab ***\n"
+    )
   }
 }

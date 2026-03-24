@@ -11,7 +11,7 @@ object ChessApp:
     ChessGUI.startInBackground(controller)
     new ConsoleView(controller).run()
   }
-  
+
   private def welcomeBanner(): String = {
     val separator = "=" * 60
     s"""$separator
@@ -20,5 +20,3 @@ object ChessApp:
        |$separator
        |""".stripMargin
   }
-  
-  

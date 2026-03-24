@@ -1,6 +1,6 @@
 package chess.controller.parser
 
-import chess.model.Board
+import chess.model.{Board, Square, File, Rank}
 import chess.controller.GameController
 
 object FENExample extends App {
@@ -44,17 +44,17 @@ object FENExample extends App {
   println(s"FEN: ${controller4.getBoardAsFEN}\n")
 
   println("After 1.e4:")
-  controller4.applyMove(5, 2, 5, 4)
+  controller4.applyMove(Square("e2"), Square("e4"))
   println(controller4.board)
   println(s"FEN: ${controller4.getBoardAsFEN}\n")
 
   println("After 1...e5:")
-  controller4.applyMove(5, 7, 5, 5)
+  controller4.applyMove(Square("e7"), Square("e5"))
   println(controller4.board)
   println(s"FEN: ${controller4.getBoardAsFEN}\n")
 
   println("After 2.Nf3:")
-  controller4.applyMove(7, 1, 6, 3)
+  controller4.applyMove(Square("g1"), Square("f3"))
   println(controller4.board)
   println(s"FEN: ${controller4.getBoardAsFEN}\n")
 
