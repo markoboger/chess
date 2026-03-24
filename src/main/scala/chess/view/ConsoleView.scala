@@ -1,7 +1,7 @@
 package chess.view
 
 import chess.controller.GameController
-import chess.model.{Board, Piece, PieceColor, Square, File, Rank}
+import chess.model.{Board, Piece, Color, Square, File, Rank}
 import scala.io.StdIn
 
 /** A console-based view for the chess game. Uses ScalaFX's Reactor pattern to

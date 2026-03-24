@@ -32,8 +32,7 @@ lazy val Chess = project
       "org.openjfx" % "javafx-graphics" % "21.0.2" classifier javafxClassifier,
       "org.openjfx" % "javafx-fxml" % "21.0.2" classifier javafxClassifier
     ),
-    // Note: Scoverage exclusions don't work reliably with Scala 3.5.0
-    // See COVERAGE_REPORT.md for actual core logic coverage (88.54%)
+    coverageExcludedFiles := ".*view/.*;.*ChessApp.*;.*FENExample.*;.*PGNExample.*",
     coverageMinimumStmtTotal := 40,
     coverageFailOnMinimum := false
   )

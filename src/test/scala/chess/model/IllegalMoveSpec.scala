@@ -30,7 +30,7 @@ class IllegalMoveSpec extends AnyWordSpec with Matchers {
         val resultBoard = board.move(Square("e2"), Square("e4"))
         resultBoard should not equal board
         resultBoard.pieceAt(Square("e4")) shouldEqual Some(
-          Piece(PieceType.Pawn, PieceColor.White)
+          Piece(Role.Pawn, Color.White)
         )
         resultBoard.pieceAt(Square("e2")) shouldEqual None
       }
@@ -58,7 +58,7 @@ class IllegalMoveSpec extends AnyWordSpec with Matchers {
         val resultBoard = afterD5.move(Square("e4"), Square("d5"))
         resultBoard should not equal afterD5
         resultBoard.pieceAt(Square("d5")) shouldEqual Some(
-          Piece(PieceType.Pawn, PieceColor.White)
+          Piece(Role.Pawn, Color.White)
         )
       }
 

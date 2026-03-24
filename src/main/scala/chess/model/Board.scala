@@ -9,6 +9,16 @@ final case class Board(
     squares(8 - square.rank.index)(square.file.index - 1)
 
   def move(from: Square, to: Square): Board =
+    pieceAt(from) match
+      case None => this
+      case Some(piece) =>
+        val candidate = applyMoveUnchecked(from, to)
+        if candidate eq this then return this
+        // Reject if move leaves own king in check
+        if candidate.isInCheck(piece.color) then return this
+        candidate
+
+  private[model] def applyMoveUnchecked(from: Square, to: Square): Board =
     // Check if source square has a piece
     pieceAt(from) match
       case None        => this
@@ -20,13 +30,13 @@ final case class Board(
           case _ => ()
 
         // Validate move based on piece type
-        val isValid = piece.pieceType match
-          case PieceType.Pawn   => isValidPawnMove(from, to, piece.color)
-          case PieceType.Knight => isValidKnightMove(from, to)
-          case PieceType.Bishop => isValidBishopMove(from, to)
-          case PieceType.Rook   => isValidRookMove(from, to)
-          case PieceType.Queen  => isValidQueenMove(from, to)
-          case PieceType.King   => isValidKingMove(from, to)
+        val isValid = piece.role match
+          case Role.Pawn   => isValidPawnMove(from, to, piece.color)
+          case Role.Knight => isValidKnightMove(from, to)
+          case Role.Bishop => isValidBishopMove(from, to)
+          case Role.Rook   => isValidRookMove(from, to)
+          case Role.Queen  => isValidQueenMove(from, to)
+          case Role.King   => isValidKingMove(from, to)
 
         if !isValid then return this
 
@@ -45,7 +55,7 @@ final case class Board(
         finalSquares = updateSquare(finalSquares, to, Some(piece))
 
         // Handle en passant capture
-        if piece.pieceType == PieceType.Pawn && isEnPassantCapture(
+        if piece.role == Role.Pawn && isEnPassantCapture(
             from,
             to,
             piece.color
@@ -59,10 +69,10 @@ final case class Board(
   private def isValidPawnMove(
       from: Square,
       to: Square,
-      color: PieceColor
+      color: Color
   ): Boolean =
-    val direction = if color == PieceColor.White then 1 else -1
-    val startRank = if color == PieceColor.White then Rank._2 else Rank._7
+    val direction = if color == Color.White then 1 else -1
+    val startRank = if color == Color.White then Rank._2 else Rank._7
 
     // Pawn can only move forward
     val rankDiff = to.rank - from.rank
@@ -98,10 +108,10 @@ final case class Board(
   private def isEnPassantCapture(
       from: Square,
       to: Square,
-      color: PieceColor
+      color: Color
   ): Boolean =
-    val direction = if color == PieceColor.White then 1 else -1
-    val enPassantRank = if color == PieceColor.White then Rank._5 else Rank._4
+    val direction = if color == Color.White then 1 else -1
+    val enPassantRank = if color == Color.White then Rank._5 else Rank._4
 
     // En passant only valid on specific ranks
     if from.rank != enPassantRank then return false
@@ -118,9 +128,9 @@ final case class Board(
     lastMove match
       case Some((lastFrom, lastTo)) =>
         // Last move must be a pawn moving 2 squares
-        val lastDirection = if color == PieceColor.White then -1 else 1
+        val lastDirection = if color == Color.White then -1 else 1
         val lastStartRank =
-          if color == PieceColor.White then Rank._7 else Rank._2
+          if color == Color.White then Rank._7 else Rank._2
         val lastRankDiff = lastTo.rank - lastFrom.rank
 
         // Check if opponent pawn moved 2 squares from starting position
@@ -135,7 +145,7 @@ final case class Board(
         val capturedSquare = Square(to.file, from.rank)
         pieceAt(capturedSquare) match
           case Some(capturedPiece)
-              if capturedPiece.pieceType == PieceType.Pawn && capturedPiece.color != color =>
+              if capturedPiece.role == Role.Pawn && capturedPiece.color != color =>
             true
           case _ => false
       case None => false
@@ -187,6 +197,55 @@ final case class Board(
 
     true
 
+  def findKing(color: Color): Option[Square] =
+    Square.all.find { sq =>
+      pieceAt(sq) match
+        case Some(piece) => piece.role == Role.King && piece.color == color
+        case None        => false
+    }
+
+  def isAttackedBy(square: Square, attackerColor: Color): Boolean =
+    Square.all.exists { from =>
+      pieceAt(from) match
+        case Some(piece) if piece.color == attackerColor =>
+          piece.role match
+            case Role.Pawn =>
+              val direction = if attackerColor == Color.White then 1 else -1
+              val fileDiff = (square.file - from.file).abs
+              val rankDiff = square.rank - from.rank
+              fileDiff == 1 && rankDiff == direction
+            case Role.Knight => isValidKnightMove(from, square)
+            case Role.Bishop => isValidBishopMove(from, square)
+            case Role.Rook   => isValidRookMove(from, square)
+            case Role.Queen  => isValidQueenMove(from, square)
+            case Role.King   => isValidKingMove(from, square)
+        case _ => false
+    }
+
+  def isInCheck(color: Color): Boolean =
+    findKing(color) match
+      case Some(kingSquare) => isAttackedBy(kingSquare, color.opposite)
+      case None             => false
+
+  def legalMoves(color: Color): Vector[(Square, Square)] =
+    Square.all.flatMap { from =>
+      pieceAt(from) match
+        case Some(piece) if piece.color == color =>
+          Square.all
+            .filter { to =>
+              val candidate = applyMoveUnchecked(from, to)
+              !(candidate eq this) && !candidate.isInCheck(color)
+            }
+            .map(to => (from, to))
+        case _ => Vector.empty
+    }.toVector
+
+  def isCheckmate(color: Color): Boolean =
+    isInCheck(color) && legalMoves(color).isEmpty
+
+  def isStalemate(color: Color): Boolean =
+    !isInCheck(color) && legalMoves(color).isEmpty
+
   override def toString: String =
     val files = "  a b c d e f g h"
     val rows = for {
@@ -203,26 +262,26 @@ final case class Board(
     (files +: rows :+ files).mkString("\n")
 
 object Board:
-  private def backRank(color: PieceColor): Vector[Piece] =
+  private def backRank(color: Color): Vector[Piece] =
     Vector(
-      Piece(PieceType.Rook, color),
-      Piece(PieceType.Knight, color),
-      Piece(PieceType.Bishop, color),
-      Piece(PieceType.Queen, color),
-      Piece(PieceType.King, color),
-      Piece(PieceType.Bishop, color),
-      Piece(PieceType.Knight, color),
-      Piece(PieceType.Rook, color)
+      Piece(Role.Rook, color),
+      Piece(Role.Knight, color),
+      Piece(Role.Bishop, color),
+      Piece(Role.Queen, color),
+      Piece(Role.King, color),
+      Piece(Role.Bishop, color),
+      Piece(Role.Knight, color),
+      Piece(Role.Rook, color)
     )
 
   def initial: Board =
-    val blackRank = backRank(PieceColor.Black).map(Some(_))
+    val blackRank = backRank(Color.Black).map(Some(_))
     val blackPawns =
-      Vector.fill(8)(Some(Piece(PieceType.Pawn, PieceColor.Black)))
+      Vector.fill(8)(Some(Piece(Role.Pawn, Color.Black)))
     val empty = Vector.fill(4)(Vector.fill(8)(Option.empty[Piece]))
     val whitePawns =
-      Vector.fill(8)(Some(Piece(PieceType.Pawn, PieceColor.White)))
-    val whiteRank = backRank(PieceColor.White).map(Some(_))
+      Vector.fill(8)(Some(Piece(Role.Pawn, Color.White)))
+    val whiteRank = backRank(Color.White).map(Some(_))
 
     Board(
       Vector(

@@ -1,6 +1,6 @@
 package chess.controller
 
-import chess.model.{Board, PieceColor, Square, File, Rank}
+import chess.model.{Board, Color, Square, File, Rank}
 import chess.controller.parser.{PGNParser, FENParser}
 import scalafx.beans.property.ObjectProperty
 import scala.util.{Try, Success, Failure}
@@ -71,8 +71,8 @@ final class GameController(initialBoard: Board):
   def applyMove(from: Square, to: Square): Option[Board] = {
     board.pieceAt(from) match {
       case Some(piece)
-          if piece.color == (if (_isWhiteToMove) PieceColor.White
-                             else PieceColor.Black) =>
+          if piece.color == (if (_isWhiteToMove) Color.White
+                             else Color.Black) =>
         val nextBoard = board.move(from, to)
         if (nextBoard != board) {
           this.board = nextBoard
@@ -84,6 +84,21 @@ final class GameController(initialBoard: Board):
       case _ => None
     }
   }
+
+  def activeColor: Color =
+    if _isWhiteToMove then Color.White else Color.Black
+
+  def isInCheck: Boolean = board.isInCheck(activeColor)
+
+  def isCheckmate: Boolean = board.isCheckmate(activeColor)
+
+  def isStalemate: Boolean = board.isStalemate(activeColor)
+
+  def gameStatus: String =
+    if isCheckmate then s"Checkmate! ${activeColor.opposite} wins!"
+    else if isStalemate then "Stalemate! The game is a draw."
+    else if isInCheck then s"${activeColor} is in check!"
+    else s"${activeColor} to move"
 
   /** Apply a move to the given board and return the new board.
     * @deprecated

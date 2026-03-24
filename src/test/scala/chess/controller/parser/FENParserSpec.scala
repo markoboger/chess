@@ -1,6 +1,6 @@
 package chess.controller.parser
 
-import chess.model.{Board, Piece, PieceType, PieceColor, Square, File, Rank}
+import chess.model.{Board, Piece, Role, Color, Square, File, Rank}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import scala.util.{Success, Failure}
@@ -17,32 +17,32 @@ final class FENParserSpec extends AnyWordSpec with Matchers:
 
       // Check white pieces
       board.pieceAt(Square("a1")) should contain(
-        Piece(PieceType.Rook, PieceColor.White)
+        Piece(Role.Rook, Color.White)
       )
       board.pieceAt(Square("b1")) should contain(
-        Piece(PieceType.Knight, PieceColor.White)
+        Piece(Role.Knight, Color.White)
       )
       board.pieceAt(Square("e1")) should contain(
-        Piece(PieceType.King, PieceColor.White)
+        Piece(Role.King, Color.White)
       )
 
       // Check black pieces
       board.pieceAt(Square("a8")) should contain(
-        Piece(PieceType.Rook, PieceColor.Black)
+        Piece(Role.Rook, Color.Black)
       )
       board.pieceAt(Square("b8")) should contain(
-        Piece(PieceType.Knight, PieceColor.Black)
+        Piece(Role.Knight, Color.Black)
       )
       board.pieceAt(Square("e8")) should contain(
-        Piece(PieceType.King, PieceColor.Black)
+        Piece(Role.King, Color.Black)
       )
 
       // Check pawns
       board.pieceAt(Square("a2")) should contain(
-        Piece(PieceType.Pawn, PieceColor.White)
+        Piece(Role.Pawn, Color.White)
       )
       board.pieceAt(Square("a7")) should contain(
-        Piece(PieceType.Pawn, PieceColor.Black)
+        Piece(Role.Pawn, Color.Black)
       )
     }
 
@@ -69,7 +69,7 @@ final class FENParserSpec extends AnyWordSpec with Matchers:
       val board = result.get
 
       board.pieceAt(Square("e4")) should contain(
-        Piece(PieceType.Pawn, PieceColor.White)
+        Piece(Role.Pawn, Color.White)
       )
       board.pieceAt(Square("e2")) shouldBe empty
     }
@@ -82,10 +82,10 @@ final class FENParserSpec extends AnyWordSpec with Matchers:
       val board = result.get
 
       board.pieceAt(Square("e4")) should contain(
-        Piece(PieceType.Pawn, PieceColor.White)
+        Piece(Role.Pawn, Color.White)
       )
       board.pieceAt(Square("e5")) should contain(
-        Piece(PieceType.Pawn, PieceColor.Black)
+        Piece(Role.Pawn, Color.Black)
       )
     }
 
@@ -98,13 +98,13 @@ final class FENParserSpec extends AnyWordSpec with Matchers:
 
       // Check some key pieces
       board.pieceAt(Square("c4")) should contain(
-        Piece(PieceType.Bishop, PieceColor.White)
+        Piece(Role.Bishop, Color.White)
       )
       board.pieceAt(Square("f6")) should contain(
-        Piece(PieceType.Knight, PieceColor.Black)
+        Piece(Role.Knight, Color.Black)
       )
       board.pieceAt(Square("c6")) should contain(
-        Piece(PieceType.Knight, PieceColor.Black)
+        Piece(Role.Knight, Color.Black)
       )
     }
 
@@ -117,36 +117,36 @@ final class FENParserSpec extends AnyWordSpec with Matchers:
 
       // White pieces
       board.pieceAt(Square("a1")) should contain(
-        Piece(PieceType.Rook, PieceColor.White)
+        Piece(Role.Rook, Color.White)
       )
       board.pieceAt(Square("b1")) should contain(
-        Piece(PieceType.Knight, PieceColor.White)
+        Piece(Role.Knight, Color.White)
       )
       board.pieceAt(Square("c1")) should contain(
-        Piece(PieceType.Bishop, PieceColor.White)
+        Piece(Role.Bishop, Color.White)
       )
       board.pieceAt(Square("d1")) should contain(
-        Piece(PieceType.Queen, PieceColor.White)
+        Piece(Role.Queen, Color.White)
       )
       board.pieceAt(Square("e1")) should contain(
-        Piece(PieceType.King, PieceColor.White)
+        Piece(Role.King, Color.White)
       )
 
       // Black pieces
       board.pieceAt(Square("a8")) should contain(
-        Piece(PieceType.Rook, PieceColor.Black)
+        Piece(Role.Rook, Color.Black)
       )
       board.pieceAt(Square("b8")) should contain(
-        Piece(PieceType.Knight, PieceColor.Black)
+        Piece(Role.Knight, Color.Black)
       )
       board.pieceAt(Square("c8")) should contain(
-        Piece(PieceType.Bishop, PieceColor.Black)
+        Piece(Role.Bishop, Color.Black)
       )
       board.pieceAt(Square("d8")) should contain(
-        Piece(PieceType.Queen, PieceColor.Black)
+        Piece(Role.Queen, Color.Black)
       )
       board.pieceAt(Square("e8")) should contain(
-        Piece(PieceType.King, PieceColor.Black)
+        Piece(Role.King, Color.Black)
       )
     }
 
@@ -194,7 +194,7 @@ final class FENParserSpec extends AnyWordSpec with Matchers:
       val board = result.get
 
       board.pieceAt(Square("d5")) should contain(
-        Piece(PieceType.Queen, PieceColor.White)
+        Piece(Role.Queen, Color.White)
       )
       board.pieceAt(Square("a5")) shouldBe empty
       board.pieceAt(Square("h5")) shouldBe empty

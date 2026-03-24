@@ -1,6 +1,6 @@
 package chess.controller.parser
 
-import chess.model.{Board, Piece, PieceType, PieceColor, Square, File, Rank}
+import chess.model.{Board, Piece, Role, Color, Square, File, Rank}
 import scala.util.matching.Regex
 import scala.util.{Try, Success, Failure}
 
@@ -73,19 +73,19 @@ object PGNParser {
       isWhiteToMove: Boolean
   ): Try[(Square, Square)] = {
     val pieceType = pieceStr match {
-      case ""  => PieceType.Pawn
-      case "N" => PieceType.Knight
-      case "B" => PieceType.Bishop
-      case "R" => PieceType.Rook
-      case "Q" => PieceType.Queen
-      case "K" => PieceType.King
+      case ""  => Role.Pawn
+      case "N" => Role.Knight
+      case "B" => Role.Bishop
+      case "R" => Role.Rook
+      case "Q" => Role.Queen
+      case "K" => Role.King
       case _ =>
         return Failure(
           new IllegalArgumentException(s"Invalid piece: $pieceStr")
         )
     }
 
-    val color = if (isWhiteToMove) PieceColor.White else PieceColor.Black
+    val color = if (isWhiteToMove) Color.White else Color.Black
     val targetSquare = Square.fromString(target) match {
       case Some(sq) => sq
       case None =>
@@ -114,8 +114,8 @@ object PGNParser {
   }
 
   private def findPieceMatchingMove(
-      pieceType: PieceType,
-      color: PieceColor,
+      pieceType: Role,
+      color: Color,
       fileHint: String,
       rankHint: String,
       target: Square,
@@ -125,7 +125,7 @@ object PGNParser {
     val possiblePieces = for {
       square <- Square.all
       piece <- board.pieceAt(square)
-      if piece.pieceType == pieceType && piece.color == color
+      if piece.role == pieceType && piece.color == color
     } yield square
 
     // Filter pieces that can move to the target square
@@ -149,16 +149,16 @@ object PGNParser {
   private def isValidMove(
       from: Square,
       to: Square,
-      pieceType: PieceType,
-      color: PieceColor,
+      pieceType: Role,
+      color: Color,
       board: Board
   ): Boolean = {
     // This is a simplified version - a real implementation would need to handle all chess rules
     // including check detection, en passant, castling rights, etc.
     pieceType match {
-      case PieceType.Pawn =>
-        val direction = if (color == PieceColor.White) 1 else -1
-        val startRank = if (color == PieceColor.White) Rank._2 else Rank._7
+      case Role.Pawn =>
+        val direction = if (color == Color.White) 1 else -1
+        val startRank = if (color == Color.White) Rank._2 else Rank._7
         val isCapture = (to.file - from.file).abs == 1
 
         if (isCapture) {
@@ -183,30 +183,30 @@ object PGNParser {
           singleMove || doubleMove
         }
 
-      case PieceType.Knight =>
+      case Role.Knight =>
         val dx = (to.file - from.file).abs
         val dy = (to.rank - from.rank).abs
         (dx == 2 && dy == 1) || (dx == 1 && dy == 2)
 
-      case PieceType.Bishop =>
+      case Role.Bishop =>
         val dx = (to.file - from.file).abs
         val dy = (to.rank - from.rank).abs
         dx == dy && isPathClear(from, to, board)
 
-      case PieceType.Rook =>
+      case Role.Rook =>
         (from.file == to.file || from.rank == to.rank) && isPathClear(
           from,
           to,
           board
         )
 
-      case PieceType.Queen =>
+      case Role.Queen =>
         val dx = (to.file - from.file).abs
         val dy = (to.rank - from.rank).abs
         ((dx == dy) || (from.file == to.file || from.rank == to.rank)) &&
         isPathClear(from, to, board)
 
-      case PieceType.King =>
+      case Role.King =>
         val dx = (to.file - from.file).abs
         val dy = (to.rank - from.rank).abs
         dx <= 1 && dy <= 1

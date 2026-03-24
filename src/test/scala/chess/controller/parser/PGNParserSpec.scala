@@ -1,6 +1,6 @@
 package chess.controller.parser
 
-import chess.model.{Board, Piece, PieceType, PieceColor, Square, File, Rank}
+import chess.model.{Board, Piece, Role, Color, Square, File, Rank}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import scala.util.{Success, Failure, Try}

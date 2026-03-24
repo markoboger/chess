@@ -11,7 +11,8 @@ import scalafx.scene.shape.Rectangle
 import scalafx.scene.text.{Font, FontWeight, Text}
 import scalafx.stage.Stage
 import chess.controller.GameController
-import chess.model.{Board, PieceColor, Square, File, Rank}
+import chess.model.{Board, Square, File, Rank}
+import chess.model.{Color => ChessColor}
 import scala.compiletime.uninitialized
 import javafx.application.{Application, Platform}
 import javafx.application.Platform.{setImplicitExit}
@@ -269,8 +270,8 @@ class ChessGUI(val controller: GameController) {
       case None =>
         controller.board.pieceAt(square) match {
           case Some(piece)
-              if piece.color == (if (controller.isWhiteToMove) PieceColor.White
-                                 else PieceColor.Black) =>
+              if piece.color == (if (controller.isWhiteToMove) ChessColor.White
+                                 else ChessColor.Black) =>
             selectedSquare = Some(square)
           case _ => ()
         }
@@ -289,8 +290,8 @@ class ChessGUI(val controller: GameController) {
               controller.board.pieceAt(square) match {
                 case Some(piece)
                     if piece.color == (if (controller.isWhiteToMove)
-                                         PieceColor.White
-                                       else PieceColor.Black) =>
+                                         ChessColor.White
+                                       else ChessColor.Black) =>
                   selectedSquare = Some(square)
                 case _ =>
                   selectedSquare = None

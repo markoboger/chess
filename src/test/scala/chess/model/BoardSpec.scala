@@ -10,10 +10,10 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       val board = Board.initial
 
       board.pieceAt(Square("e1")) should contain(
-        Piece(PieceType.King, PieceColor.White)
+        Piece(Role.King, Color.White)
       )
       board.pieceAt(Square("e8")) should contain(
-        Piece(PieceType.King, PieceColor.Black)
+        Piece(Role.King, Color.Black)
       )
     }
 
@@ -21,10 +21,10 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       val board = Board.initial
 
       board.pieceAt(Square("a2")) should contain(
-        Piece(PieceType.Pawn, PieceColor.White)
+        Piece(Role.Pawn, Color.White)
       )
       board.pieceAt(Square("h7")) should contain(
-        Piece(PieceType.Pawn, PieceColor.Black)
+        Piece(Role.Pawn, Color.Black)
       )
     }
 
@@ -49,7 +49,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
 
       moved.pieceAt(Square("e2")) shouldBe empty
       moved.pieceAt(Square("e4")) should contain(
-        Piece(PieceType.Pawn, PieceColor.White)
+        Piece(Role.Pawn, Color.White)
       )
     }
 
@@ -65,7 +65,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
 
       afterCapture.pieceAt(Square("e4")) shouldBe empty
       afterCapture.pieceAt(Square("d5")) should contain(
-        Piece(PieceType.Pawn, PieceColor.White)
+        Piece(Role.Pawn, Color.White)
       )
     }
   }
@@ -76,7 +76,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       val board = FENParser.parseFEN("8/8/8/8/8/8/8/R3K3").get
       val moved = board.move(Square("a1"), Square("a8"))
       moved.pieceAt(Square("a8")) should contain(
-        Piece(PieceType.Rook, PieceColor.White)
+        Piece(Role.Rook, Color.White)
       )
       moved.pieceAt(Square("a1")) shouldBe empty
     }
@@ -85,7 +85,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       val board = FENParser.parseFEN("8/8/8/8/8/8/8/R3K3").get
       val moved = board.move(Square("a1"), Square("d1"))
       moved.pieceAt(Square("d1")) should contain(
-        Piece(PieceType.Rook, PieceColor.White)
+        Piece(Role.Rook, Color.White)
       )
     }
 
@@ -106,7 +106,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       val board = FENParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
       val moved = board.move(Square("d1"), Square("h5"))
       moved.pieceAt(Square("h5")) should contain(
-        Piece(PieceType.Queen, PieceColor.White)
+        Piece(Role.Queen, Color.White)
       )
     }
 
@@ -114,7 +114,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       val board = FENParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
       val moved = board.move(Square("d1"), Square("d8"))
       moved.pieceAt(Square("d8")) should contain(
-        Piece(PieceType.Queen, PieceColor.White)
+        Piece(Role.Queen, Color.White)
       )
     }
 
@@ -144,7 +144,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       val board = FENParser.parseFEN("8/8/3p4/4P3/8/8/8/4K3").get
       val moved = board.move(Square("e5"), Square("d6"))
       moved.pieceAt(Square("d6")) should contain(
-        Piece(PieceType.Pawn, PieceColor.White)
+        Piece(Role.Pawn, Color.White)
       )
       moved.pieceAt(Square("e5")) shouldBe empty
     }
@@ -154,7 +154,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       val board = FENParser.parseFEN("8/8/8/4P3/8/8/8/4K3").get
       val moved = board.move(Square("e5"), Square("e6"))
       moved.pieceAt(Square("e6")) should contain(
-        Piece(PieceType.Pawn, PieceColor.White)
+        Piece(Role.Pawn, Color.White)
       )
     }
 

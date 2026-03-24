@@ -15,7 +15,7 @@ class EnPassantSpec extends AnyWordSpec with Matchers {
 
         afterCapture should not equal afterD5
         afterCapture.pieceAt(Square("d5")) shouldEqual Some(
-          Piece(PieceType.Pawn, PieceColor.White)
+          Piece(Role.Pawn, Color.White)
         )
         afterCapture.pieceAt(Square("d4")) shouldEqual None
       }
@@ -28,7 +28,7 @@ class EnPassantSpec extends AnyWordSpec with Matchers {
 
         afterCapture should not equal afterE5
         afterCapture.pieceAt(Square("e5")) shouldEqual Some(
-          Piece(PieceType.Pawn, PieceColor.White)
+          Piece(Role.Pawn, Color.White)
         )
         afterCapture.pieceAt(Square("e4")) shouldEqual None
       }
@@ -46,7 +46,7 @@ class EnPassantSpec extends AnyWordSpec with Matchers {
 
         afterCapture should not equal afterC4
         afterCapture.pieceAt(Square("c3")) shouldEqual Some(
-          Piece(PieceType.Pawn, PieceColor.Black)
+          Piece(Role.Pawn, Color.Black)
         )
         afterCapture.pieceAt(Square("c4")) shouldEqual None
       }
