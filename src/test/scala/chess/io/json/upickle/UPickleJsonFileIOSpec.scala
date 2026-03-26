@@ -3,7 +3,7 @@ package chess.io.json.upickle
 import chess.io.FileIO
 import chess.io.json.circe.CirceJsonFileIO
 import chess.model.{Board, Piece, Color, Role, Square, File, Rank}
-import chess.controller.parser.FENParser
+import chess.io.fen.RegexFenParser
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -54,7 +54,9 @@ class UPickleJsonFileIOSpec extends AnyWordSpec with Matchers {
 
     "round-trip a FEN-loaded mid-game position" in {
       val board =
-        FENParser.parseFEN("r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR").get
+        RegexFenParser
+          .parseFEN("r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR")
+          .get
       val json = fileIO.save(board)
       val loaded = fileIO.load(json)
 
@@ -69,16 +71,24 @@ class UPickleJsonFileIOSpec extends AnyWordSpec with Matchers {
 
       // Check white pieces
       loaded.pieceAt(Square("a1")) shouldBe Some(Piece(Role.Rook, Color.White))
-      loaded.pieceAt(Square("b1")) shouldBe Some(Piece(Role.Knight, Color.White))
-      loaded.pieceAt(Square("c1")) shouldBe Some(Piece(Role.Bishop, Color.White))
+      loaded.pieceAt(Square("b1")) shouldBe Some(
+        Piece(Role.Knight, Color.White)
+      )
+      loaded.pieceAt(Square("c1")) shouldBe Some(
+        Piece(Role.Bishop, Color.White)
+      )
       loaded.pieceAt(Square("d1")) shouldBe Some(Piece(Role.Queen, Color.White))
       loaded.pieceAt(Square("e1")) shouldBe Some(Piece(Role.King, Color.White))
       loaded.pieceAt(Square("e2")) shouldBe Some(Piece(Role.Pawn, Color.White))
 
       // Check black pieces
       loaded.pieceAt(Square("a8")) shouldBe Some(Piece(Role.Rook, Color.Black))
-      loaded.pieceAt(Square("b8")) shouldBe Some(Piece(Role.Knight, Color.Black))
-      loaded.pieceAt(Square("c8")) shouldBe Some(Piece(Role.Bishop, Color.Black))
+      loaded.pieceAt(Square("b8")) shouldBe Some(
+        Piece(Role.Knight, Color.Black)
+      )
+      loaded.pieceAt(Square("c8")) shouldBe Some(
+        Piece(Role.Bishop, Color.Black)
+      )
       loaded.pieceAt(Square("d8")) shouldBe Some(Piece(Role.Queen, Color.Black))
       loaded.pieceAt(Square("e8")) shouldBe Some(Piece(Role.King, Color.Black))
       loaded.pieceAt(Square("e7")) shouldBe Some(Piece(Role.Pawn, Color.Black))

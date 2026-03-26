@@ -1,6 +1,6 @@
 package chess.model
 
-import chess.controller.parser.FENParser
+import chess.io.fen.RegexFenParser
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -75,7 +75,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
   "Board piece moves" should {
     "allow valid rook moves on open files" in {
       // FEN with rook on a1 and no obstructions on file a
-      val board = FENParser.parseFEN("8/8/8/8/8/8/8/R3K3").get
+      val board = RegexFenParser.parseFEN("8/8/8/8/8/8/8/R3K3").get
       val result = board.move(Square("a1"), Square("a8"))
       result.isSuccess shouldBe true
       result.board.pieceAt(Square("a8")) should contain(
@@ -85,7 +85,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
     }
 
     "allow valid rook moves along ranks" in {
-      val board = FENParser.parseFEN("8/8/8/8/8/8/8/R3K3").get
+      val board = RegexFenParser.parseFEN("8/8/8/8/8/8/8/R3K3").get
       val result = board.move(Square("a1"), Square("d1"))
       result.isSuccess shouldBe true
       result.board.pieceAt(Square("d1")) should contain(
@@ -94,20 +94,20 @@ final class BoardSpec extends AnyWordSpec with Matchers:
     }
 
     "reject rook move to same square" in {
-      val board = FENParser.parseFEN("8/8/8/8/8/8/8/R3K3").get
+      val board = RegexFenParser.parseFEN("8/8/8/8/8/8/8/R3K3").get
       val result = board.move(Square("a1"), Square("a1"))
       result.isFailed shouldBe true
     }
 
     "reject rook move when path is blocked" in {
       // Rook on a1 blocked by pawn on a2
-      val board = FENParser.parseFEN("8/8/8/8/8/8/P7/R3K3").get
+      val board = RegexFenParser.parseFEN("8/8/8/8/8/8/P7/R3K3").get
       val result = board.move(Square("a1"), Square("a4"))
       result.isFailed shouldBe true
     }
 
     "allow valid queen diagonal moves" in {
-      val board = FENParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
+      val board = RegexFenParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
       val result = board.move(Square("d1"), Square("h5"))
       result.isSuccess shouldBe true
       result.board.pieceAt(Square("h5")) should contain(
@@ -116,7 +116,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
     }
 
     "allow valid queen straight moves" in {
-      val board = FENParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
+      val board = RegexFenParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
       val result = board.move(Square("d1"), Square("d8"))
       result.isSuccess shouldBe true
       result.board.pieceAt(Square("d8")) should contain(
@@ -125,19 +125,19 @@ final class BoardSpec extends AnyWordSpec with Matchers:
     }
 
     "reject queen L-shape move" in {
-      val board = FENParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
+      val board = RegexFenParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
       val result = board.move(Square("d1"), Square("e3"))
       result.isFailed shouldBe true
     }
 
     "reject queen move to same square" in {
-      val board = FENParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
+      val board = RegexFenParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
       val result = board.move(Square("d1"), Square("d1"))
       result.isFailed shouldBe true
     }
 
     "reject queen move when path is blocked" in {
-      val board = FENParser.parseFEN("8/8/8/8/8/8/3P4/3QK3").get
+      val board = RegexFenParser.parseFEN("8/8/8/8/8/8/3P4/3QK3").get
       val result = board.move(Square("d1"), Square("d4"))
       result.isFailed shouldBe true
     }
@@ -147,7 +147,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
     "not remove captured piece on regular diagonal capture from rank 5" in {
       // White pawn on e5 captures black pawn on d6 (regular capture, not en passant)
       // This triggers isEnPassantCapture from move execution (line 48) where pieceAt(to) is defined
-      val board = FENParser.parseFEN("8/8/3p4/4P3/8/8/8/4K3").get
+      val board = RegexFenParser.parseFEN("8/8/3p4/4P3/8/8/8/4K3").get
       val result = board.move(Square("e5"), Square("d6"))
       result.isSuccess shouldBe true
       result.board.pieceAt(Square("d6")) should contain(
@@ -158,7 +158,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
 
     "not trigger en passant on forward pawn move from rank 5" in {
       // Forward move from rank 5 - triggers isEnPassantCapture from line 48, hits fileDiff!=1
-      val board = FENParser.parseFEN("8/8/8/4P3/8/8/8/4K3").get
+      val board = RegexFenParser.parseFEN("8/8/8/4P3/8/8/8/4K3").get
       val result = board.move(Square("e5"), Square("e6"))
       result.isSuccess shouldBe true
       result.board.pieceAt(Square("e6")) should contain(
@@ -168,7 +168,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
 
     "reject en passant when last move distance is wrong from starting rank" in {
       // lastMove from rank 7 but only 1 square (not 2) - hits line 128
-      val board = FENParser.parseFEN("8/8/8/4P3/8/8/8/4K3").get
+      val board = RegexFenParser.parseFEN("8/8/8/4P3/8/8/8/4K3").get
       val boardWithLastMove =
         board.copy(lastMove = Some((Square("d7"), Square("d6"))))
       val result = boardWithLastMove.move(Square("e5"), Square("d6"))
@@ -177,14 +177,14 @@ final class BoardSpec extends AnyWordSpec with Matchers:
 
     "reject en passant when pawn is not on correct rank" in {
       // White pawn on e4 (not rank 5), trying diagonal move to empty d5
-      val board = FENParser.parseFEN("8/8/8/8/4P3/8/8/4K3").get
+      val board = RegexFenParser.parseFEN("8/8/8/8/4P3/8/8/4K3").get
       val result = board.move(Square("e4"), Square("d5"))
       // Diagonal pawn move to empty square with no en passant possible - rejected
       result.isFailed shouldBe true
     }
 
     "reject en passant when last move was not a 2-square pawn advance" in {
-      val board = FENParser.parseFEN("8/8/8/3pP3/8/8/8/4K3").get
+      val board = RegexFenParser.parseFEN("8/8/8/3pP3/8/8/8/4K3").get
       // Last move was d6->d5 (1-square move, not 2-square)
       val boardWithLastMove =
         board.copy(lastMove = Some((Square("d6"), Square("d5"))))
@@ -193,7 +193,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
     }
 
     "reject en passant when last move target is on wrong rank" in {
-      val board = FENParser.parseFEN("8/8/8/4P3/3p4/8/8/4K3").get
+      val board = RegexFenParser.parseFEN("8/8/8/4P3/3p4/8/8/4K3").get
       // Last move was d6->d4, but d4 is not on same rank as e5
       val boardWithLastMove =
         board.copy(lastMove = Some((Square("d6"), Square("d4"))))
@@ -202,7 +202,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
     }
 
     "reject en passant when last move file doesn't match target" in {
-      val board = FENParser.parseFEN("8/8/8/2ppP3/8/8/8/4K3").get
+      val board = RegexFenParser.parseFEN("8/8/8/2ppP3/8/8/8/4K3").get
       // Last move was c7->c5, but we try to capture on d6
       val boardWithLastMove =
         board.copy(lastMove = Some((Square("c7"), Square("c5"))))
@@ -211,14 +211,14 @@ final class BoardSpec extends AnyWordSpec with Matchers:
     }
 
     "reject en passant when there is no last move" in {
-      val board = FENParser.parseFEN("8/8/8/3pP3/8/8/8/4K3").get
+      val board = RegexFenParser.parseFEN("8/8/8/3pP3/8/8/8/4K3").get
       // No lastMove set
       val result = board.move(Square("e5"), Square("d6"))
       result.isFailed shouldBe true
     }
 
     "reject en passant when captured piece is not a pawn" in {
-      val board = FENParser.parseFEN("8/8/8/3nP3/8/8/8/4K3").get
+      val board = RegexFenParser.parseFEN("8/8/8/3nP3/8/8/8/4K3").get
       // Fake lastMove suggesting a 2-square move (but it's a knight, not a pawn)
       val boardWithLastMove =
         board.copy(lastMove = Some((Square("d7"), Square("d5"))))
@@ -229,7 +229,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
 
   "Board.applyMoveUnchecked" should {
     "return same board when source square is empty" in {
-      val board = FENParser.parseFEN("8/8/8/8/8/8/8/4K3").get
+      val board = RegexFenParser.parseFEN("8/8/8/8/8/8/8/4K3").get
       val result = board.applyMoveUnchecked(Square("a1"), Square("a2"))
       result should be theSameInstanceAs board
     }

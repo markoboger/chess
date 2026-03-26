@@ -1,11 +1,15 @@
 package chess.controller
 
 import chess.model.{Board, Color, Square, File, Rank, MoveResult, MoveError}
-import chess.controller.parser.{PGNParser, FENParser}
+import chess.io.{FenIO, PgnIO}
+import chess.io.pgn.PGNParser
 import chess.util.Observable
 import scala.util.{Try, Success, Failure}
 
-final class GameController(initialBoard: Board) extends Observable[MoveResult]:
+final class GameController(initialBoard: Board)(using
+    val fenIO: FenIO,
+    val pgnIO: PgnIO
+) extends Observable[MoveResult]:
   private var currentBoard: Board = initialBoard
   private var _isWhiteToMove: Boolean = true
 
@@ -33,13 +37,7 @@ final class GameController(initialBoard: Board) extends Observable[MoveResult]:
   def isAtLatest: Boolean = _currentIndex == _boardStates.length - 1
 
   /** Format the move history as a PGN move text. */
-  def pgnText: String = {
-    _pgnMoves.zipWithIndex
-      .map { case (move, i) =>
-        if (i % 2 == 0) s"${i / 2 + 1}. $move" else move
-      }
-      .mkString(" ")
-  }
+  def pgnText: String = pgnIO.save(_pgnMoves)
 
   /** Navigate one move backward. */
   def backward(): Unit = {
@@ -83,7 +81,7 @@ final class GameController(initialBoard: Board) extends Observable[MoveResult]:
     *   Either the new board or an error message
     */
   def loadFromFEN(fen: String): Either[String, Board] = {
-    FENParser.parseFEN(fen) match {
+    fenIO.load(fen) match {
       case Success(newBoard) =>
         currentBoard = newBoard
         resetHistory(newBoard)
@@ -99,7 +97,7 @@ final class GameController(initialBoard: Board) extends Observable[MoveResult]:
     *   The FEN string representing the current board
     */
   def getBoardAsFEN: String = {
-    FENParser.boardToFEN(board)
+    fenIO.save(board)
   }
 
   /** Apply a move using PGN notation (e.g., "e4", "Nf3", "O-O").
@@ -145,6 +143,28 @@ final class GameController(initialBoard: Board) extends Observable[MoveResult]:
       case None    => MoveResult.Failed(board, MoveError.NoPiece)
     notifyObservers(result)
     result
+
+  /** Load a game from PGN move text (e.g. "1. e4 e5 2. Nf3 Nc6"). Resets to the
+    * initial board and applies all moves in sequence.
+    * @return
+    *   Right(board) on success, Left(error) if any move fails
+    */
+  def loadPgnMoves(pgnText: String): Either[String, Board] = {
+    pgnIO.load(pgnText) match {
+      case Failure(e) => Left(e.getMessage)
+      case Success(tokens) =>
+        announceInitial(Board.initial)
+        tokens.zipWithIndex.foldLeft[Either[String, Board]](Right(board)) {
+          case (Left(err), _) => Left(err)
+          case (Right(_), (token, i)) =>
+            applyPgnMove(token) match {
+              case _: MoveResult.Moved => Right(board)
+              case MoveResult.Failed(_, error) =>
+                Left(s"Failed at move ${i + 1} ('$token'): ${error.message}")
+            }
+        }
+    }
+  }
 
   def activeColor: Color =
     if _isWhiteToMove then Color.White else Color.Black

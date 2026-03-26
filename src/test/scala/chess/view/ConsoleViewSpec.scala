@@ -1,11 +1,17 @@
 package chess.view
 
 import chess.controller.GameController
+import chess.io.{FenIO, PgnIO}
+import chess.io.fen.RegexFenParser
+import chess.io.pgn.PgnFileIO
 import chess.model.Board
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 final class ConsoleViewSpec extends AnyWordSpec with Matchers:
+
+  given FenIO = RegexFenParser
+  given PgnIO = PgnFileIO()
   "ConsoleView" should {
     "render ranks and files with coordinate labels" in {
       val controller = new GameController(Board.initial)

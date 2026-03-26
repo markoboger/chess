@@ -2,6 +2,7 @@ package chess.controller.parser
 
 import chess.model.{Board, Color, MoveResult, GameEvent}
 import chess.controller.GameController
+import chess.AppBindings.given
 
 object PGNExample extends App {
   // Initialize the game with the starting position

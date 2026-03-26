@@ -10,7 +10,9 @@ import chess.model.{
   MoveError,
   GameEvent
 }
-import chess.controller.parser.FENParser
+import chess.io.{FenIO, PgnIO}
+import chess.io.fen.RegexFenParser
+import chess.io.pgn.PgnFileIO
 import chess.util.Observer
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -21,6 +23,9 @@ class TestObserver extends Observer[MoveResult]:
   override def update(event: MoveResult): Unit = lastEvent = Some(event)
 
 final class GameControllerSpec extends AnyWordSpec with Matchers:
+
+  given FenIO = RegexFenParser
+  given PgnIO = PgnFileIO()
 
   "GameController" should {
     "announce the initial board to observers" in {
@@ -201,13 +206,14 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
     }
 
     "report check via gameStatus" in {
-      val board = FENParser.parseFEN("4k3/8/8/8/8/8/8/4RK2").get
+      val board = RegexFenParser.parseFEN("4k3/8/8/8/8/8/8/4RK2").get
       val controller = new GameController(board)
       // It's white to move, but let's set up black to move scenario
       // Actually, with white to move and black king in check from rook,
       // we need to check from black's perspective
       // Let's use a position where white is in check
-      val boardWhiteInCheck = FENParser.parseFEN("4k3/8/8/8/8/8/8/3rK3").get
+      val boardWhiteInCheck =
+        RegexFenParser.parseFEN("4k3/8/8/8/8/8/8/3rK3").get
       val ctrl2 = new GameController(boardWhiteInCheck)
       ctrl2.isInCheck shouldBe true
       ctrl2.gameStatus should include("check")
@@ -215,17 +221,17 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
 
     "report checkmate via gameStatus" in {
       // White king on a1, black queen on b2 (protected by black king on c3)
-      val matedBoard = FENParser.parseFEN("8/8/8/8/8/2k5/1q6/K7").get
+      val matedBoard = RegexFenParser.parseFEN("8/8/8/8/8/2k5/1q6/K7").get
       val ctrl = new GameController(matedBoard)
       ctrl.isCheckmate shouldBe true
       ctrl.gameStatus should include("Checkmate")
     }
 
     "report stalemate via gameStatus" in {
-      val board = FENParser.parseFEN("k7/8/1Q6/8/8/8/8/2K5").get
+      val board = RegexFenParser.parseFEN("k7/8/1Q6/8/8/8/8/2K5").get
       // Black to move, but controller starts with white to move
       // Need white stalemated: king on a1, black queen on b3
-      val stalemateBoard = FENParser.parseFEN("7k/8/8/8/8/1q6/8/K7").get
+      val stalemateBoard = RegexFenParser.parseFEN("7k/8/8/8/8/1q6/8/K7").get
       val ctrl = new GameController(stalemateBoard)
       // White king on a1, black queen on b3: king can go to a2 (attacked by q), b1 (attacked by q), b2 (attacked by q)
       // Actually a1 king, b3 queen: a2 is attacked diag by queen. b1 attacked by queen on rank. b2 attacked diag.
@@ -359,5 +365,98 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       controller.boardStates.length shouldBe 1
       controller.pgnMoves shouldBe empty
       controller.currentIndex shouldBe 0
+    }
+  }
+
+  "GameController.loadPgnMoves" should {
+    "load a sequence of PGN moves with move numbers" in {
+      val controller = new GameController(Board.initial)
+      val result = controller.loadPgnMoves("1. e4 e5 2. Nf3 Nc6")
+      result.isRight shouldBe true
+      controller.pgnMoves.length shouldBe 4
+      controller.boardStates.length shouldBe 5
+      controller.currentIndex shouldBe 4
+      controller.isAtLatest shouldBe true
+    }
+
+    "load moves without move numbers" in {
+      val controller = new GameController(Board.initial)
+      val result = controller.loadPgnMoves("e4 e5 Nf3 Nc6")
+      result.isRight shouldBe true
+      controller.pgnMoves.length shouldBe 4
+    }
+
+    "strip comments and results" in {
+      val controller = new GameController(Board.initial)
+      val result = controller.loadPgnMoves("1. e4 {best move} e5 1-0")
+      result.isRight shouldBe true
+      controller.pgnMoves.length shouldBe 2
+    }
+
+    "strip variations in parentheses" in {
+      val controller = new GameController(Board.initial)
+      val result = controller.loadPgnMoves("1. e4 e5 (1... c5) 2. Nf3")
+      result.isRight shouldBe true
+      controller.pgnMoves.length shouldBe 3
+    }
+
+    "return Left on empty input" in {
+      val controller = new GameController(Board.initial)
+      val result = controller.loadPgnMoves("")
+      result.isLeft shouldBe true
+      result.left.getOrElse("") should include("No moves found")
+    }
+
+    "return Left on input with only move numbers and results" in {
+      val controller = new GameController(Board.initial)
+      val result = controller.loadPgnMoves("1. 2. 1/2-1/2")
+      result.isLeft shouldBe true
+    }
+
+    "return Left on invalid move" in {
+      val controller = new GameController(Board.initial)
+      val result = controller.loadPgnMoves("1. e4 e5 2. Qh8")
+      result.isLeft shouldBe true
+      result.left.getOrElse("") should include("Failed at move 3")
+    }
+
+    "reset board to initial before applying moves" in {
+      val controller = new GameController(Board.initial)
+      // Make some moves first
+      controller.applyMove(Square("d2"), Square("d4"))
+      controller.pgnMoves.length shouldBe 1
+
+      // Load PGN should reset and start fresh
+      controller.loadPgnMoves("1. e4 e5")
+      controller.pgnMoves.length shouldBe 2
+      controller.boardStates.head shouldBe Board.initial
+    }
+
+    "allow navigation after loading" in {
+      val controller = new GameController(Board.initial)
+      controller.loadPgnMoves("1. e4 e5 2. Nf3")
+      controller.currentIndex shouldBe 3
+
+      controller.backward()
+      controller.currentIndex shouldBe 2
+      controller.isAtLatest shouldBe false
+
+      controller.forward()
+      controller.currentIndex shouldBe 3
+      controller.isAtLatest shouldBe true
+    }
+
+    "handle result markers *" in {
+      val controller = new GameController(Board.initial)
+      val result = controller.loadPgnMoves("1. e4 e5 *")
+      result.isRight shouldBe true
+      controller.pgnMoves.length shouldBe 2
+    }
+
+    "propagate first error when multiple moves follow a bad one" in {
+      val controller = new GameController(Board.initial)
+      val result = controller.loadPgnMoves("1. e4 Qh8 Nf3 Nc6")
+      result.isLeft shouldBe true
+      result.left.getOrElse("") should include("Failed at move 2")
     }
   }

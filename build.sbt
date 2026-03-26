@@ -34,9 +34,11 @@ lazy val Chess = project
       "io.circe" %% "circe-core" % "0.14.10",
       "io.circe" %% "circe-generic" % "0.14.10",
       "io.circe" %% "circe-parser" % "0.14.10",
-      "com.lihaoyi" %% "upickle" % "4.0.2"
+      "com.lihaoyi" %% "upickle" % "4.0.2",
+      "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0",
+      "com.lihaoyi" %% "fastparse" % "3.1.1"
     ),
-    coverageExcludedFiles := ".*view/.*;.*ChessApp.*;.*FENExample.*;.*PGNExample.*",
+    coverageExcludedFiles := ".*view/.*;.*ChessApp.*;.*FENExample.*;.*PGNExample.*;.*FastParseFenParser.*;.*FastParsePgnParser.*;.*AppBindings.*",
     coverageMinimumStmtTotal := 40,
     coverageFailOnMinimum := false
   )

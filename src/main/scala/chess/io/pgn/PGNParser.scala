@@ -1,4 +1,4 @@
-package chess.controller.parser
+package chess.io.pgn
 
 import chess.model.{Board, Piece, Role, Color, Square, File, Rank}
 import scala.util.matching.Regex

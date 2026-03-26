@@ -2,6 +2,7 @@ package chess.controller.parser
 
 import chess.model.{Board, Square, File, Rank}
 import chess.controller.GameController
+import chess.AppBindings.given
 
 object FENExample extends App {
   println("=== FEN Notation Example ===\n")

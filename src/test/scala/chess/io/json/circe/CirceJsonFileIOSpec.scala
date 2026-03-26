@@ -2,7 +2,7 @@ package chess.io.json.circe
 
 import chess.io.FileIO
 import chess.model.{Board, Piece, Color, Role, Square, File, Rank}
-import chess.controller.parser.FENParser
+import chess.io.fen.RegexFenParser
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -52,7 +52,7 @@ class CirceJsonFileIOSpec extends AnyWordSpec with Matchers {
     }
 
     "round-trip a FEN-loaded mid-game position" in {
-      val board = FENParser
+      val board = RegexFenParser
         .parseFEN("r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR")
         .get
       val json = fileIO.save(board)

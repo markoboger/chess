@@ -1,9 +1,10 @@
-package chess.controller.parser
+package chess.io.fen
 
+import chess.io.FenIO
 import chess.model.{Board, Piece, Role, Color}
 import scala.util.{Try, Success, Failure}
 
-object FENParser {
+object RegexFenParser extends FenIO {
 
   /** Parses a FEN (Forsyth-Edwards Notation) string and returns a Board. FEN
     * format: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -134,4 +135,10 @@ object FENParser {
     }
     if (piece.color == Color.White) char.toUpper else char
   }
+
+  // --- FenIO interface ------------------------------------------------------
+
+  override def save(board: Board): String = boardToFEN(board)
+
+  override def load(input: String): Try[Board] = parseFEN(input)
 }

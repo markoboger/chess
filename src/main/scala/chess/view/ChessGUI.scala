@@ -8,16 +8,25 @@ import scalafx.scene.control._
 import scalafx.scene.layout._
 import scalafx.scene.paint.Color
 import scalafx.scene.shape.Rectangle
-import scalafx.scene.text.{Font, FontWeight, Text}
+import scalafx.scene.text.{Font, FontWeight, Text, TextFlow}
 import scalafx.stage.Stage
+import scalafx.stage.FileChooser
+import scalafx.stage.FileChooser.ExtensionFilter
 import chess.controller.GameController
 import chess.model.{Board, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.model.{Color => ChessColor}
+import chess.io.FileIO
+import chess.io.json.circe.CirceJsonFileIO
+import chess.io.json.upickle.UPickleJsonFileIO
+import chess.AppBindings.given
 import chess.util.Observer
 import scala.compiletime.uninitialized
 import javafx.application.{Application, Platform}
 import javafx.application.Platform.{setImplicitExit}
 import java.awt.Desktop
+import java.io.{File => JFile, PrintWriter}
+import scala.io.Source
+import scala.util.{Try, Success, Failure}
 
 class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   controller.add(this)
@@ -32,7 +41,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var playerLabel: Label = uninitialized
   private var moveInput: TextField = uninitialized
   private var fenDisplay: TextArea = uninitialized
-  private var pgnDisplay: TextArea = uninitialized
+  private var pgnDisplay: TextFlow = uninitialized
+  private var pgnScrollPane: ScrollPane = uninitialized
   private[view] var initialized: Boolean = false
 
   override def update(event: MoveResult): Unit = {
@@ -49,7 +59,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
               if (controller.isWhiteToMove) "White to move" else "Black to move"
           }
           fenDisplay.text = controller.getBoardAsFEN
-          pgnDisplay.text = controller.pgnText
+          updatePgnDisplay()
           updateBoard()
         case MoveResult.Failed(_, _) =>
           // Errors are handled inline by the originating action
@@ -173,12 +183,16 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       padding = Insets(10, 0, 5, 0)
     }
 
-    pgnDisplay = new TextArea {
-      text = ""
-      prefRowCount = 6
-      wrapText = true
-      editable = false
-      style = "-fx-font-family: monospace;"
+    pgnDisplay = new TextFlow {
+      padding = Insets(5)
+      prefWidth = 250
+    }
+
+    pgnScrollPane = new ScrollPane {
+      content = pgnDisplay
+      prefHeight = 120
+      fitToWidth = true
+      style = "-fx-background-color: white;"
     }
 
     val backButton = new Button("\u25C0 Back") {
@@ -204,34 +218,59 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       children = Seq(backButton, forwardButton)
     }
 
-    // FEN section
-    val fenLabel = new Label("FEN Position:") {
+    // Paste input section — accepts both FEN and PGN
+    val pasteLabel = new Label("Paste PGN or FEN:") {
+      font = Font.font("Arial", FontWeight.Normal, 14)
+      padding = Insets(10, 0, 5, 0)
+    }
+
+    val pasteInput = new TextArea {
+      promptText =
+        "Paste PGN moves (e.g. 1. e4 e5 2. Nf3 ...)\nor a FEN string here"
+      prefRowCount = 4
+      wrapText = true
+      style = "-fx-font-family: monospace; -fx-font-size: 12px;"
+    }
+
+    val loadButton = new Button("Load") {
+      prefWidth = 120
+      style =
+        "-fx-font-size: 13px; -fx-padding: 8px; -fx-background-color: #4CAF50; -fx-text-fill: white;"
+      onAction = _ => {
+        val input = pasteInput.text.value.trim
+        if (input.nonEmpty) {
+          loadPgnOrFen(input)
+          selectedSquare = None
+        }
+      }
+    }
+
+    val clearPasteButton = new Button("Clear") {
+      prefWidth = 120
+      style = "-fx-font-size: 13px; -fx-padding: 8px;"
+      onAction = _ => pasteInput.text = ""
+    }
+
+    val loadButtonBox = new HBox(10) {
+      alignment = Pos.Center
+      children = Seq(loadButton, clearPasteButton)
+    }
+
+    // FEN display (read-only)
+    val fenLabel = new Label("FEN:") {
       font = Font.font("Arial", FontWeight.Normal, 14)
       padding = Insets(10, 0, 5, 0)
     }
 
     fenDisplay = new TextArea {
       text = controller.getBoardAsFEN
-      prefRowCount = 4
+      prefRowCount = 2
       wrapText = true
+      editable = false
+      style =
+        "-fx-font-family: monospace; -fx-font-size: 11px; -fx-opacity: 0.9;"
     }
 
-    val fenLoadButton = new Button("Load FEN") {
-      prefWidth = 250
-      style = "-fx-font-size: 14px; -fx-padding: 10px;"
-      onAction = _ => {
-        val fen = fenDisplay.text.value.trim
-        if (fen.nonEmpty) {
-          controller.loadFromFEN(fen) match {
-            case Right(_) =>
-              selectedSquare = None
-            // Display updated by observer update()
-            case Left(error) =>
-              showAlert("Invalid FEN", error)
-          }
-        }
-      }
-    }
     // New Game button
     val resetButton = new Button("New Game") {
       prefWidth = 250
@@ -242,7 +281,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         controller.announceInitial(Board.initial)
         selectedSquare = None
         moveInput.text = ""
-        pgnDisplay.text = ""
+        pgnDisplay.children.clear()
+        pasteInput.text = ""
       }
     }
 
@@ -258,12 +298,15 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         moveButton,
         new Separator(),
         pgnLabel,
-        pgnDisplay,
+        pgnScrollPane,
         navButtonBox,
+        new Separator(),
+        pasteLabel,
+        pasteInput,
+        loadButtonBox,
         new Separator(),
         fenLabel,
         fenDisplay,
-        fenLoadButton,
         new Separator(),
         resetButton
       )
@@ -296,6 +339,41 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
           showAlert("Illegal Move - Chess Rules Violation", detailedError)
       }
     }
+  }
+
+  private def updatePgnDisplay(): Unit = {
+    pgnDisplay.children.clear()
+    val moves = controller.pgnMoves
+    val boldIndex =
+      controller.currentIndex - 1 // move that led to the current position
+
+    moves.zipWithIndex.foreach { case (move, i) =>
+      // Add move number before white's moves (even indices)
+      if (i % 2 == 0) {
+        val numText = new Text(s"${i / 2 + 1}. ") {
+          font = Font.font("monospace", FontWeight.Normal, 13)
+        }
+        pgnDisplay.children.add(numText)
+      }
+
+      val moveText = new Text(move) {
+        font =
+          if (i == boldIndex)
+            Font.font("monospace", FontWeight.Bold, 13)
+          else
+            Font.font("monospace", FontWeight.Normal, 13)
+      }
+      pgnDisplay.children.add(moveText)
+
+      // Add space after move
+      val space = new Text(" ") {
+        font = Font.font("monospace", FontWeight.Normal, 13)
+      }
+      pgnDisplay.children.add(space)
+    }
+
+    // Auto-scroll to bottom
+    pgnScrollPane.vvalue = 1.0
   }
 
   private[view] def updateBoard(): Unit = {
@@ -371,10 +449,213 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     }
   }
 
+  private def loadPgnOrFen(input: String): Unit = {
+    // Heuristic: FEN strings contain '/' for rank separators and typically
+    // have 7 slashes (8 ranks). PGN move text does not.
+    val isFen = input.count(_ == '/') >= 7 && !input.contains('\n')
+
+    if (isFen) {
+      controller.loadFromFEN(input) match {
+        case Right(_) =>
+          showInfo("FEN Loaded", "Position loaded from FEN string.")
+        case Left(error) =>
+          showAlert("Invalid FEN", error)
+      }
+    } else {
+      controller.loadPgnMoves(input) match {
+        case Right(_) =>
+          showInfo(
+            "PGN Loaded",
+            s"Loaded ${controller.pgnMoves.length} moves from PGN."
+          )
+        case Left(error) =>
+          showAlert("Invalid PGN", error)
+      }
+    }
+  }
+
+  private def writeToFile(file: java.io.File, content: String): Unit = {
+    val pw = new PrintWriter(file)
+    try pw.write(content)
+    finally pw.close()
+  }
+
+  private def readFromFile(file: java.io.File): String = {
+    val source = Source.fromFile(file)
+    try source.mkString
+    finally source.close()
+  }
+
+  private[view] def createMenuBar(): MenuBar = {
+    val circeFileIO: FileIO = new CirceJsonFileIO
+    val upickleFileIO: FileIO = new UPickleJsonFileIO
+
+    val jsonFilter = new ExtensionFilter("JSON Files", "*.json")
+    val fenFilter = new ExtensionFilter("FEN Files", "*.fen")
+    val pgnFilter = new ExtensionFilter("PGN Files", "*.pgn")
+
+    def exportJson(fileIO: FileIO, label: String): Unit = {
+      val chooser = new FileChooser {
+        title = s"Export JSON ($label)"
+        extensionFilters.add(jsonFilter)
+        initialFileName = "board.json"
+      }
+      val file = chooser.showSaveDialog(primaryStage)
+      if (file != null) {
+        Try { writeToFile(file, fileIO.save(controller.board)) } match {
+          case Success(_) =>
+            showInfo(
+              "Export Successful",
+              s"Board exported to ${file.getName} using $label."
+            )
+          case Failure(e) =>
+            showAlert("Export Failed", e.getMessage)
+        }
+      }
+    }
+
+    def importJson(fileIO: FileIO, label: String): Unit = {
+      val chooser = new FileChooser {
+        title = s"Import JSON ($label)"
+        extensionFilters.add(jsonFilter)
+      }
+      val file = chooser.showOpenDialog(primaryStage)
+      if (file != null) {
+        Try(readFromFile(file)).flatMap(fileIO.load) match {
+          case Success(board) =>
+            controller.announceInitial(board)
+            selectedSquare = None
+            showInfo(
+              "Import Successful",
+              s"Board imported from ${file.getName} using $label."
+            )
+          case Failure(e) =>
+            showAlert("Import Failed", e.getMessage)
+        }
+      }
+    }
+
+    def exportFEN(): Unit = {
+      val chooser = new FileChooser {
+        title = "Export FEN"
+        extensionFilters.add(fenFilter)
+        initialFileName = "position.fen"
+      }
+      val file = chooser.showSaveDialog(primaryStage)
+      if (file != null) {
+        Try { writeToFile(file, controller.getBoardAsFEN) } match {
+          case Success(_) =>
+            showInfo("Export Successful", s"FEN exported to ${file.getName}.")
+          case Failure(e) =>
+            showAlert("Export Failed", e.getMessage)
+        }
+      }
+    }
+
+    def importFEN(): Unit = {
+      val chooser = new FileChooser {
+        title = "Import FEN"
+        extensionFilters.add(fenFilter)
+      }
+      val file = chooser.showOpenDialog(primaryStage)
+      if (file != null) {
+        Try(readFromFile(file).trim).toEither.left
+          .map(_.getMessage)
+          .flatMap(controller.loadFromFEN) match {
+          case Right(_) =>
+            selectedSquare = None
+            showInfo("Import Successful", s"FEN imported from ${file.getName}.")
+          case Left(e) =>
+            showAlert("Import Failed", e)
+        }
+      }
+    }
+
+    def exportPGN(): Unit = {
+      val chooser = new FileChooser {
+        title = "Export PGN"
+        extensionFilters.add(pgnFilter)
+        initialFileName = "game.pgn"
+      }
+      val file = chooser.showSaveDialog(primaryStage)
+      if (file != null) {
+        Try { writeToFile(file, controller.pgnText) } match {
+          case Success(_) =>
+            showInfo("Export Successful", s"PGN exported to ${file.getName}.")
+          case Failure(e) =>
+            showAlert("Export Failed", e.getMessage)
+        }
+      }
+    }
+
+    def importPGN(): Unit = {
+      val chooser = new FileChooser {
+        title = "Import PGN"
+        extensionFilters.add(pgnFilter)
+      }
+      val file = chooser.showOpenDialog(primaryStage)
+      if (file != null) {
+        Try(readFromFile(file)).toEither.left
+          .map(_.getMessage)
+          .flatMap(controller.loadPgnMoves) match {
+          case Right(_) =>
+            selectedSquare = None
+            showInfo("Import Successful", s"PGN imported from ${file.getName}.")
+          case Left(e) =>
+            showAlert("Import Failed", e)
+        }
+      }
+    }
+
+    val importMenu = new Menu("Import") {
+      items = Seq(
+        new MenuItem("JSON (Circe)") {
+          onAction = _ => importJson(circeFileIO, "Circe")
+        },
+        new MenuItem("JSON (uPickle)") {
+          onAction = _ => importJson(upickleFileIO, "uPickle")
+        },
+        new SeparatorMenuItem(),
+        new MenuItem("FEN") { onAction = _ => importFEN() },
+        new MenuItem("PGN") { onAction = _ => importPGN() }
+      )
+    }
+    val exportMenu = new Menu("Export") {
+      items = Seq(
+        new MenuItem("JSON (Circe)") {
+          onAction = _ => exportJson(circeFileIO, "Circe")
+        },
+        new MenuItem("JSON (uPickle)") {
+          onAction = _ => exportJson(upickleFileIO, "uPickle")
+        },
+        new SeparatorMenuItem(),
+        new MenuItem("FEN") { onAction = _ => exportFEN() },
+        new MenuItem("PGN") { onAction = _ => exportPGN() }
+      )
+    }
+
+    val fileMenu = new Menu("File") {
+      items = Seq(importMenu, exportMenu)
+    }
+
+    new MenuBar {
+      menus = Seq(fileMenu)
+    }
+  }
+
   private def showAlert(alertTitle: String, message: String): Unit = {
     new Alert(Alert.AlertType.Error) {
       initOwner(primaryStage)
       title = alertTitle
+      headerText = None
+      contentText = message
+    }.showAndWait()
+  }
+
+  private def showInfo(infoTitle: String, message: String): Unit = {
+    new Alert(Alert.AlertType.Information) {
+      initOwner(primaryStage)
+      title = infoTitle
       headerText = None
       contentText = message
     }.showAndWait()
@@ -423,8 +704,9 @@ class ChessGUILauncher extends javafx.application.Application {
 
     // Set up the scene
     gui.primaryStage.title = "Chess Game - ScalaFX"
-    gui.primaryStage.scene = new Scene(1000, 800) {
+    gui.primaryStage.scene = new Scene(1050, 850) {
       root = new BorderPane {
+        top = gui.createMenuBar()
         center = gui.createBoardPane()
         right = gui.createControlPanel()
         style = "-fx-background-color: #f5f5f5;"

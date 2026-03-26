@@ -2,7 +2,7 @@ package chess.model
 
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.matchers.should.Matchers
-import chess.controller.parser.FENParser
+import chess.io.fen.RegexFenParser
 
 class MoveResultSpec extends AnyWordSpec with Matchers {
 
@@ -24,7 +24,7 @@ class MoveResultSpec extends AnyWordSpec with Matchers {
     }
 
     "return the board via getOrElse, ignoring default" in {
-      val other = FENParser.parseFEN("8/8/8/8/8/8/8/4K3").get
+      val other = RegexFenParser.parseFEN("8/8/8/8/8/8/8/4K3").get
       moved.getOrElse(other) shouldBe board
     }
 
@@ -76,7 +76,7 @@ class MoveResultSpec extends AnyWordSpec with Matchers {
     }
 
     "return the default via getOrElse" in {
-      val other = FENParser.parseFEN("8/8/8/8/8/8/8/4K3").get
+      val other = RegexFenParser.parseFEN("8/8/8/8/8/8/8/4K3").get
       failed.getOrElse(other) shouldBe other
     }
 
@@ -131,7 +131,7 @@ class MoveResultSpec extends AnyWordSpec with Matchers {
   "MoveResult game events" should {
     "detect check" in {
       // Scholar's mate setup: after Qh5, f6, Qxf7+ gives check
-      val board = FENParser
+      val board = RegexFenParser
         .parseFEN("rnbqkbnr/pppp1ppp/5p2/4p2Q/4P3/8/PPPP1PPP/RNB1KBNR")
         .get
       // Qxf7+ gives check
@@ -142,7 +142,7 @@ class MoveResultSpec extends AnyWordSpec with Matchers {
 
     "detect checkmate" in {
       // Scholar's mate: Qxf7#
-      val board = FENParser
+      val board = RegexFenParser
         .parseFEN("rnbqkbnr/pppp1ppp/8/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR")
         .get
       // First Qh5
@@ -161,11 +161,11 @@ class MoveResultSpec extends AnyWordSpec with Matchers {
       // Use: Black king a1, White king a3, White queen on h8 -> Qa8 is check, but Qb2 is stalemate
       // Simpler: Black king h8, White king f7 is check...
       // Known stalemate pattern: Black king a8, White king a6, White pawn a7 = stalemate
-      val board = FENParser.parseFEN("k7/P7/K7/8/8/8/8/1Q6").get
+      val board = RegexFenParser.parseFEN("k7/P7/K7/8/8/8/8/1Q6").get
       // This is already stalemate for black. Let's instead create a move that PRODUCES stalemate.
       // Setup: Black king on a8, White king on c7, White queen on b1
       // Qb6 would produce stalemate (a7 blocked by Kc7, b8 blocked by Kc7, b7 blocked by Qb6+Kc7)
-      val setupBoard = FENParser.parseFEN("k7/2K5/8/8/8/8/8/1Q6").get
+      val setupBoard = RegexFenParser.parseFEN("k7/2K5/8/8/8/8/8/1Q6").get
       val result = setupBoard.move(Square("b1"), Square("b6"))
       result.isSuccess shouldBe true
       result.event shouldBe Some(GameEvent.Stalemate)
@@ -194,7 +194,7 @@ class MoveResultSpec extends AnyWordSpec with Matchers {
 
     "provide LeavesKingInCheck message" in {
       // Pinned rook: moving it exposes king
-      val pinBoard = FENParser.parseFEN("4r3/8/8/8/8/8/4R3/4K3").get
+      val pinBoard = RegexFenParser.parseFEN("4r3/8/8/8/8/8/4R3/4K3").get
       val result = pinBoard.move(Square("e2"), Square("a2"))
       result match {
         case MoveResult.Failed(_, MoveError.LeavesKingInCheck) =>
