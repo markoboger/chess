@@ -1,6 +1,15 @@
 package chess.controller
 
-import chess.model.{Board, Color, Square, File, Rank}
+import chess.model.{
+  Board,
+  Color,
+  Square,
+  File,
+  Rank,
+  MoveResult,
+  MoveError,
+  GameEvent
+}
 import chess.controller.parser.FENParser
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -32,9 +41,10 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       }
 
       val before = controller.board
-      val after =
-        controller.applyMove(before, from = Square("e2"), to = Square("e4"))
+      val result = controller.applyMove(from = Square("e2"), to = Square("e4"))
+      result.isSuccess shouldBe true
 
+      val after = result.board
       controller.board shouldBe after
       lastBoard should contain(after)
       after should not be theSameInstanceAs(before)
@@ -57,7 +67,7 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
 
       controller.isWhiteToMove shouldBe true
       val result = controller.applyPgnMove("e4")
-      result.isRight shouldBe true
+      result.isSuccess shouldBe true
       controller.isWhiteToMove shouldBe false
     }
 
@@ -65,22 +75,22 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       val controller = new GameController(Board.initial)
 
       val result = controller.applyPgnMove("Ke4")
-      result.isLeft shouldBe true
+      result.isFailed shouldBe true
     }
 
     "apply coordinate moves successfully" in {
       val controller = new GameController(Board.initial)
 
       val result = controller.applyMove(Square("e2"), Square("e4"))
-      result.isDefined shouldBe true
+      result.isSuccess shouldBe true
       controller.isWhiteToMove shouldBe false
     }
 
-    "return None for invalid coordinate moves" in {
+    "return Failed for invalid coordinate moves" in {
       val controller = new GameController(Board.initial)
 
       val result = controller.applyMove(Square("e4"), Square("e5"))
-      result shouldBe None
+      result.isFailed shouldBe true
       controller.isWhiteToMove shouldBe true
     }
 
@@ -88,7 +98,11 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       val controller = new GameController(Board.initial)
 
       val result = controller.applyMove(Square("e7"), Square("e5"))
-      result shouldBe None
+      result.isFailed shouldBe true
+      result match {
+        case MoveResult.Failed(_, MoveError.WrongColor) => // expected
+        case other => fail(s"Expected WrongColor, got: $other")
+      }
       controller.isWhiteToMove shouldBe true
     }
 
@@ -98,7 +112,7 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       val moves = List("e4", "e5", "Nf3", "Nc6", "Bc4")
       moves.foreach { move =>
         val result = controller.applyPgnMove(move)
-        result.isRight shouldBe true
+        result.isSuccess shouldBe true
       }
 
       controller.isWhiteToMove shouldBe false
@@ -137,21 +151,21 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       fen should be("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR")
     }
 
-    "return None when piece exists but move is invalid" in {
+    "return Failed when piece exists but move is invalid" in {
       val controller = new GameController(Board.initial)
       // White pawn on e2 trying to move to e5 (3 squares) - piece exists, correct color, but invalid move
       val result = controller.applyMove(Square("e2"), Square("e5"))
-      result shouldBe None
+      result.isFailed shouldBe true
       controller.isWhiteToMove shouldBe true
     }
 
-    "return Left when PGN parses but Board rejects the move" in {
+    "return Failed when PGN parses but Board rejects the move" in {
       // Use a FEN position where PGNParser finds a piece (its simplified validation passes)
       // but Board.move's stricter validation rejects it
       // King on e1, pawn on e2 blocks Ke2 but PGNParser's King validation (dx<=1,dy<=1) passes
       val controller = new GameController(Board.initial)
       val result = controller.applyPgnMove("Ke2")
-      result.isLeft shouldBe true
+      result.isFailed shouldBe true
     }
 
     "report activeColor as White initially" in {

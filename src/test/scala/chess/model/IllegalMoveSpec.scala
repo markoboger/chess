@@ -9,107 +9,111 @@ class IllegalMoveSpec extends AnyWordSpec with Matchers {
     "testing pawn moves" should {
       "reject pawn moving 2 squares diagonally (e2d4)" in {
         val board = Board.initial
-        val resultBoard = board.move(Square("e2"), Square("d4"))
-        resultBoard shouldEqual board
+        val result = board.move(Square("e2"), Square("d4"))
+        result.isFailed shouldBe true
       }
 
       "reject pawn moving backwards" in {
         val board = Board.initial
-        val resultBoard = board.move(Square("e4"), Square("e3"))
-        resultBoard shouldEqual board
+        val result = board.move(Square("e4"), Square("e3"))
+        result.isFailed shouldBe true
       }
 
       "reject pawn moving 3 squares" in {
         val board = Board.initial
-        val resultBoard = board.move(Square("e2"), Square("e5"))
-        resultBoard shouldEqual board
+        val result = board.move(Square("e2"), Square("e5"))
+        result.isFailed shouldBe true
       }
 
       "allow pawn moving 2 squares from starting position" in {
         val board = Board.initial
-        val resultBoard = board.move(Square("e2"), Square("e4"))
-        resultBoard should not equal board
-        resultBoard.pieceAt(Square("e4")) shouldEqual Some(
+        val result = board.move(Square("e2"), Square("e4"))
+        result.isSuccess shouldBe true
+        result.board.pieceAt(Square("e4")) shouldEqual Some(
           Piece(Role.Pawn, Color.White)
         )
-        resultBoard.pieceAt(Square("e2")) shouldEqual None
+        result.board.pieceAt(Square("e2")) shouldEqual None
       }
 
       "reject pawn moving 2 squares from non-starting position" in {
-        val board = Board.initial
-        val afterE4 = board.move(Square("e2"), Square("e4"))
-        val afterD5 = afterE4.move(Square("d7"), Square("d5"))
-        val resultBoard = afterD5.move(Square("e4"), Square("e6"))
-        resultBoard shouldEqual afterD5
+        val setup = for
+          b1 <- Board.initial.move(Square("e2"), Square("e4"))
+          b2 <- b1.move(Square("d7"), Square("d5"))
+        yield b2
+        val board = setup.get
+        val result = board.move(Square("e4"), Square("e6"))
+        result.isFailed shouldBe true
       }
 
       "reject pawn moving to occupied square" in {
         val board = Board.initial
         val afterE3 = board.move(Square("e2"), Square("e3"))
-        afterE3 should not equal board
-        val resultBoard = afterE3.move(Square("e4"), Square("e3"))
-        resultBoard shouldEqual afterE3
+        afterE3.isSuccess shouldBe true
+        val result = afterE3.board.move(Square("e4"), Square("e3"))
+        result.isFailed shouldBe true
       }
 
       "allow pawn capturing diagonally" in {
-        val board = Board.initial
-        val afterE4 = board.move(Square("e2"), Square("e4"))
-        val afterD5 = afterE4.move(Square("d7"), Square("d5"))
-        val resultBoard = afterD5.move(Square("e4"), Square("d5"))
-        resultBoard should not equal afterD5
-        resultBoard.pieceAt(Square("d5")) shouldEqual Some(
+        val result = for
+          b1 <- Board.initial.move(Square("e2"), Square("e4"))
+          b2 <- b1.move(Square("d7"), Square("d5"))
+          b3 <- b2.move(Square("e4"), Square("d5"))
+        yield b3
+        result.isSuccess shouldBe true
+        result.board.pieceAt(Square("d5")) shouldEqual Some(
           Piece(Role.Pawn, Color.White)
         )
       }
 
       "reject pawn capturing non-diagonally" in {
-        val board = Board.initial
-        val afterE4 = board.move(Square("e2"), Square("e4"))
-        val afterD5 = afterE4.move(Square("d7"), Square("d5"))
-        val afterE5 = afterD5.move(Square("e4"), Square("e5"))
-        afterE5 should not equal afterD5
-        val resultBoard = afterE5.move(Square("e5"), Square("d6"))
-        resultBoard shouldEqual afterE5
+        val setup = for
+          b1 <- Board.initial.move(Square("e2"), Square("e4"))
+          b2 <- b1.move(Square("d7"), Square("d5"))
+          b3 <- b2.move(Square("e4"), Square("e5"))
+        yield b3
+        setup.isSuccess shouldBe true
+        val result = setup.board.move(Square("e5"), Square("d6"))
+        result.isFailed shouldBe true
       }
     }
 
     "testing knight moves" should {
       "reject knight moving in straight line" in {
         val board = Board.initial
-        val resultBoard = board.move(Square("b1"), Square("b3"))
-        resultBoard shouldEqual board
+        val result = board.move(Square("b1"), Square("b3"))
+        result.isFailed shouldBe true
       }
     }
 
     "testing bishop moves" should {
       "reject bishop moving in straight line" in {
         val board = Board.initial
-        val resultBoard = board.move(Square("c1"), Square("c3"))
-        resultBoard shouldEqual board
+        val result = board.move(Square("c1"), Square("c3"))
+        result.isFailed shouldBe true
       }
     }
 
     "testing rook moves" should {
       "reject rook moving diagonally" in {
         val board = Board.initial
-        val resultBoard = board.move(Square("a1"), Square("c3"))
-        resultBoard shouldEqual board
+        val result = board.move(Square("a1"), Square("c3"))
+        result.isFailed shouldBe true
       }
     }
 
     "testing queen moves" should {
       "reject queen moving in L-shape" in {
         val board = Board.initial
-        val resultBoard = board.move(Square("d1"), Square("f2"))
-        resultBoard shouldEqual board
+        val result = board.move(Square("d1"), Square("f2"))
+        result.isFailed shouldBe true
       }
     }
 
     "testing king moves" should {
       "reject king moving 2 squares" in {
         val board = Board.initial
-        val resultBoard = board.move(Square("e1"), Square("e3"))
-        resultBoard shouldEqual board
+        val result = board.move(Square("e1"), Square("e3"))
+        result.isFailed shouldBe true
       }
     }
 
@@ -125,8 +129,8 @@ class IllegalMoveSpec extends AnyWordSpec with Matchers {
     "testing capture rules" should {
       "reject capturing own piece" in {
         val board = Board.initial
-        val resultBoard = board.move(Square("e2"), Square("d1"))
-        resultBoard shouldEqual board
+        val result = board.move(Square("e2"), Square("d1"))
+        result.isFailed shouldBe true
       }
     }
   }

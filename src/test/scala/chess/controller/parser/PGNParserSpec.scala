@@ -25,9 +25,10 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
     }
 
     "parse bishop moves" in {
-      val board = Board.initial
-        .move(Square("e2"), Square("e4")) // e4
-        .move(Square("e7"), Square("e5")) // e5
+      val board = (for
+        b1 <- Board.initial.move(Square("e2"), Square("e4"))
+        b2 <- b1.move(Square("e7"), Square("e5"))
+      yield b2).get
 
       // Bc4
       val result = PGNParser.parseMove("Bc4", board, isWhiteToMove = true)
@@ -35,9 +36,10 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
     }
 
     "parse queen moves" in {
-      val board = Board.initial
-        .move(Square("e2"), Square("e4")) // e4
-        .move(Square("e7"), Square("e5")) // e5
+      val board = (for
+        b1 <- Board.initial.move(Square("e2"), Square("e4"))
+        b2 <- b1.move(Square("e7"), Square("e5"))
+      yield b2).get
 
       // Qh5
       val result = PGNParser.parseMove("Qh5", board, isWhiteToMove = true)
@@ -45,9 +47,10 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
     }
 
     "parse king moves" in {
-      val board = Board.initial
-        .move(Square("e2"), Square("e3")) // e3
-        .move(Square("e7"), Square("e6")) // e6
+      val board = (for
+        b1 <- Board.initial.move(Square("e2"), Square("e3"))
+        b2 <- b1.move(Square("e7"), Square("e6"))
+      yield b2).get
 
       // Ke2
       val result = PGNParser.parseMove("Ke2", board, isWhiteToMove = true)
@@ -55,13 +58,14 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
     }
 
     "parse kingside castling" in {
-      val board = Board.initial
-        .move(Square("e2"), Square("e4")) // e4
-        .move(Square("e7"), Square("e5")) // e5
-        .move(Square("g1"), Square("f3")) // Nf3
-        .move(Square("g8"), Square("f6")) // Nf6
-        .move(Square("f1"), Square("e2")) // Be2
-        .move(Square("f8"), Square("e7")) // Be7
+      val board = (for
+        b1 <- Board.initial.move(Square("e2"), Square("e4"))
+        b2 <- b1.move(Square("e7"), Square("e5"))
+        b3 <- b2.move(Square("g1"), Square("f3"))
+        b4 <- b3.move(Square("g8"), Square("f6"))
+        b5 <- b4.move(Square("f1"), Square("e2"))
+        b6 <- b5.move(Square("f8"), Square("e7"))
+      yield b6).get
 
       // O-O
       val result = PGNParser.parseMove("O-O", board, isWhiteToMove = true)
@@ -69,17 +73,9 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
     }
 
     "parse queenside castling" in {
-      val board = Board.initial
-        .move(Square("e2"), Square("e4")) // e4
-        .move(Square("e7"), Square("e5")) // e5
-        .move(Square("d1"), Square("d2")) // Qd2
-        .move(Square("d8"), Square("d7")) // Qd7
-        .move(Square("c1"), Square("c2")) // Bc2
-        .move(Square("c8"), Square("c7")) // Bc7
-        .move(Square("b1"), Square("b2")) // Nb2
-        .move(Square("b8"), Square("b7")) // Nb7
-        .move(Square("a1"), Square("a2")) // Ra2
-        .move(Square("a8"), Square("a7")) // Ra7
+      // Use FEN to set up a position with queenside castling available
+      val board =
+        FENParser.parseFEN("r3kbnr/pppppppp/8/8/8/8/PPPPPPPP/R3KBNR").get
 
       // O-O-O
       val result = PGNParser.parseMove("O-O-O", board, isWhiteToMove = true)
@@ -87,9 +83,10 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
     }
 
     "parse moves with check symbol" in {
-      val board = Board.initial
-        .move(Square("e2"), Square("e4")) // e4
-        .move(Square("e7"), Square("e5")) // e5
+      val board = (for
+        b1 <- Board.initial.move(Square("e2"), Square("e4"))
+        b2 <- b1.move(Square("e7"), Square("e5"))
+      yield b2).get
 
       // Qh5+
       val result = PGNParser.parseMove("Qh5+", board, isWhiteToMove = true)
@@ -97,9 +94,10 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
     }
 
     "parse moves with checkmate symbol" in {
-      val board = Board.initial
-        .move(Square("e2"), Square("e4")) // e4
-        .move(Square("e7"), Square("e5")) // e5
+      val board = (for
+        b1 <- Board.initial.move(Square("e2"), Square("e4"))
+        b2 <- b1.move(Square("e7"), Square("e5"))
+      yield b2).get
 
       // Qh5#
       val result = PGNParser.parseMove("Qh5#", board, isWhiteToMove = true)
@@ -121,8 +119,7 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
     }
 
     "parse black moves correctly" in {
-      val board = Board.initial
-        .move(Square("e2"), Square("e4")) // e4
+      val board = Board.initial.move(Square("e2"), Square("e4")).get
 
       // e5 (black's move)
       val result = PGNParser.parseMove("e5", board, isWhiteToMove = false)
@@ -130,9 +127,10 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
     }
 
     "handle disambiguation with file hint" in {
-      val board = Board.initial
-        .move(Square("g1"), Square("f3")) // Nf3
-        .move(Square("g8"), Square("f6")) // Nf6
+      val board = (for
+        b1 <- Board.initial.move(Square("g1"), Square("f3"))
+        b2 <- b1.move(Square("g8"), Square("f6"))
+      yield b2).get
 
       // Nbd2 (knight from b-file to d2)
       val result = PGNParser.parseMove("Nbd2", board, isWhiteToMove = true)
@@ -223,7 +221,7 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
 
       // Apply move and get new board
       val (from1, to1) = move1.get
-      val board2 = board.move(from1, to1)
+      val board2 = board.move(from1, to1).get
 
       // Second move: Nc6
       val move2 = PGNParser.parseMove("Nc6", board2, isWhiteToMove = false)

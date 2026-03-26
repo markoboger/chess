@@ -1,6 +1,6 @@
 package chess.controller
 
-import chess.model.{Board, Color, Square, File, Rank}
+import chess.model.{Board, Color, Square, File, Rank, MoveResult, MoveError}
 import chess.controller.parser.{PGNParser, FENParser}
 import scalafx.beans.property.ObjectProperty
 import scala.util.{Try, Success, Failure}
@@ -44,46 +44,34 @@ final class GameController(initialBoard: Board):
     FENParser.boardToFEN(board)
   }
 
-  /** Apply a move to the given board using PGN notation.
-    * @param pgnMove
-    *   The move in PGN notation (e.g., "e4", "Nf3", "O-O")
+  /** Apply a move using PGN notation (e.g., "e4", "Nf3", "O-O").
     * @return
-    *   The new board state after the move, or an error message
+    *   [[MoveResult]] — [[MoveResult.Moved]] with board and game event on
+    *   success, or [[MoveResult.Failed]] with error reason on failure
     */
-  def applyPgnMove(pgnMove: String): Either[String, Board] = {
-    PGNParser.parseMove(pgnMove, board, _isWhiteToMove) match {
-      case Success((from, to)) =>
-        applyMove(from, to) match {
-          case Some(newBoard) =>
-            Right(newBoard)
-          case None =>
-            Left(s"Invalid move: $pgnMove is not a legal move in this position")
-        }
+  def applyPgnMove(pgnMove: String): MoveResult =
+    PGNParser.parseMove(pgnMove, board, _isWhiteToMove) match
+      case Success((from, to)) => applyMove(from, to)
       case Failure(e) =>
-        Left(s"Failed to parse move '$pgnMove': ${e.getMessage}")
-    }
-  }
+        MoveResult.Failed(board, MoveError.ParseError(e.getMessage))
 
-  /** Apply a move to the given board using file/rank coordinates.
+  /** Apply a move using file/rank coordinates.
     * @return
-    *   The new board if the move was valid, None otherwise
+    *   [[MoveResult]] — [[MoveResult.Moved]] with board and game event on
+    *   success, or [[MoveResult.Failed]] with error reason on failure
     */
-  def applyMove(from: Square, to: Square): Option[Board] = {
-    board.pieceAt(from) match {
-      case Some(piece)
-          if piece.color == (if (_isWhiteToMove) Color.White
-                             else Color.Black) =>
-        val nextBoard = board.move(from, to)
-        if (nextBoard != board) {
-          this.board = nextBoard
-          _isWhiteToMove = !_isWhiteToMove
-          Some(nextBoard)
-        } else {
-          None
-        }
-      case _ => None
-    }
-  }
+  def applyMove(from: Square, to: Square): MoveResult =
+    board.pieceAt(from) match
+      case Some(piece) if piece.color == activeColor =>
+        board.move(from, to) match
+          case moved: MoveResult.Moved =>
+            this.board = moved.board
+            _isWhiteToMove = !_isWhiteToMove
+            moved
+          case failed: MoveResult.Failed =>
+            failed
+      case Some(_) => MoveResult.Failed(board, MoveError.WrongColor)
+      case None    => MoveResult.Failed(board, MoveError.NoPiece)
 
   def activeColor: Color =
     if _isWhiteToMove then Color.White else Color.Black
@@ -99,13 +87,3 @@ final class GameController(initialBoard: Board):
     else if isStalemate then "Stalemate! The game is a draw."
     else if isInCheck then s"${activeColor} is in check!"
     else s"${activeColor} to move"
-
-  /** Apply a move to the given board and return the new board.
-    * @deprecated
-    *   Use applyMove(from, to) instead
-    */
-  def applyMove(board: Board, from: Square, to: Square): Board = {
-    val nextBoard = board.move(from, to)
-    this.board = nextBoard
-    nextBoard
-  }

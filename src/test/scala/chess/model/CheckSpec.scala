@@ -138,30 +138,30 @@ final class CheckSpec extends AnyWordSpec with Matchers:
       // White king on e1, white rook on e2 shields from black rook on e8
       // Moving the rook away from e-file exposes the king
       val board = FENParser.parseFEN("4r3/8/8/8/8/8/4R3/4K3").get
-      val moved = board.move(Square("e2"), Square("a2"))
-      moved shouldEqual board
+      val result = board.move(Square("e2"), Square("a2"))
+      result.isFailed shouldBe true
     }
 
     "allow a move that does not leave king in check" in {
       // Same position, rook moves along the e-file (still shields)
       val board = FENParser.parseFEN("4r3/8/8/8/8/8/4R3/4K3").get
-      val moved = board.move(Square("e2"), Square("e5"))
-      moved should not equal board
+      val result = board.move(Square("e2"), Square("e5"))
+      result.isSuccess shouldBe true
     }
 
     "reject a king move into check" in {
       // White king on e1, black rook on d8 — Kd1 walks into the rook's line
       val board = FENParser.parseFEN("3r4/8/8/8/8/8/8/4K3").get
-      val moved = board.move(Square("e1"), Square("d1"))
-      moved shouldEqual board
+      val result = board.move(Square("e1"), Square("d1"))
+      result.isFailed shouldBe true
     }
 
     "allow a king move out of check" in {
       // White king on e1 in check from black rook on e8, can escape to d1
       val board = FENParser.parseFEN("4r3/8/8/8/8/8/8/4K3").get
       board.isInCheck(Color.White) shouldBe true
-      val moved = board.move(Square("e1"), Square("d1"))
-      moved should not equal board
+      val result = board.move(Square("e1"), Square("d1"))
+      result.isSuccess shouldBe true
     }
 
     "allow capturing the checking piece" in {
@@ -169,9 +169,9 @@ final class CheckSpec extends AnyWordSpec with Matchers:
       // Bishop on b1 can capture rook on e4 diagonally
       val board = FENParser.parseFEN("8/8/8/8/4r3/8/8/1B2K3").get
       board.isInCheck(Color.White) shouldBe true
-      val moved = board.move(Square("b1"), Square("e4"))
-      moved should not equal board
-      moved.isInCheck(Color.White) shouldBe false
+      val result = board.move(Square("b1"), Square("e4"))
+      result.isSuccess shouldBe true
+      result.board.isInCheck(Color.White) shouldBe false
     }
 
     "allow blocking a check" in {
@@ -179,9 +179,9 @@ final class CheckSpec extends AnyWordSpec with Matchers:
       // White rook blocks by moving to e2
       val board = FENParser.parseFEN("4r3/8/8/8/8/8/R7/4K3").get
       board.isInCheck(Color.White) shouldBe true
-      val moved = board.move(Square("a2"), Square("e2"))
-      moved should not equal board
-      moved.isInCheck(Color.White) shouldBe false
+      val result = board.move(Square("a2"), Square("e2"))
+      result.isSuccess shouldBe true
+      result.board.isInCheck(Color.White) shouldBe false
     }
   }
 

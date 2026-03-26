@@ -11,7 +11,7 @@ import scalafx.scene.shape.Rectangle
 import scalafx.scene.text.{Font, FontWeight, Text}
 import scalafx.stage.Stage
 import chess.controller.GameController
-import chess.model.{Board, Square, File, Rank}
+import chess.model.{Board, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.model.{Color => ChessColor}
 import scala.compiletime.uninitialized
 import javafx.application.{Application, Platform}
@@ -208,17 +208,23 @@ class ChessGUI(val controller: GameController) {
     val move = moveInput.text.value.trim
     if (move.nonEmpty) {
       controller.applyPgnMove(move) match {
-        case Right(_) =>
+        case MoveResult.Moved(_, event) =>
           moveInput.text = ""
-          playerLabel.text =
-            if (controller.isWhiteToMove) "White to move" else "Black to move"
+          playerLabel.text = event match {
+            case GameEvent.Checkmate => "Checkmate!"
+            case GameEvent.Stalemate => "Stalemate! Draw."
+            case GameEvent.Check =>
+              s"${if (controller.isWhiteToMove) "White" else "Black"} is in check!"
+            case GameEvent.Moved =>
+              if (controller.isWhiteToMove) "White to move" else "Black to move"
+          }
           fenDisplay.text = controller.getBoardAsFEN
           updateBoard()
-        case Left(error) =>
+        case MoveResult.Failed(_, error) =>
           val detailedError = s"""
             |Move: '$move'
             |
-            |Reason: $error
+            |Reason: ${error.message}
             |
             |Valid moves in PGN notation:
             |  • Pawn: e4, e5
@@ -280,13 +286,19 @@ class ChessGUI(val controller: GameController) {
           selectedSquare = None
         } else {
           controller.applyMove(fromSquare, square) match {
-            case Some(_) =>
+            case MoveResult.Moved(_, event) =>
               selectedSquare = None
-              playerLabel.text =
-                if (controller.isWhiteToMove) "White to move"
-                else "Black to move"
+              playerLabel.text = event match {
+                case GameEvent.Checkmate => "Checkmate!"
+                case GameEvent.Stalemate => "Stalemate! Draw."
+                case GameEvent.Check =>
+                  s"${if (controller.isWhiteToMove) "White" else "Black"} is in check!"
+                case GameEvent.Moved =>
+                  if (controller.isWhiteToMove) "White to move"
+                  else "Black to move"
+              }
               fenDisplay.text = controller.getBoardAsFEN
-            case None =>
+            case _: MoveResult.Failed =>
               controller.board.pieceAt(square) match {
                 case Some(piece)
                     if piece.color == (if (controller.isWhiteToMove)

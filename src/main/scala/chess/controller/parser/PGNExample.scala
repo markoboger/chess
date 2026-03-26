@@ -1,6 +1,6 @@
 package chess.controller.parser
 
-import chess.model.{Board, Color}
+import chess.model.{Board, Color, MoveResult, GameEvent}
 import chess.controller.GameController
 
 object PGNExample extends App {
@@ -38,10 +38,16 @@ object PGNExample extends App {
       s"\n${if (controller.isWhiteToMove) "White" else "Black"} plays: $move"
     )
     controller.applyPgnMove(move) match {
-      case Right(newBoard) =>
+      case MoveResult.Moved(newBoard, event) =>
         println(newBoard)
-      case Left(error) =>
-        println(s"Error: $error")
+        event match {
+          case GameEvent.Check     => println("Check!")
+          case GameEvent.Checkmate => println("Checkmate!")
+          case GameEvent.Stalemate => println("Stalemate!")
+          case GameEvent.Moved     => // normal move
+        }
+      case MoveResult.Failed(_, error) =>
+        println(s"Error: ${error.message}")
     }
   }
 }

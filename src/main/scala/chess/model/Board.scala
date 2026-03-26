@@ -8,15 +8,19 @@ final case class Board(
   def pieceAt(square: Square): Option[Piece] =
     squares(8 - square.rank.index)(square.file.index - 1)
 
-  def move(from: Square, to: Square): Board =
+  def move(from: Square, to: Square): MoveResult =
     pieceAt(from) match
-      case None => this
+      case None => MoveResult.Failed(this, MoveError.NoPiece)
       case Some(piece) =>
         val candidate = applyMoveUnchecked(from, to)
-        if candidate eq this then return this
-        // Reject if move leaves own king in check
-        if candidate.isInCheck(piece.color) then return this
-        candidate
+        if candidate eq this then MoveResult.Failed(this, MoveError.InvalidMove)
+        else if candidate.isInCheck(piece.color) then
+          MoveResult.Failed(this, MoveError.LeavesKingInCheck)
+        else
+          MoveResult.Moved(
+            candidate,
+            candidate.detectGameEvent(piece.color.opposite)
+          )
 
   private[model] def applyMoveUnchecked(from: Square, to: Square): Board =
     // Check if source square has a piece
@@ -245,6 +249,25 @@ final case class Board(
 
   def isStalemate(color: Color): Boolean =
     !isInCheck(color) && legalMoves(color).isEmpty
+
+  private def hasLegalMoves(color: Color): Boolean =
+    Square.all.exists { from =>
+      pieceAt(from) match
+        case Some(piece) if piece.color == color =>
+          Square.all.exists { to =>
+            val candidate = applyMoveUnchecked(from, to)
+            !(candidate eq this) && !candidate.isInCheck(color)
+          }
+        case _ => false
+    }
+
+  private def detectGameEvent(opponent: Color): GameEvent =
+    val inCheck = isInCheck(opponent)
+    if inCheck then
+      if !hasLegalMoves(opponent) then GameEvent.Checkmate
+      else GameEvent.Check
+    else if !hasLegalMoves(opponent) then GameEvent.Stalemate
+    else GameEvent.Moved
 
   override def toString: String =
     val files = "  a b c d e f g h"

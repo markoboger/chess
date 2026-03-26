@@ -45,10 +45,11 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       val board = Board.initial
 
       // Move white pawn from e2 to e4
-      val moved = board.move(from = Square("e2"), to = Square("e4"))
+      val result = board.move(from = Square("e2"), to = Square("e4"))
+      result.isSuccess shouldBe true
 
-      moved.pieceAt(Square("e2")) shouldBe empty
-      moved.pieceAt(Square("e4")) should contain(
+      result.board.pieceAt(Square("e2")) shouldBe empty
+      result.board.pieceAt(Square("e4")) should contain(
         Piece(Role.Pawn, Color.White)
       )
     }
@@ -56,15 +57,16 @@ final class BoardSpec extends AnyWordSpec with Matchers:
     "allow capturing an opposing piece" in {
       val board = Board.initial
 
-      // First move white pawn from e2 to e4
-      val afterWhite = board.move(Square("e2"), Square("e4"))
-      // Then move black pawn from d7 to d5
-      val afterBlack = afterWhite.move(Square("d7"), Square("d5"))
-      // Now white pawn can capture black pawn diagonally: e4 to d5
-      val afterCapture = afterBlack.move(Square("e4"), Square("d5"))
+      // Chain moves using for-comprehension
+      val result = for
+        b1 <- board.move(Square("e2"), Square("e4"))
+        b2 <- b1.move(Square("d7"), Square("d5"))
+        b3 <- b2.move(Square("e4"), Square("d5"))
+      yield b3
 
-      afterCapture.pieceAt(Square("e4")) shouldBe empty
-      afterCapture.pieceAt(Square("d5")) should contain(
+      result.isSuccess shouldBe true
+      result.board.pieceAt(Square("e4")) shouldBe empty
+      result.board.pieceAt(Square("d5")) should contain(
         Piece(Role.Pawn, Color.White)
       )
     }
@@ -74,66 +76,70 @@ final class BoardSpec extends AnyWordSpec with Matchers:
     "allow valid rook moves on open files" in {
       // FEN with rook on a1 and no obstructions on file a
       val board = FENParser.parseFEN("8/8/8/8/8/8/8/R3K3").get
-      val moved = board.move(Square("a1"), Square("a8"))
-      moved.pieceAt(Square("a8")) should contain(
+      val result = board.move(Square("a1"), Square("a8"))
+      result.isSuccess shouldBe true
+      result.board.pieceAt(Square("a8")) should contain(
         Piece(Role.Rook, Color.White)
       )
-      moved.pieceAt(Square("a1")) shouldBe empty
+      result.board.pieceAt(Square("a1")) shouldBe empty
     }
 
     "allow valid rook moves along ranks" in {
       val board = FENParser.parseFEN("8/8/8/8/8/8/8/R3K3").get
-      val moved = board.move(Square("a1"), Square("d1"))
-      moved.pieceAt(Square("d1")) should contain(
+      val result = board.move(Square("a1"), Square("d1"))
+      result.isSuccess shouldBe true
+      result.board.pieceAt(Square("d1")) should contain(
         Piece(Role.Rook, Color.White)
       )
     }
 
     "reject rook move to same square" in {
       val board = FENParser.parseFEN("8/8/8/8/8/8/8/R3K3").get
-      val moved = board.move(Square("a1"), Square("a1"))
-      moved shouldEqual board
+      val result = board.move(Square("a1"), Square("a1"))
+      result.isFailed shouldBe true
     }
 
     "reject rook move when path is blocked" in {
       // Rook on a1 blocked by pawn on a2
       val board = FENParser.parseFEN("8/8/8/8/8/8/P7/R3K3").get
-      val moved = board.move(Square("a1"), Square("a4"))
-      moved shouldEqual board
+      val result = board.move(Square("a1"), Square("a4"))
+      result.isFailed shouldBe true
     }
 
     "allow valid queen diagonal moves" in {
       val board = FENParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
-      val moved = board.move(Square("d1"), Square("h5"))
-      moved.pieceAt(Square("h5")) should contain(
+      val result = board.move(Square("d1"), Square("h5"))
+      result.isSuccess shouldBe true
+      result.board.pieceAt(Square("h5")) should contain(
         Piece(Role.Queen, Color.White)
       )
     }
 
     "allow valid queen straight moves" in {
       val board = FENParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
-      val moved = board.move(Square("d1"), Square("d8"))
-      moved.pieceAt(Square("d8")) should contain(
+      val result = board.move(Square("d1"), Square("d8"))
+      result.isSuccess shouldBe true
+      result.board.pieceAt(Square("d8")) should contain(
         Piece(Role.Queen, Color.White)
       )
     }
 
     "reject queen L-shape move" in {
       val board = FENParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
-      val moved = board.move(Square("d1"), Square("e3"))
-      moved shouldEqual board
+      val result = board.move(Square("d1"), Square("e3"))
+      result.isFailed shouldBe true
     }
 
     "reject queen move to same square" in {
       val board = FENParser.parseFEN("8/8/8/8/8/8/8/3QK3").get
-      val moved = board.move(Square("d1"), Square("d1"))
-      moved shouldEqual board
+      val result = board.move(Square("d1"), Square("d1"))
+      result.isFailed shouldBe true
     }
 
     "reject queen move when path is blocked" in {
       val board = FENParser.parseFEN("8/8/8/8/8/8/3P4/3QK3").get
-      val moved = board.move(Square("d1"), Square("d4"))
-      moved shouldEqual board
+      val result = board.move(Square("d1"), Square("d4"))
+      result.isFailed shouldBe true
     }
   }
 
@@ -142,18 +148,20 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       // White pawn on e5 captures black pawn on d6 (regular capture, not en passant)
       // This triggers isEnPassantCapture from move execution (line 48) where pieceAt(to) is defined
       val board = FENParser.parseFEN("8/8/3p4/4P3/8/8/8/4K3").get
-      val moved = board.move(Square("e5"), Square("d6"))
-      moved.pieceAt(Square("d6")) should contain(
+      val result = board.move(Square("e5"), Square("d6"))
+      result.isSuccess shouldBe true
+      result.board.pieceAt(Square("d6")) should contain(
         Piece(Role.Pawn, Color.White)
       )
-      moved.pieceAt(Square("e5")) shouldBe empty
+      result.board.pieceAt(Square("e5")) shouldBe empty
     }
 
     "not trigger en passant on forward pawn move from rank 5" in {
       // Forward move from rank 5 - triggers isEnPassantCapture from line 48, hits fileDiff!=1
       val board = FENParser.parseFEN("8/8/8/4P3/8/8/8/4K3").get
-      val moved = board.move(Square("e5"), Square("e6"))
-      moved.pieceAt(Square("e6")) should contain(
+      val result = board.move(Square("e5"), Square("e6"))
+      result.isSuccess shouldBe true
+      result.board.pieceAt(Square("e6")) should contain(
         Piece(Role.Pawn, Color.White)
       )
     }
@@ -163,16 +171,16 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       val board = FENParser.parseFEN("8/8/8/4P3/8/8/8/4K3").get
       val boardWithLastMove =
         board.copy(lastMove = Some((Square("d7"), Square("d6"))))
-      val moved = boardWithLastMove.move(Square("e5"), Square("d6"))
-      moved shouldEqual boardWithLastMove
+      val result = boardWithLastMove.move(Square("e5"), Square("d6"))
+      result.isFailed shouldBe true
     }
 
     "reject en passant when pawn is not on correct rank" in {
       // White pawn on e4 (not rank 5), trying diagonal move to empty d5
       val board = FENParser.parseFEN("8/8/8/8/4P3/8/8/4K3").get
-      val moved = board.move(Square("e4"), Square("d5"))
+      val result = board.move(Square("e4"), Square("d5"))
       // Diagonal pawn move to empty square with no en passant possible - rejected
-      moved shouldEqual board
+      result.isFailed shouldBe true
     }
 
     "reject en passant when last move was not a 2-square pawn advance" in {
@@ -180,8 +188,8 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       // Last move was d6->d5 (1-square move, not 2-square)
       val boardWithLastMove =
         board.copy(lastMove = Some((Square("d6"), Square("d5"))))
-      val moved = boardWithLastMove.move(Square("e5"), Square("d6"))
-      moved shouldEqual boardWithLastMove
+      val result = boardWithLastMove.move(Square("e5"), Square("d6"))
+      result.isFailed shouldBe true
     }
 
     "reject en passant when last move target is on wrong rank" in {
@@ -189,8 +197,8 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       // Last move was d6->d4, but d4 is not on same rank as e5
       val boardWithLastMove =
         board.copy(lastMove = Some((Square("d6"), Square("d4"))))
-      val moved = boardWithLastMove.move(Square("e5"), Square("d6"))
-      moved shouldEqual boardWithLastMove
+      val result = boardWithLastMove.move(Square("e5"), Square("d6"))
+      result.isFailed shouldBe true
     }
 
     "reject en passant when last move file doesn't match target" in {
@@ -198,15 +206,15 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       // Last move was c7->c5, but we try to capture on d6
       val boardWithLastMove =
         board.copy(lastMove = Some((Square("c7"), Square("c5"))))
-      val moved = boardWithLastMove.move(Square("e5"), Square("d6"))
-      moved shouldEqual boardWithLastMove
+      val result = boardWithLastMove.move(Square("e5"), Square("d6"))
+      result.isFailed shouldBe true
     }
 
     "reject en passant when there is no last move" in {
       val board = FENParser.parseFEN("8/8/8/3pP3/8/8/8/4K3").get
       // No lastMove set
-      val moved = board.move(Square("e5"), Square("d6"))
-      moved shouldEqual board
+      val result = board.move(Square("e5"), Square("d6"))
+      result.isFailed shouldBe true
     }
 
     "reject en passant when captured piece is not a pawn" in {
@@ -214,8 +222,8 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       // Fake lastMove suggesting a 2-square move (but it's a knight, not a pawn)
       val boardWithLastMove =
         board.copy(lastMove = Some((Square("d7"), Square("d5"))))
-      val moved = boardWithLastMove.move(Square("e5"), Square("d6"))
-      moved shouldEqual boardWithLastMove
+      val result = boardWithLastMove.move(Square("e5"), Square("d6"))
+      result.isFailed shouldBe true
     }
   }
 
@@ -235,7 +243,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
     }
 
     "display moved pieces correctly" in {
-      val board = Board.initial.move(Square("e2"), Square("e4"))
+      val board = Board.initial.move(Square("e2"), Square("e4")).get
       val boardStr = board.toString
 
       boardStr should include("♙")

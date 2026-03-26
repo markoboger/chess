@@ -1,7 +1,17 @@
 package chess.view
 
 import chess.controller.GameController
-import chess.model.{Board, Piece, Color, Square, File, Rank}
+import chess.model.{
+  Board,
+  Piece,
+  Color,
+  Square,
+  File,
+  Rank,
+  MoveResult,
+  MoveError,
+  GameEvent
+}
 import scala.io.StdIn
 
 /** A console-based view for the chess game. Uses ScalaFX's Reactor pattern to
@@ -60,6 +70,13 @@ class ConsoleView(val controller: GameController) {
     }
   }
 
+  private def handleGameEvent(event: GameEvent): Unit = event match {
+    case GameEvent.Check     => println("Check!")
+    case GameEvent.Checkmate => println("Checkmate!")
+    case GameEvent.Stalemate => println("Stalemate! The game is a draw.")
+    case GameEvent.Moved     => // normal move, board shown via observer
+  }
+
   /** Main game loop for the console interface.
     */
   def run(): Unit = {
@@ -89,20 +106,25 @@ class ConsoleView(val controller: GameController) {
       } else {
         // Try PGN notation first
         controller.applyPgnMove(input) match {
-          case Right(_) => // Success, board is updated via observer
-          case Left(_)  =>
-            // If PGN fails, try coordinate notation
+          case MoveResult.Moved(_, event) =>
+            handleGameEvent(event)
+          case MoveResult.Failed(_, MoveError.ParseError(_)) =>
+            // PGN parsing failed, try coordinate notation
             parseMove(input) match {
               case Some((from, to)) =>
                 controller.applyMove(from, to) match {
-                  case Some(_) => // Success, board is updated via observer
-                  case None    => println("Invalid move. Please try again.")
+                  case MoveResult.Moved(_, event) =>
+                    handleGameEvent(event)
+                  case MoveResult.Failed(_, error) =>
+                    println(s"Invalid move: ${error.message}")
                 }
               case None =>
                 println(
                   "Invalid move format. Use PGN (e4, Nf3, O-O) or coordinates (e2e4)."
                 )
             }
+          case MoveResult.Failed(_, error) =>
+            println(s"Illegal move: ${error.message}")
         }
       }
     }
