@@ -227,6 +227,14 @@ final class BoardSpec extends AnyWordSpec with Matchers:
     }
   }
 
+  "Board.applyMoveUnchecked" should {
+    "return same board when source square is empty" in {
+      val board = FENParser.parseFEN("8/8/8/8/8/8/8/4K3").get
+      val result = board.applyMoveUnchecked(Square("a1"), Square("a2"))
+      result should be theSameInstanceAs board
+    }
+  }
+
   "Board.toString" should {
     "display the initial board in a readable format" in {
       val board = Board.initial

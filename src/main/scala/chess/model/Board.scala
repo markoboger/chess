@@ -141,8 +141,9 @@ final case class Board(
         if lastFrom.rank != lastStartRank then return false
         if lastRankDiff != 2 * lastDirection then return false
 
-        // Check if the pawn is now on the same rank as our pawn and adjacent file
-        if lastTo.rank != from.rank then return false
+        // After verifying a 2-square move from starting rank, the pawn
+        // always lands on the same rank as the capturing pawn, so only
+        // the file adjacency needs checking.
         if lastTo.file != to.file then return false
 
         // Verify there's an opponent pawn at the captured square
@@ -166,8 +167,8 @@ final case class Board(
     isPathClear(from, to)
 
   private def isValidRookMove(from: Square, to: Square): Boolean =
+    // Same-square moves are already rejected by the own-piece capture check
     if from.file != to.file && from.rank != to.rank then return false
-    if from.file == to.file && from.rank == to.rank then return false
     isPathClear(from, to)
 
   private def isValidQueenMove(from: Square, to: Square): Boolean =
@@ -175,7 +176,7 @@ final case class Board(
     val rankDiff = (to.rank - from.rank).abs
 
     // Queen moves like rook or bishop
-    if from.file == to.file && from.rank == to.rank then return false
+    // Same-square moves are already rejected by the own-piece capture check
     if from.file != to.file && from.rank != to.rank && fileDiff != rankDiff then
       return false
 

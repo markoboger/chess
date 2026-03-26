@@ -373,4 +373,24 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
       val result = PGNParser.parseMove("Ra3", board, isWhiteToMove = true)
       result.isFailure shouldBe true
     }
+
+    "fail on invalid castling notation" in {
+      val board = Board.initial
+      val result = PGNParser.parseMove("O-O-O-O", board, isWhiteToMove = true)
+      result.isFailure shouldBe true
+    }
+
+    "fail on invalid piece letter in standard move" in {
+      val board = Board.initial
+      // 'Z' is not a valid piece
+      val result = PGNParser.parseMove("Ze4", board, isWhiteToMove = true)
+      result.isFailure shouldBe true
+    }
+
+    "fail on invalid target square in standard move" in {
+      val board = Board.initial
+      // 'j9' is not a valid square
+      val result = PGNParser.parseMove("Nj9", board, isWhiteToMove = true)
+      result.isFailure shouldBe true
+    }
   }

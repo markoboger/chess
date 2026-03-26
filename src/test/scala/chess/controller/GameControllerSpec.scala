@@ -11,34 +11,35 @@ import chess.model.{
   GameEvent
 }
 import chess.controller.parser.FENParser
+import chess.util.Observer
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+
+/** A simple test observer that records the last event it received. */
+class TestObserver extends Observer[MoveResult]:
+  var lastEvent: Option[MoveResult] = None
+  override def update(event: MoveResult): Unit = lastEvent = Some(event)
 
 final class GameControllerSpec extends AnyWordSpec with Matchers:
 
   "GameController" should {
-    "announce the initial board to listeners" in {
+    "announce the initial board to observers" in {
       val controller = new GameController(Board.initial)
-      var lastBoard: Option[Board] = None
-
-      controller.boardProperty.onChange { (_, _, newBoard) =>
-        lastBoard = Some(newBoard)
-      }
+      val observer = new TestObserver
+      controller.add(observer)
 
       val emptyBoard = Board(Vector.fill(8, 8)(None))
       controller.announceInitial(emptyBoard)
 
-      lastBoard shouldBe defined
-      lastBoard.get shouldBe emptyBoard
+      observer.lastEvent shouldBe defined
+      observer.lastEvent.get.isSuccess shouldBe true
+      observer.lastEvent.get.board shouldBe emptyBoard
     }
 
-    "update its internal board and notify listeners when applying a move" in {
+    "update its internal board and notify observers when applying a move" in {
       val controller = new GameController(Board.initial)
-      var lastBoard: Option[Board] = None
-
-      controller.boardProperty.onChange { (_, _, newBoard) =>
-        lastBoard = Some(newBoard)
-      }
+      val observer = new TestObserver
+      controller.add(observer)
 
       val before = controller.board
       val result = controller.applyMove(from = Square("e2"), to = Square("e4"))
@@ -46,7 +47,7 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
 
       val after = result.board
       controller.board shouldBe after
-      lastBoard should contain(after)
+      observer.lastEvent.get.board shouldBe after
       after should not be theSameInstanceAs(before)
     }
 

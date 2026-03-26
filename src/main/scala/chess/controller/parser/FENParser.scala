@@ -16,11 +16,10 @@ object FENParser {
   def parseFEN(fen: String): Try[Board] = {
     Try {
       val parts = fen.trim.split("\\s+")
-      if (parts.length < 1) {
+      val boardPart = parts(0)
+      if (boardPart.isEmpty) {
         throw new IllegalArgumentException("FEN string is empty")
       }
-
-      val boardPart = parts(0)
       parseBoardFromFEN(boardPart)
     }
   }

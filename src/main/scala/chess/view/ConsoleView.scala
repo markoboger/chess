@@ -12,18 +12,24 @@ import chess.model.{
   MoveError,
   GameEvent
 }
+import chess.util.Observer
 import scala.io.StdIn
 
-/** A console-based view for the chess game. Uses ScalaFX's Reactor pattern to
-  * receive board updates.
+/** A console-based view for the chess game.
+  *
+  * Implements [[Observer]] to react to move results published by the
+  * [[GameController]]. Both successful moves and errors are handled in
+  * [[update]], making the TUI fully event-driven.
   */
-class ConsoleView(val controller: GameController) {
-  controller.boardProperty.onChange { (_, _, newBoard) =>
-    println(showBoard(newBoard))
-    if (!isInputAvailable) {
-      val player = if (controller.isWhiteToMove) "White" else "Black"
-      println(s"$player to move (make moves in GUI)\n")
-    }
+class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
+  controller.add(this)
+
+  override def update(event: MoveResult): Unit = event match {
+    case MoveResult.Moved(board, gameEvent) =>
+      println(showBoard(board))
+      handleGameEvent(gameEvent)
+    case MoveResult.Failed(_, error) =>
+      println(s"Error: ${error.message}")
   }
 
   def showWelcome(): String =
@@ -70,11 +76,17 @@ class ConsoleView(val controller: GameController) {
     }
   }
 
-  private def handleGameEvent(event: GameEvent): Unit = event match {
-    case GameEvent.Check     => println("Check!")
-    case GameEvent.Checkmate => println("Checkmate!")
-    case GameEvent.Stalemate => println("Stalemate! The game is a draw.")
-    case GameEvent.Moved     => // normal move, board shown via observer
+  private def handleGameEvent(event: GameEvent): Unit = {
+    val player = if (controller.isWhiteToMove) "White" else "Black"
+    event match {
+      case GameEvent.Check => println(s"Check! $player to move.")
+      case GameEvent.Checkmate =>
+        println(
+          s"Checkmate! ${if (controller.isWhiteToMove) "Black" else "White"} wins!"
+        )
+      case GameEvent.Stalemate => println("Stalemate! The game is a draw.")
+      case GameEvent.Moved     => println(s"$player to move.")
+    }
   }
 
   /** Main game loop for the console interface.
@@ -104,27 +116,20 @@ class ConsoleView(val controller: GameController) {
         println("Thanks for playing!")
         running = false
       } else {
-        // Try PGN notation first
+        // Try PGN notation first; display is handled by update() observer
         controller.applyPgnMove(input) match {
-          case MoveResult.Moved(_, event) =>
-            handleGameEvent(event)
+          case _: MoveResult.Moved => // displayed by update()
           case MoveResult.Failed(_, MoveError.ParseError(_)) =>
             // PGN parsing failed, try coordinate notation
             parseMove(input) match {
               case Some((from, to)) =>
-                controller.applyMove(from, to) match {
-                  case MoveResult.Moved(_, event) =>
-                    handleGameEvent(event)
-                  case MoveResult.Failed(_, error) =>
-                    println(s"Invalid move: ${error.message}")
-                }
+                controller.applyMove(from, to) // result displayed by update()
               case None =>
                 println(
                   "Invalid move format. Use PGN (e4, Nf3, O-O) or coordinates (e2e4)."
                 )
             }
-          case MoveResult.Failed(_, error) =>
-            println(s"Illegal move: ${error.message}")
+          case _: MoveResult.Failed => // error displayed by update()
         }
       }
     }

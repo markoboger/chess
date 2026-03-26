@@ -13,12 +13,15 @@ import scalafx.stage.Stage
 import chess.controller.GameController
 import chess.model.{Board, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.model.{Color => ChessColor}
+import chess.util.Observer
 import scala.compiletime.uninitialized
 import javafx.application.{Application, Platform}
 import javafx.application.Platform.{setImplicitExit}
 import java.awt.Desktop
 
-class ChessGUI(val controller: GameController) {
+class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
+  controller.add(this)
+
   private var selectedSquare: Option[Square] = None
   private var boardSquares: Array[Array[Rectangle]] =
     Array.ofDim[Rectangle](8, 8)
@@ -29,6 +32,30 @@ class ChessGUI(val controller: GameController) {
   private var playerLabel: Label = uninitialized
   private var moveInput: TextField = uninitialized
   private var fenDisplay: TextArea = uninitialized
+  private[view] var initialized: Boolean = false
+
+  override def update(event: MoveResult): Unit = {
+    if (!initialized) return
+    Platform.runLater(() => {
+      event match {
+        case MoveResult.Moved(_, gameEvent) =>
+          playerLabel.text = gameEvent match {
+            case GameEvent.Checkmate => "Checkmate!"
+            case GameEvent.Stalemate => "Stalemate! Draw."
+            case GameEvent.Check =>
+              s"${if (controller.isWhiteToMove) "White" else "Black"} is in check!"
+            case GameEvent.Moved =>
+              if (controller.isWhiteToMove) "White to move" else "Black to move"
+          }
+          fenDisplay.text = controller.getBoardAsFEN
+          updateBoard()
+        case MoveResult.Failed(_, _) =>
+          // Errors are handled inline by the originating action
+          // (click vs text input require different UI feedback)
+          ()
+      }
+    })
+  }
 
   private[view] def createBoardPane(): GridPane = {
     val boardPane = new GridPane {
@@ -159,8 +186,7 @@ class ChessGUI(val controller: GameController) {
           controller.loadFromFEN(fen) match {
             case Right(_) =>
               selectedSquare = None
-              playerLabel.text = "White to move"
-              updateBoard()
+            // Display updated by observer update()
             case Left(error) =>
               showAlert("Invalid FEN", error)
           }
@@ -173,14 +199,10 @@ class ChessGUI(val controller: GameController) {
       style =
         "-fx-font-size: 14px; -fx-padding: 10px; -fx-background-color: #ff9800; -fx-text-fill: white;"
       onAction = _ => {
-        // Reset the board state
-        controller.board = Board.initial
-        controller.announceInitial(controller.board)
+        // Reset the board state — observer update() handles display refresh
+        controller.announceInitial(Board.initial)
         selectedSquare = None
         moveInput.text = ""
-        playerLabel.text = "White to move"
-        fenDisplay.text = controller.getBoardAsFEN
-        updateBoard()
       }
     }
 
@@ -208,18 +230,9 @@ class ChessGUI(val controller: GameController) {
     val move = moveInput.text.value.trim
     if (move.nonEmpty) {
       controller.applyPgnMove(move) match {
-        case MoveResult.Moved(_, event) =>
+        case _: MoveResult.Moved =>
           moveInput.text = ""
-          playerLabel.text = event match {
-            case GameEvent.Checkmate => "Checkmate!"
-            case GameEvent.Stalemate => "Stalemate! Draw."
-            case GameEvent.Check =>
-              s"${if (controller.isWhiteToMove) "White" else "Black"} is in check!"
-            case GameEvent.Moved =>
-              if (controller.isWhiteToMove) "White to move" else "Black to move"
-          }
-          fenDisplay.text = controller.getBoardAsFEN
-          updateBoard()
+        // Board/label/FEN updated by observer update()
         case MoveResult.Failed(_, error) =>
           val detailedError = s"""
             |Move: '$move'
@@ -286,19 +299,20 @@ class ChessGUI(val controller: GameController) {
           selectedSquare = None
         } else {
           controller.applyMove(fromSquare, square) match {
-            case MoveResult.Moved(_, event) =>
+            case _: MoveResult.Moved =>
               selectedSquare = None
-              playerLabel.text = event match {
-                case GameEvent.Checkmate => "Checkmate!"
-                case GameEvent.Stalemate => "Stalemate! Draw."
-                case GameEvent.Check =>
-                  s"${if (controller.isWhiteToMove) "White" else "Black"} is in check!"
-                case GameEvent.Moved =>
-                  if (controller.isWhiteToMove) "White to move"
-                  else "Black to move"
+            // Board/label/FEN updated by observer update()
+            case MoveResult.Failed(_, error) =>
+              // Show error briefly in the player label
+              playerLabel.text = error match {
+                case MoveError.LeavesKingInCheck =>
+                  "Illegal: move leaves king in check!"
+                case MoveError.WrongColor      => "That's not your piece!"
+                case MoveError.NoPiece         => "No piece on that square!"
+                case MoveError.InvalidMove     => "That piece can't move there!"
+                case MoveError.ParseError(msg) => s"Error: $msg"
               }
-              fenDisplay.text = controller.getBoardAsFEN
-            case _: MoveResult.Failed =>
+              // Try to re-select if clicking on own piece
               controller.board.pieceAt(square) match {
                 case Some(piece)
                     if piece.color == (if (controller.isWhiteToMove)
@@ -373,10 +387,8 @@ class ChessGUILauncher extends javafx.application.Application {
       }
     }
 
-    // Listen to board property changes using ScalaFX Reactor pattern
-    gui.controller.boardProperty.onChange { (_, _, _) =>
-      gui.updateBoard()
-    }
+    // Mark GUI as initialized — observer update() calls are now safe
+    gui.initialized = true
 
     // Configure stage properties for visibility
     gui.primaryStage.resizable = true

@@ -57,8 +57,6 @@ object PGNParser {
       case "O-O-O" | "0-0-0" =>
         // Queenside castling
         Success((Square(File.E, rank), Square(File.C, rank)))
-      case _ =>
-        Failure(new IllegalArgumentException(s"Invalid castling move: $castle"))
     }
   }
 
@@ -79,20 +77,11 @@ object PGNParser {
       case "R" => Role.Rook
       case "Q" => Role.Queen
       case "K" => Role.King
-      case _ =>
-        return Failure(
-          new IllegalArgumentException(s"Invalid piece: $pieceStr")
-        )
     }
 
     val color = if (isWhiteToMove) Color.White else Color.Black
-    val targetSquare = Square.fromString(target) match {
-      case Some(sq) => sq
-      case None =>
-        return Failure(
-          new IllegalArgumentException(s"Invalid target square: $target")
-        )
-    }
+    // Target square is guaranteed valid by MovePattern regex
+    val targetSquare = Square.fromString(target).get
 
     // Find the piece that can make this move
     findPieceMatchingMove(

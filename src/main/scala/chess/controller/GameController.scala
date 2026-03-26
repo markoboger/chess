@@ -2,21 +2,21 @@ package chess.controller
 
 import chess.model.{Board, Color, Square, File, Rank, MoveResult, MoveError}
 import chess.controller.parser.{PGNParser, FENParser}
-import scalafx.beans.property.ObjectProperty
+import chess.util.Observable
 import scala.util.{Try, Success, Failure}
 
-final class GameController(initialBoard: Board):
-  val boardProperty: ObjectProperty[Board] = ObjectProperty(initialBoard)
+final class GameController(initialBoard: Board) extends Observable[MoveResult]:
+  private var currentBoard: Board = initialBoard
   private var _isWhiteToMove: Boolean = true
 
-  def board: Board = boardProperty.value
-  def board_=(newBoard: Board): Unit = boardProperty.value = newBoard
+  def board: Board = currentBoard
 
   def isWhiteToMove: Boolean = _isWhiteToMove
 
-  /** Notify listeners about the initial board that was created elsewhere. */
+  /** Notify observers about a board reset (new game, FEN load, etc.). */
   def announceInitial(board: Board): Unit = {
-    boardProperty.value = board
+    currentBoard = board
+    notifyObservers(MoveResult.Moved(board))
   }
 
   /** Load a position from FEN notation.
@@ -28,8 +28,9 @@ final class GameController(initialBoard: Board):
   def loadFromFEN(fen: String): Either[String, Board] = {
     FENParser.parseFEN(fen) match {
       case Success(newBoard) =>
-        this.board = newBoard
+        currentBoard = newBoard
         _isWhiteToMove = true
+        notifyObservers(MoveResult.Moved(newBoard))
         Right(newBoard)
       case Failure(e) =>
         Left(s"Failed to parse FEN: ${e.getMessage}")
@@ -61,17 +62,19 @@ final class GameController(initialBoard: Board):
     *   success, or [[MoveResult.Failed]] with error reason on failure
     */
   def applyMove(from: Square, to: Square): MoveResult =
-    board.pieceAt(from) match
+    val result = board.pieceAt(from) match
       case Some(piece) if piece.color == activeColor =>
         board.move(from, to) match
           case moved: MoveResult.Moved =>
-            this.board = moved.board
+            currentBoard = moved.board
             _isWhiteToMove = !_isWhiteToMove
             moved
           case failed: MoveResult.Failed =>
             failed
       case Some(_) => MoveResult.Failed(board, MoveError.WrongColor)
       case None    => MoveResult.Failed(board, MoveError.NoPiece)
+    notifyObservers(result)
+    result
 
   def activeColor: Color =
     if _isWhiteToMove then Color.White else Color.Black
