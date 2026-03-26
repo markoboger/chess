@@ -394,3 +394,212 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
       result.isFailure shouldBe true
     }
   }
+
+  "PGNParser.toAlgebraic" should {
+    "convert a pawn move" in {
+      val board = Board.initial
+      val after = board.move(Square("e2"), Square("e4")).get
+      PGNParser.toAlgebraic(
+        Square("e2"),
+        Square("e4"),
+        board,
+        after,
+        isWhite = true
+      ) shouldBe "e4"
+    }
+
+    "convert a knight move" in {
+      val board = Board.initial
+      val after = board.move(Square("g1"), Square("f3")).get
+      PGNParser.toAlgebraic(
+        Square("g1"),
+        Square("f3"),
+        board,
+        after,
+        isWhite = true
+      ) shouldBe "Nf3"
+    }
+
+    "convert a pawn capture" in {
+      // Set up a position where e4 pawn can capture d5 pawn
+      val fen = "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR"
+      val board = FENParser.parseFEN(fen).get
+      val after = board.move(Square("e4"), Square("d5")).get
+      PGNParser.toAlgebraic(
+        Square("e4"),
+        Square("d5"),
+        board,
+        after,
+        isWhite = true
+      ) shouldBe "exd5"
+    }
+
+    "convert kingside castling" in {
+      // Board doesn't implement castling via move(), so construct boards manually
+      val before = FENParser.parseFEN("4k3/8/8/8/8/8/8/4K2R").get
+      val after = FENParser.parseFEN("4k3/8/8/8/8/8/8/5RK1").get
+      PGNParser.toAlgebraic(
+        Square("e1"),
+        Square("g1"),
+        before,
+        after,
+        isWhite = true
+      ) shouldBe "O-O"
+    }
+
+    "convert queenside castling" in {
+      val before = FENParser.parseFEN("4k3/8/8/8/8/8/8/R3K3").get
+      val after = FENParser.parseFEN("4k3/8/8/8/8/8/8/2KR4").get
+      PGNParser.toAlgebraic(
+        Square("e1"),
+        Square("c1"),
+        before,
+        after,
+        isWhite = true
+      ) shouldBe "O-O-O"
+    }
+
+    "add + for check" in {
+      // Rook on a1, king on e1; move rook to e8 checking black king
+      val fen = "4k3/8/8/8/8/8/8/R3K3"
+      val board = FENParser.parseFEN(fen).get
+      val after = board.move(Square("a1"), Square("a8")).get
+      val pgn = PGNParser.toAlgebraic(
+        Square("a1"),
+        Square("a8"),
+        board,
+        after,
+        isWhite = true
+      )
+      pgn shouldBe "Ra8+"
+    }
+
+    "add # for checkmate" in {
+      // Scholar's mate final move: queen to f7
+      val fen = "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR"
+      val board = FENParser.parseFEN(fen).get
+      val after = board.move(Square("f3"), Square("f7")).get
+      val pgn = PGNParser.toAlgebraic(
+        Square("f3"),
+        Square("f7"),
+        board,
+        after,
+        isWhite = true
+      )
+      pgn shouldBe "Qxf7#"
+    }
+
+    "disambiguate with file when two rooks share a rank" in {
+      // Two white rooks on a1 and h1, king on b2 (out of the way)
+      val fen = "4k3/8/8/8/8/8/1K6/R6R"
+      val board = FENParser.parseFEN(fen).get
+      val after = board.move(Square("a1"), Square("c1")).get
+      val pgn = PGNParser.toAlgebraic(
+        Square("a1"),
+        Square("c1"),
+        board,
+        after,
+        isWhite = true
+      )
+      pgn shouldBe "Rac1"
+    }
+
+    "disambiguate with rank when two rooks share a file" in {
+      // Two white rooks on a1 and a5, king on e1
+      val fen = "4k3/8/8/R7/8/8/8/R3K3"
+      val board = FENParser.parseFEN(fen).get
+      val after = board.move(Square("a1"), Square("a3")).get
+      val pgn = PGNParser.toAlgebraic(
+        Square("a1"),
+        Square("a3"),
+        board,
+        after,
+        isWhite = true
+      )
+      pgn shouldBe "R1a3"
+    }
+
+    "convert a king move" in {
+      val fen = "4k3/8/8/8/8/8/8/4K3"
+      val board = FENParser.parseFEN(fen).get
+      val after = board.move(Square("e1"), Square("e2")).get
+      PGNParser.toAlgebraic(
+        Square("e1"),
+        Square("e2"),
+        board,
+        after,
+        isWhite = true
+      ) shouldBe "Ke2"
+    }
+
+    "convert a bishop move" in {
+      val fen = "4k3/8/8/8/8/8/8/2B1K3"
+      val board = FENParser.parseFEN(fen).get
+      val after = board.move(Square("c1"), Square("f4")).get
+      PGNParser.toAlgebraic(
+        Square("c1"),
+        Square("f4"),
+        board,
+        after,
+        isWhite = true
+      ) shouldBe "Bf4"
+    }
+
+    "convert a queen move" in {
+      val fen = "4k3/8/8/8/8/8/8/3QK3"
+      val board = FENParser.parseFEN(fen).get
+      val after = board.move(Square("d1"), Square("d5")).get
+      PGNParser.toAlgebraic(
+        Square("d1"),
+        Square("d5"),
+        board,
+        after,
+        isWhite = true
+      ) shouldBe "Qd5"
+    }
+
+    "add # for castling with checkmate" in {
+      // After O-O, rook on f1 checkmates black king on f8
+      // f7 empty so rook sees king, e8/g8 blocked by rooks, e7/g7 blocked by pawns
+      val before = FENParser.parseFEN("4rkr1/4p1pp/8/8/8/8/8/4K2R").get
+      val after = FENParser.parseFEN("4rkr1/4p1pp/8/8/8/8/8/5RK1").get
+      val pgn = PGNParser.toAlgebraic(
+        Square("e1"),
+        Square("g1"),
+        before,
+        after,
+        isWhite = true
+      )
+      pgn shouldBe "O-O#"
+    }
+
+    "add + for castling with check" in {
+      // After O-O, rook on f1 gives check to black king on f8
+      val before = FENParser.parseFEN("5k2/8/8/8/8/8/8/4K2R").get
+      val after = FENParser.parseFEN("5k2/8/8/8/8/8/8/5RK1").get
+      val pgn = PGNParser.toAlgebraic(
+        Square("e1"),
+        Square("g1"),
+        before,
+        after,
+        isWhite = true
+      )
+      pgn shouldBe "O-O+"
+    }
+
+    "disambiguate with file and rank when three queens can reach same square" in {
+      // Three white queens: a1, a5, c1 all can reach a3
+      // Moving Qa1 to a3: Qa5 shares file a, Qc1 shares rank 1 => need Qa1a3
+      val fen = "4k3/8/8/Q7/8/8/8/Q1Q1K3"
+      val board = FENParser.parseFEN(fen).get
+      val after = board.move(Square("a1"), Square("a3")).get
+      val pgn = PGNParser.toAlgebraic(
+        Square("a1"),
+        Square("a3"),
+        board,
+        after,
+        isWhite = true
+      )
+      pgn shouldBe "Qa1a3"
+    }
+  }

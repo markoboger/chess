@@ -32,6 +32,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var playerLabel: Label = uninitialized
   private var moveInput: TextField = uninitialized
   private var fenDisplay: TextArea = uninitialized
+  private var pgnDisplay: TextArea = uninitialized
   private[view] var initialized: Boolean = false
 
   override def update(event: MoveResult): Unit = {
@@ -48,6 +49,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
               if (controller.isWhiteToMove) "White to move" else "Black to move"
           }
           fenDisplay.text = controller.getBoardAsFEN
+          pgnDisplay.text = controller.pgnText
           updateBoard()
         case MoveResult.Failed(_, _) =>
           // Errors are handled inline by the originating action
@@ -165,6 +167,43 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     // Allow Enter key to submit move
     moveInput.onAction = _ => handleMoveInput()
 
+    // PGN section
+    val pgnLabel = new Label("Game PGN:") {
+      font = Font.font("Arial", FontWeight.Normal, 14)
+      padding = Insets(10, 0, 5, 0)
+    }
+
+    pgnDisplay = new TextArea {
+      text = ""
+      prefRowCount = 6
+      wrapText = true
+      editable = false
+      style = "-fx-font-family: monospace;"
+    }
+
+    val backButton = new Button("\u25C0 Back") {
+      prefWidth = 120
+      style = "-fx-font-size: 13px; -fx-padding: 8px;"
+      onAction = _ => {
+        controller.backward()
+        selectedSquare = None
+      }
+    }
+
+    val forwardButton = new Button("Forward \u25B6") {
+      prefWidth = 120
+      style = "-fx-font-size: 13px; -fx-padding: 8px;"
+      onAction = _ => {
+        controller.forward()
+        selectedSquare = None
+      }
+    }
+
+    val navButtonBox = new HBox(10) {
+      alignment = Pos.Center
+      children = Seq(backButton, forwardButton)
+    }
+
     // FEN section
     val fenLabel = new Label("FEN Position:") {
       font = Font.font("Arial", FontWeight.Normal, 14)
@@ -203,6 +242,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         controller.announceInitial(Board.initial)
         selectedSquare = None
         moveInput.text = ""
+        pgnDisplay.text = ""
       }
     }
 
@@ -216,6 +256,10 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         moveLabel,
         moveInput,
         moveButton,
+        new Separator(),
+        pgnLabel,
+        pgnDisplay,
+        navButtonBox,
         new Separator(),
         fenLabel,
         fenDisplay,

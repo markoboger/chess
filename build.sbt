@@ -30,7 +30,11 @@ lazy val Chess = project
       "org.openjfx" % "javafx-base" % "21.0.2" classifier javafxClassifier,
       "org.openjfx" % "javafx-controls" % "21.0.2" classifier javafxClassifier,
       "org.openjfx" % "javafx-graphics" % "21.0.2" classifier javafxClassifier,
-      "org.openjfx" % "javafx-fxml" % "21.0.2" classifier javafxClassifier
+      "org.openjfx" % "javafx-fxml" % "21.0.2" classifier javafxClassifier,
+      "io.circe" %% "circe-core" % "0.14.10",
+      "io.circe" %% "circe-generic" % "0.14.10",
+      "io.circe" %% "circe-parser" % "0.14.10",
+      "com.lihaoyi" %% "upickle" % "4.0.2"
     ),
     coverageExcludedFiles := ".*view/.*;.*ChessApp.*;.*FENExample.*;.*PGNExample.*",
     coverageMinimumStmtTotal := 40,

@@ -202,6 +202,83 @@ object PGNParser {
     }
   }
 
+  /** Convert a coordinate move to standard algebraic (PGN) notation.
+    *
+    * @param from
+    *   source square
+    * @param to
+    *   target square
+    * @param boardBefore
+    *   board state before the move
+    * @param boardAfter
+    *   board state after the move
+    * @param isWhite
+    *   whether the moving side is white
+    * @return
+    *   the PGN string, e.g. "Nf3", "exd5", "O-O", "Qd1#"
+    */
+  def toAlgebraic(
+      from: Square,
+      to: Square,
+      boardBefore: Board,
+      boardAfter: Board,
+      isWhite: Boolean
+  ): String = {
+    val piece = boardBefore.pieceAt(from).get
+    val opponent = if (isWhite) Color.Black else Color.White
+    val isCapture = boardBefore.pieceAt(to).isDefined ||
+      (piece.role == Role.Pawn && from.file != to.file) // en passant
+
+    // Castling
+    if (piece.role == Role.King && (to.file - from.file).abs == 2) {
+      val base = if (to.file.index > from.file.index) "O-O" else "O-O-O"
+      val suffix =
+        if (boardAfter.isCheckmate(opponent)) "#"
+        else if (boardAfter.isInCheck(opponent)) "+"
+        else ""
+      return base + suffix
+    }
+
+    val sb = new StringBuilder
+
+    piece.role match {
+      case Role.Pawn =>
+        if (isCapture) sb.append(from.file.letter)
+      case Role.Knight => sb.append("N")
+      case Role.Bishop => sb.append("B")
+      case Role.Rook   => sb.append("R")
+      case Role.Queen  => sb.append("Q")
+      case Role.King   => sb.append("K")
+    }
+
+    // Disambiguation for non-pawn pieces
+    if (piece.role != Role.Pawn && piece.role != Role.King) {
+      val others = Square.all.filter { sq =>
+        sq != from &&
+        boardBefore
+          .pieceAt(sq)
+          .exists(p => p.role == piece.role && p.color == piece.color) &&
+        isValidMove(sq, to, piece.role, piece.color, boardBefore)
+      }
+      if (others.nonEmpty) {
+        val sameFile = others.exists(_.file == from.file)
+        val sameRank = others.exists(_.rank == from.rank)
+        if (!sameFile) sb.append(from.file.letter)
+        else if (!sameRank) sb.append(from.rank.index)
+        else { sb.append(from.file.letter); sb.append(from.rank.index) }
+      }
+    }
+
+    if (isCapture) sb.append("x")
+    sb.append(to.toString)
+
+    // Check / checkmate
+    if (boardAfter.isCheckmate(opponent)) sb.append("#")
+    else if (boardAfter.isInCheck(opponent)) sb.append("+")
+
+    sb.toString
+  }
+
   private def isPathClear(from: Square, to: Square, board: Board): Boolean = {
     val dx = (to.file - from.file).sign
     val dy = (to.rank - from.rank).sign

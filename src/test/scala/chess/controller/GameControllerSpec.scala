@@ -233,4 +233,131 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       ctrl.isStalemate shouldBe true
       ctrl.gameStatus should include("Stalemate")
     }
+
+    "track board states in history" in {
+      val controller = new GameController(Board.initial)
+      controller.boardStates.length shouldBe 1
+      controller.currentIndex shouldBe 0
+      controller.isAtLatest shouldBe true
+
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.boardStates.length shouldBe 2
+      controller.currentIndex shouldBe 1
+      controller.isAtLatest shouldBe true
+
+      controller.applyMove(Square("e7"), Square("e5"))
+      controller.boardStates.length shouldBe 3
+      controller.currentIndex shouldBe 2
+    }
+
+    "generate PGN text from move history" in {
+      val controller = new GameController(Board.initial)
+      controller.pgnText shouldBe ""
+
+      controller.applyPgnMove("e4")
+      controller.pgnText shouldBe "1. e4"
+
+      controller.applyPgnMove("e5")
+      controller.pgnText shouldBe "1. e4 e5"
+
+      controller.applyPgnMove("Nf3")
+      controller.pgnText shouldBe "1. e4 e5 2. Nf3"
+    }
+
+    "record PGN for coordinate moves" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.pgnMoves.head shouldBe "e4"
+    }
+
+    "navigate backward through history" in {
+      val controller = new GameController(Board.initial)
+      val observer = new TestObserver
+      controller.add(observer)
+
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.applyMove(Square("e7"), Square("e5"))
+      controller.currentIndex shouldBe 2
+
+      controller.backward()
+      controller.currentIndex shouldBe 1
+      controller.board shouldBe controller.boardStates(1)
+      controller.isWhiteToMove shouldBe false
+      observer.lastEvent.get.isSuccess shouldBe true
+
+      controller.backward()
+      controller.currentIndex shouldBe 0
+      controller.board shouldBe controller.boardStates(0)
+      controller.isWhiteToMove shouldBe true
+    }
+
+    "not navigate backward past the initial position" in {
+      val controller = new GameController(Board.initial)
+      controller.backward()
+      controller.currentIndex shouldBe 0
+      controller.board shouldBe Board.initial
+    }
+
+    "navigate forward through history" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.applyMove(Square("e7"), Square("e5"))
+
+      controller.backward()
+      controller.backward()
+      controller.currentIndex shouldBe 0
+
+      controller.forward()
+      controller.currentIndex shouldBe 1
+      controller.isWhiteToMove shouldBe false
+
+      controller.forward()
+      controller.currentIndex shouldBe 2
+      controller.isAtLatest shouldBe true
+    }
+
+    "not navigate forward past the latest position" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+
+      controller.forward()
+      controller.currentIndex shouldBe 1
+      controller.isAtLatest shouldBe true
+    }
+
+    "reject moves when not at the latest position" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.applyMove(Square("e7"), Square("e5"))
+
+      controller.backward()
+      controller.isAtLatest shouldBe false
+
+      val result = controller.applyMove(Square("d2"), Square("d4"))
+      result.isFailed shouldBe true
+    }
+
+    "reset history on announceInitial" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.applyMove(Square("e7"), Square("e5"))
+      controller.pgnMoves.length shouldBe 2
+
+      controller.announceInitial(Board.initial)
+      controller.boardStates.length shouldBe 1
+      controller.pgnMoves shouldBe empty
+      controller.currentIndex shouldBe 0
+      controller.pgnText shouldBe ""
+    }
+
+    "reset history on loadFromFEN" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.pgnMoves.length shouldBe 1
+
+      controller.loadFromFEN("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR")
+      controller.boardStates.length shouldBe 1
+      controller.pgnMoves shouldBe empty
+      controller.currentIndex shouldBe 0
+    }
   }
