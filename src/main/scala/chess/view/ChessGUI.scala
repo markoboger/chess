@@ -13,7 +13,7 @@ import scalafx.stage.Stage
 import scalafx.stage.FileChooser
 import scalafx.stage.FileChooser.ExtensionFilter
 import chess.controller.{GameController, ComputerPlayer, MoveStrategy}
-import chess.controller.strategy.{RandomStrategy, GreedyStrategy, MaterialBalanceStrategy}
+import chess.controller.strategy.{RandomStrategy, GreedyStrategy, MaterialBalanceStrategy, PieceSquareStrategy, MinimaxStrategy, QuiescenceStrategy}
 import chess.model.{Board, Piece, PromotableRole, Role, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.model.{Color => ChessColor}
 import chess.io.FileIO
@@ -21,6 +21,8 @@ import chess.io.json.circe.CirceJsonFileIO
 import chess.io.json.upickle.UPickleJsonFileIO
 import chess.AppBindings.given
 import chess.util.Observer
+import chess.clock.ClockActor
+import org.apache.pekko.actor.typed.ActorSystem
 import scala.compiletime.uninitialized
 import javafx.application.{Application, Platform}
 import javafx.application.Platform.{setImplicitExit}
@@ -44,9 +46,14 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     case HumanVsHuman, HumanVsComputer, ComputerVsComputer
 
   private[view] var gameMode: GameMode = GameMode.HumanVsHuman
-  private[view] val computerPlayer: ComputerPlayer = new ComputerPlayer()
+  private[view] val whiteComputer: ComputerPlayer = new ComputerPlayer(new QuiescenceStrategy(3))
+  private[view] val blackComputer: ComputerPlayer = new ComputerPlayer(new MinimaxStrategy(3))
   // Whether a background computer-move thread is currently scheduled
   @volatile private var computerScheduled: Boolean = false
+  @volatile private[view] var paused: Boolean = false
+
+  private var pauseButton: Button = uninitialized
+  private var gameButtonBox: HBox = uninitialized
   private[view] var primaryStage: Stage = uninitialized
 
   // UI components that need to be updated
@@ -58,6 +65,20 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var blackCapturesBox: HBox = uninitialized
   private var whiteCapturesBox: HBox = uninitialized
   private var materialLabel: Label = uninitialized
+  private var whiteClockLabel: Label = uninitialized
+  private var blackClockLabel: Label = uninitialized
+
+  // ── Chess clock ────────────────────────────────────────────────────────────
+  enum ClockMode:
+    case NoLimit
+    case Timed(initialMs: Long, incrementMs: Long, label: String)
+
+  private var clockMode: ClockMode = ClockMode.NoLimit
+  private var whiteElapsedMs: Long = 0
+  private var blackElapsedMs: Long = 0
+  private var clockStarted: Boolean = false
+  private var lastPgnLength: Int = 0
+  private var clockSystem: ActorSystem[chess.clock.ClockActor.Command] = _
   private[view] var initialized: Boolean = false
 
   override def update(event: MoveResult): Unit = {
@@ -65,6 +86,12 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     Platform.runLater(() => {
       event match {
         case MoveResult.Moved(_, gameEvent) =>
+          // Detect a real move (not navigation) by a growing PGN list
+          val newPgnLength = controller.pgnMoves.length
+          if (newPgnLength > lastPgnLength) {
+            lastPgnLength = newPgnLength
+            switchClock()
+          }
           playerLabel.text = gameEvent match {
             case GameEvent.Checkmate => "Checkmate!"
             case GameEvent.Stalemate => "Stalemate! Draw."
@@ -94,7 +121,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     case GameMode.ComputerVsComputer => true
 
   private[view] def triggerComputerMoveIfNeeded(): Unit =
-    if (!computerScheduled && isComputerTurn && !isGameOver) {
+    if (!computerScheduled && !paused && isComputerTurn && !isGameOver) {
       computerScheduled = true
       val delayMs = if (gameMode == GameMode.ComputerVsComputer) 500L else 300L
       val t = new Thread(() => {
@@ -103,7 +130,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
           computerScheduled = false
           if (isComputerTurn && !isGameOver) {
             val color = controller.activeColor
-            computerPlayer.move(controller.board, color).foreach {
+            val player = if color == chess.model.Color.White then whiteComputer else blackComputer
+            player.move(controller.board, color).foreach {
               case (from, to, promo) =>
                 selectedSquare = None
                 controller.applyMove(from, to, promo)
@@ -327,20 +355,52 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         "-fx-font-family: monospace; -fx-font-size: 11px; -fx-opacity: 0.9;"
     }
 
-    // New Game button
-    val resetButton = new Button("New Game") {
-      prefWidth = 250
+    // New Game button (yellow)
+    val resetButton = new Button("\u2605 New Game") {
+      prefWidth = 120
       style =
-        "-fx-font-size: 14px; -fx-padding: 10px; -fx-background-color: #ff9800; -fx-text-fill: white;"
+        "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #f1c40f; -fx-text-fill: #333333; -fx-font-weight: bold;"
       onAction = _ => {
-        // Reset the board state — observer update() handles display refresh
+        paused = false
+        updatePauseButton()
+        resetClock()
+        lastPgnLength = 0
         controller.announceInitial(Board.initial)
         selectedSquare = None
         moveInput.text = ""
         pgnDisplay.children.clear()
         pasteInput.text = ""
+        triggerComputerMoveIfNeeded()
       }
     }
+
+    // Pause / Continue button (orange when running, green when paused)
+    pauseButton = new Button("\u23F8 Pause") {
+      prefWidth = 120
+      style =
+        "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #e67e22; -fx-text-fill: white; -fx-font-weight: bold;"
+      onAction = _ => {
+        paused = !paused
+        updatePauseButton()
+        if (paused) {
+          if (clockSystem != null) clockSystem ! ClockActor.Stop
+        } else {
+          if (!controller.isAtLatest) {
+            controller.goToMove(controller.boardStates.length - 1)
+            selectedSquare = None
+          }
+          if (clockStarted && clockSystem != null) clockSystem ! ClockActor.Start
+          triggerComputerMoveIfNeeded()
+        }
+      }
+    }
+
+    gameButtonBox = new HBox(10) {
+      alignment = Pos.Center
+      children = Seq(resetButton, pauseButton)
+    }
+    pauseButton.visible = false
+    pauseButton.managed = false
 
     new VBox(10) {
       padding = Insets(20)
@@ -364,10 +424,34 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         fenLabel,
         fenDisplay,
         new Separator(),
-        resetButton
+        gameButtonBox
       )
     }
   }
+
+  /** Update pause button label/colour to reflect current paused state. */
+  private[view] def updatePauseButton(): Unit =
+    if (pauseButton == null) return
+    if (paused) {
+      pauseButton.text = "\u25B6 Continue"
+      pauseButton.style =
+        "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold;"
+    } else {
+      pauseButton.text = "\u23F8 Pause"
+      pauseButton.style =
+        "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #e67e22; -fx-text-fill: white; -fx-font-weight: bold;"
+    }
+
+  /** Show or hide the Pause button depending on whether C vs C mode is active. */
+  private[view] def updatePauseButtonVisibility(): Unit =
+    if (pauseButton == null) return
+    val cvc = gameMode == GameMode.ComputerVsComputer
+    pauseButton.visible = cvc
+    pauseButton.managed = cvc
+    if (!cvc) {
+      paused = false
+      updatePauseButton()
+    }
 
   private def handleMoveInput(): Unit = {
     val move = moveInput.text.value.trim
@@ -443,7 +527,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     })
   }
 
-  private[view] def createCapturedPanel(): VBox = {
+  private[view] def createCapturedPanel(): HBox = {
     blackCapturesBox = new HBox(3) { padding = Insets(2, 0, 2, 0) }
     whiteCapturesBox = new HBox(3) { padding = Insets(2, 0, 2, 0) }
     materialLabel = new Label("=") {
@@ -451,11 +535,41 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       maxWidth = Double.MaxValue
       alignment = Pos.Center
     }
-    updateCapturedPanel()
-    new VBox(2) {
+
+    val capturesVBox = new VBox(2) {
       padding = Insets(4, 20, 8, 20)
-      style = "-fx-background-color: #ebebeb; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;"
       children = Seq(blackCapturesBox, materialLabel, whiteCapturesBox)
+    }
+    scalafx.scene.layout.HBox.setHgrow(capturesVBox, scalafx.scene.layout.Priority.Always)
+
+    blackClockLabel = new Label("--:--") {
+      font = Font.font("Monospaced", FontWeight.Bold, 30)
+      padding = Insets(2, 16, 0, 16)
+      alignment = Pos.CenterRight
+    }
+    whiteClockLabel = new Label("--:--") {
+      font = Font.font("Monospaced", FontWeight.Bold, 30)
+      padding = Insets(0, 16, 2, 16)
+      alignment = Pos.CenterRight
+    }
+
+    val clockVBox = new VBox(0) {
+      alignment = Pos.CenterRight
+      padding = Insets(4, 8, 4, 0)
+      children = Seq(
+        new Label("BLACK") { font = Font.font("Arial", FontWeight.Bold, 10); padding = Insets(0, 16, 0, 16) },
+        blackClockLabel,
+        new Label("WHITE") { font = Font.font("Arial", FontWeight.Bold, 10); padding = Insets(2, 16, 0, 16) },
+        whiteClockLabel
+      )
+    }
+
+    updateCapturedPanel()
+    updateClockDisplay()
+
+    new HBox {
+      style = "-fx-background-color: #ebebeb; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;"
+      children = Seq(capturesVBox, clockVBox)
     }
   }
 
@@ -503,6 +617,101 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       else if adv < 0 then s"Black +${-adv}"
       else "="
   }
+
+  // ── Clock methods ──────────────────────────────────────────────────────────
+
+  private def formatTime(ms: Long): String =
+    val total = (ms / 1000).max(0)
+    val h = total / 3600
+    val m = (total % 3600) / 60
+    val s = total % 60
+    if h > 0 then f"$h%d:$m%02d:$s%02d" else f"$m%02d:$s%02d"
+
+  private def updateClockDisplay(): Unit =
+    if (whiteClockLabel == null || blackClockLabel == null) return
+    clockMode match
+      case ClockMode.NoLimit =>
+        whiteClockLabel.text = formatTime(whiteElapsedMs)
+        blackClockLabel.text = formatTime(blackElapsedMs)
+      case ClockMode.Timed(initialMs, _, _) =>
+        val wr = (initialMs - whiteElapsedMs).max(0)
+        val br = (initialMs - blackElapsedMs).max(0)
+        whiteClockLabel.text = formatTime(wr)
+        blackClockLabel.text = formatTime(br)
+    highlightActiveClockLabel()
+
+  private def highlightActiveClockLabel(): Unit =
+    if (whiteClockLabel == null || blackClockLabel == null) return
+    def colorFor(elapsedMs: Long): String = clockMode match
+      case ClockMode.Timed(initialMs, _, _) if (initialMs - elapsedMs) < 30000 => "#e74c3c"
+      case _ => "#333333"
+    val activeBase   = "-fx-background-color: #d5e8d4; -fx-background-radius: 4;"
+    val inactiveBase = "-fx-background-color: transparent;"
+    if controller.isWhiteToMove then
+      whiteClockLabel.style = s"-fx-text-fill: ${colorFor(whiteElapsedMs)}; $activeBase"
+      blackClockLabel.style = s"-fx-text-fill: #888888; $inactiveBase"
+    else
+      blackClockLabel.style = s"-fx-text-fill: ${colorFor(blackElapsedMs)}; $activeBase"
+      whiteClockLabel.style = s"-fx-text-fill: #888888; $inactiveBase"
+
+  /** Switch the active clock after a real move and start it if not yet running. */
+  private def switchClock(): Unit =
+    val incMs = clockMode match
+      case ClockMode.Timed(_, inc, _) => inc
+      case _                          => 0L
+    if !clockStarted then
+      clockStarted = true
+      clockSystem ! ClockActor.Start
+    clockSystem ! ClockActor.SwitchSide(incMs)
+    if isGameOver then clockSystem ! ClockActor.Stop
+    highlightActiveClockLabel()
+
+  /** Reset both clocks; stops ticking and zeroes elapsed times. */
+  private[view] def resetClock(): Unit =
+    whiteElapsedMs = 0
+    blackElapsedMs = 0
+    clockStarted   = false
+    if clockSystem != null then clockSystem ! ClockActor.Reset
+    updateClockDisplay()
+
+  /** Change clock mode (resets both clocks). */
+  private[view] def applyClockMode(mode: ClockMode): Unit =
+    clockMode = mode
+    val (initMs, incMs) = mode match
+      case ClockMode.Timed(i, inc, _) => (Some(i), inc)
+      case ClockMode.NoLimit          => (None, 0L)
+    if clockSystem != null then clockSystem ! ClockActor.SetMode(initMs, incMs)
+    whiteElapsedMs = 0
+    blackElapsedMs = 0
+    clockStarted   = false
+    updateClockDisplay()
+
+  private def handleTimeout(color: chess.model.Color): Unit =
+    val winner = if color == chess.model.Color.White then "Black" else "White"
+    new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION) {
+      initOwner(primaryStage.delegate)
+      setTitle("Time Out!")
+      setHeaderText(null)
+      setContentText(s"${color.toString} ran out of time. $winner wins!")
+    }.showAndWait()
+
+  /** Spawn the ClockActor inside its own ActorSystem.
+    * Callbacks marshal to the JavaFX thread via Platform.runLater.
+    */
+  private[view] def initClockActor(): Unit =
+    clockSystem = ActorSystem(
+      ClockActor(
+        onUpdate  = (wMs, bMs) => Platform.runLater { () =>
+          whiteElapsedMs = wMs
+          blackElapsedMs = bMs
+          updateClockDisplay()
+        },
+        onTimeout = color => Platform.runLater { () =>
+          handleTimeout(color)
+        }
+      ),
+      "chess-clock"
+    )
 
   private[view] def updateBoard(): Unit = {
     // Compute legal target squares once for the selected piece
@@ -843,12 +1052,14 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       selected = true
       onAction = _ => if (selected.value) {
         gameMode = GameMode.HumanVsHuman
+        updatePauseButtonVisibility()
       }
     }
     val hvcItem = new RadioMenuItem("Human vs Computer") {
       toggleGroup = modeGroup
       onAction = _ => if (selected.value) {
         gameMode = GameMode.HumanVsComputer
+        updatePauseButtonVisibility()
         triggerComputerMoveIfNeeded()
       }
     }
@@ -856,6 +1067,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       toggleGroup = modeGroup
       onAction = _ => if (selected.value) {
         gameMode = GameMode.ComputerVsComputer
+        updatePauseButtonVisibility()
         triggerComputerMoveIfNeeded()
       }
     }
@@ -864,26 +1076,68 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       items = Seq(hvhItem, hvcItem, cvcItem)
     }
 
-    // Strategy selection (applies to any computer-controlled side)
-    val strategyGroup = new ToggleGroup()
+    // Per-player strategy selection
     val strategies: Seq[(String, () => MoveStrategy)] = Seq(
-      "Random"           -> (() => new RandomStrategy()),
-      "Greedy"           -> (() => new GreedyStrategy()),
-      "Material Balance" -> (() => new MaterialBalanceStrategy())
+      "Random"                  -> (() => new RandomStrategy()),
+      "Greedy"                  -> (() => new GreedyStrategy()),
+      "Material Balance"        -> (() => new MaterialBalanceStrategy()),
+      "Piece-Square Tables"     -> (() => new PieceSquareStrategy()),
+      "Minimax (d=2)"           -> (() => new MinimaxStrategy(2)),
+      "Minimax (d=3)"           -> (() => new MinimaxStrategy(3)),
+      "Minimax (d=4)"           -> (() => new MinimaxStrategy(4)),
+      "Minimax+QSearch (d=3)"   -> (() => new QuiescenceStrategy(3)),
+      "Minimax+QSearch (d=4)"   -> (() => new QuiescenceStrategy(4))
     )
-    val strategyItems = strategies.zipWithIndex.map { case ((label, factory), idx) =>
+
+    def makeStrategySubmenu(label: String, player: ComputerPlayer): Menu = {
+      val group = new ToggleGroup()
+      val items = strategies.map { case (name, factory) =>
+        new RadioMenuItem(name) {
+          toggleGroup = group
+          selected = player.strategy.name == name
+          onAction = _ => if (selected.value) player.strategy = factory()
+        }
+      }
+      val m = new Menu(label); m.items = items; m
+    }
+
+    val strategyMenu = new Menu("Strategy") {
+      items = Seq(
+        makeStrategySubmenu("White", whiteComputer),
+        makeStrategySubmenu("Black", blackComputer)
+      )
+    }
+
+    // Clock mode menu
+    val clockModes: Seq[(String, ClockMode)] = Seq(
+      "No Limit"       -> ClockMode.NoLimit,
+      "Bullet  1+0"    -> ClockMode.Timed(  1 * 60 * 1000L,  0,        "Bullet 1+0"),
+      "Bullet  2+1"    -> ClockMode.Timed(  2 * 60 * 1000L,  1 * 1000L,"Bullet 2+1"),
+      "Blitz   3+0"    -> ClockMode.Timed(  3 * 60 * 1000L,  0,        "Blitz 3+0"),
+      "Blitz   3+2"    -> ClockMode.Timed(  3 * 60 * 1000L,  2 * 1000L,"Blitz 3+2"),
+      "Blitz   5+0"    -> ClockMode.Timed(  5 * 60 * 1000L,  0,        "Blitz 5+0"),
+      "Blitz   5+3"    -> ClockMode.Timed(  5 * 60 * 1000L,  3 * 1000L,"Blitz 5+3"),
+      "Rapid  10+0"    -> ClockMode.Timed( 10 * 60 * 1000L,  0,        "Rapid 10+0"),
+      "Rapid  15+10"   -> ClockMode.Timed( 15 * 60 * 1000L, 10 * 1000L,"Rapid 15+10"),
+      "Classical 30+0" -> ClockMode.Timed( 30 * 60 * 1000L,  0,        "Classical 30+0")
+    )
+    val clockGroup = new ToggleGroup()
+    val clockItems = clockModes.zipWithIndex.map { case ((label, mode), idx) =>
       new RadioMenuItem(label) {
-        toggleGroup = strategyGroup
+        toggleGroup = clockGroup
         selected = idx == 0
-        onAction = _ => if (selected.value) computerPlayer.strategy = factory()
+        onAction = _ => if (selected.value) {
+          applyClockMode(mode)
+          updateClockDisplay()
+        }
       }
     }
-    val strategyMenu = new Menu("Strategy") {
-      items = strategyItems
+    val clockMenu = new Menu("Clock") {
+      items = clockItems
     }
 
     new MenuBar {
-      menus = Seq(fileMenu, gameMenu, strategyMenu, viewMenu)
+      menus = Seq(fileMenu, gameMenu, strategyMenu, clockMenu, viewMenu)
     }
   }
 
@@ -992,6 +1246,7 @@ class ChessGUILauncher extends javafx.application.Application {
 
     // Mark GUI as initialized — observer update() calls are now safe
     gui.initialized = true
+    gui.initClockActor()
 
     // Configure stage properties for visibility
     gui.primaryStage.resizable = true

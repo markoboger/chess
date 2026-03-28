@@ -36,7 +36,9 @@ lazy val Chess = project
       "io.circe" %% "circe-parser" % "0.14.10",
       "com.lihaoyi" %% "upickle" % "4.0.2",
       "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0",
-      "com.lihaoyi" %% "fastparse" % "3.1.1"
+      "com.lihaoyi" %% "fastparse" % "3.1.1",
+      "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
+      "ch.qos.logback"    % "logback-classic"   % "1.5.6" % Runtime
     ),
     coverageExcludedFiles := ".*view/.*;.*ChessApp.*;.*FENExample.*;.*PGNExample.*;.*FastParseFenParser.*;.*FastParsePgnParser.*;.*AppBindings.*",
     coverageMinimumStmtTotal := 40,
