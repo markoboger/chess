@@ -13,6 +13,8 @@ import scalafx.stage.Stage
 import scalafx.stage.FileChooser
 import scalafx.stage.FileChooser.ExtensionFilter
 import chess.controller.{GameController, ComputerPlayer, MoveStrategy}
+import chess.controller.puzzle.PuzzleParser
+import chess.model.Puzzle
 import chess.controller.strategy.{
   RandomStrategy,
   GreedyStrategy,
@@ -47,6 +49,7 @@ import javafx.application.{Application, Platform}
 import javafx.application.Platform.{setImplicitExit}
 import javafx.scene.input.{Clipboard, ClipboardContent, DragEvent, TransferMode}
 import java.awt.Desktop
+import java.net.URI
 import java.io.{File => JFile, PrintWriter}
 import scala.io.Source
 import scala.util.{Try, Success, Failure}
@@ -76,6 +79,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   @volatile private var computerScheduled: Boolean = false
   @volatile private[aview] var paused: Boolean = false
 
+  private lazy val puzzles: Vector[Puzzle] =
+    PuzzleParser.fromResource("/puzzle/lichess_small_puzzle.csv")
+
   private var pauseButton: Button = uninitialized
   private var gameButtonBox: HBox = uninitialized
   private[aview] var primaryStage: Stage = uninitialized
@@ -92,6 +98,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var whiteClockLabel: Label = uninitialized
   private var blackClockLabel: Label = uninitialized
   private var whiteStrategyLabel: Label = uninitialized
+  private var puzzleInfoLabel: Label = uninitialized
+  private var puzzleLink: scalafx.scene.control.Hyperlink = uninitialized
   private var blackStrategyLabel: Label = uninitialized
 
   // ── Chess clock ────────────────────────────────────────────────────────────
@@ -103,6 +111,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var whiteElapsedMs: Long = 0
   private var blackElapsedMs: Long = 0
   private var clockStarted: Boolean = false
+  private var gameOverByTimeout: Boolean = false
+  private var moveDelayEnabled: Boolean = true
   private var lastPgnLength: Int = 0
   private var clockSystem
       : ActorSystem[chess.controller.clock.ClockActor.Command] = uninitialized
@@ -120,8 +130,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
             switchClock()
           }
           playerLabel.text = gameEvent match {
-            case GameEvent.Checkmate => "Checkmate!"
-            case GameEvent.Stalemate => "Stalemate! Draw."
+            case GameEvent.Checkmate           => "Checkmate!"
+            case GameEvent.Stalemate           => "Stalemate! Draw."
+            case GameEvent.ThreefoldRepetition => "Draw by threefold repetition."
             case GameEvent.Check =>
               s"${if (controller.isWhiteToMove) "White" else "Black"} is in check!"
             case GameEvent.Moved =>
@@ -141,7 +152,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   }
 
   private def isGameOver: Boolean =
-    controller.isCheckmate || controller.isStalemate
+    controller.isCheckmate || controller.isStalemate ||
+      controller.isThreefoldRepetition || gameOverByTimeout
 
   private def isComputerTurn: Boolean = gameMode match
     case GameMode.HumanVsHuman => false
@@ -152,7 +164,10 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private[aview] def triggerComputerMoveIfNeeded(): Unit =
     if (!computerScheduled && !paused && isComputerTurn && !isGameOver) {
       computerScheduled = true
-      val delayMs = if (gameMode == GameMode.ComputerVsComputer) 500L else 300L
+      val delayMs =
+        if (!moveDelayEnabled) 0L
+        else if (gameMode == GameMode.ComputerVsComputer) 500L
+        else 300L
       val t = new Thread(
         () => {
           Thread.sleep(delayMs)
@@ -182,7 +197,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
           val moveOpt =
             if (isComputerTurn && !isGameOver)
-              player.move(board, color)
+              player.move(board, color, controller.wouldBeThirdRepetition)
             else None
           // Only mutate UI/controller state on the FX thread
           Platform.runLater(() => {
@@ -427,13 +442,23 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #f1c40f; -fx-text-fill: #333333; -fx-font-weight: bold;"
       onAction = _ => {
         paused = false
+        gameMode = GameMode.HumanVsHuman
+        gameOverByTimeout = false
+        updatePauseButtonVisibility()
         updatePauseButton()
         resetClock()
         lastPgnLength = 0
         controller.announceInitial(Board.initial)
         selectedSquare = None
         pgnDisplay.children.clear()
-        triggerComputerMoveIfNeeded()
+        if (puzzleInfoLabel != null) {
+          puzzleInfoLabel.visible = false
+          puzzleInfoLabel.managed = false
+        }
+        if (puzzleLink != null) {
+          puzzleLink.visible = false
+          puzzleLink.managed = false
+        }
       }
     }
 
@@ -478,6 +503,27 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     pauseButton.visible = false
     pauseButton.managed = false
 
+    puzzleInfoLabel = new Label("") {
+      wrapText = true
+      maxWidth = 260
+      style = "-fx-font-size: 11px; -fx-text-fill: #555555;"
+      visible = false
+      managed = false
+    }
+
+    puzzleLink = new scalafx.scene.control.Hyperlink("") {
+      wrapText = true
+      maxWidth = 260
+      style = "-fx-font-size: 11px;"
+      visible = false
+      managed = false
+      onAction = _ => {
+        val url = text.value
+        if (url.nonEmpty && Desktop.isDesktopSupported)
+          Try(Desktop.getDesktop.browse(new URI(url)))
+      }
+    }
+
     val panelNormalStyle =
       "-fx-border-color: #cccccc; -fx-border-width: 0 0 0 1;"
     val panelDropStyle =
@@ -497,7 +543,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         fenHeader,
         fenScrollPane,
         new Separator(),
-        gameButtonBox
+        gameButtonBox,
+        puzzleInfoLabel,
+        puzzleLink
       )
     }
 
@@ -827,14 +875,12 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
   private def handleTimeout(color: chess.model.Color): Unit =
     val winner = if color == chess.model.Color.White then "Black" else "White"
-    new javafx.scene.control.Alert(
-      javafx.scene.control.Alert.AlertType.INFORMATION
-    ) {
-      initOwner(primaryStage.delegate)
-      setTitle("Time Out!")
-      setHeaderText(null)
-      setContentText(s"${color.toString} ran out of time. $winner wins!")
-    }.showAndWait()
+    gameOverByTimeout = true
+    gameMode = GameMode.HumanVsHuman
+    updatePauseButtonVisibility()
+    if clockSystem != null then clockSystem ! ClockActor.Stop
+    if playerLabel != null then
+      playerLabel.text = s"Time out! $winner wins."
 
   /** Spawn the ClockActor inside its own ActorSystem. Callbacks marshal to the
     * JavaFX thread via Platform.runLater.
@@ -1004,14 +1050,14 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     if (isFen) {
       controller.loadFromFEN(input) match {
         case Right(_) =>
-          playerLabel.text = "FEN imported."
+          Platform.runLater(() => playerLabel.text = "FEN imported.")
         case Left(error) =>
           showAlert("Invalid FEN", error)
       }
     } else {
       controller.loadPgnMoves(input) match {
         case Right(_) =>
-          playerLabel.text = "PGN imported."
+          Platform.runLater(() => playerLabel.text = "PGN imported.")
         case Left(error) =>
           showAlert("Invalid PGN", error)
       }
@@ -1225,8 +1271,13 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         }
     }
 
+    val delayItem = new CheckMenuItem("Move Delay (CvC: 500ms / HvC: 300ms)") {
+      selected = moveDelayEnabled
+      onAction = _ => moveDelayEnabled = selected.value
+    }
+
     val gameMenu = new Menu("Game") {
-      items = Seq(hvhItem, hvcItem, cvcItem)
+      items = Seq(hvhItem, hvcItem, cvcItem, new SeparatorMenuItem(), delayItem)
     }
 
     // Per-player strategy selection
@@ -1295,8 +1346,46 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       items = clockItems
     }
 
+    // ── Puzzles menu — grouped by theme, sorted alphabetically ──────────────
+    val puzzlesByTheme: Seq[(String, Vector[Puzzle])] =
+      puzzles
+        .flatMap(p => p.themes.map(t => t -> p))
+        .groupMap(_._1)(_._2)
+        .toSeq
+        .sortBy(_._1)
+
+    val puzzleThemeMenus = puzzlesByTheme.map { case (theme, ps) =>
+      val themeMenu = new Menu(s"$theme  (${ps.length})")
+      themeMenu.items = ps.sortBy(_.rating).map { p =>
+        new MenuItem(s"#${p.id}   \u2605${p.rating}  [${p.themes.mkString(", ")}]") {
+          onAction = _ => {
+            controller.loadFromFEN(p.fen)
+            gameMode = GameMode.HumanVsHuman
+            updatePauseButtonVisibility()
+            selectedSquare = None
+            if (puzzleInfoLabel != null) {
+              puzzleInfoLabel.text = s"#${p.id}  \u2605${p.rating}  ${p.themes.mkString(", ")}"
+              puzzleInfoLabel.visible = true
+              puzzleInfoLabel.managed = true
+            }
+            if (puzzleLink != null) {
+              puzzleLink.text = p.gameUrl
+              puzzleLink.visited = false
+              puzzleLink.visible = true
+              puzzleLink.managed = true
+            }
+          }
+        }
+      }
+      themeMenu
+    }
+
+    val puzzlesMenu = new Menu("Puzzles") {
+      items = puzzleThemeMenus
+    }
+
     new MenuBar {
-      menus = Seq(fileMenu, gameMenu, strategyMenu, clockMenu, viewMenu)
+      menus = Seq(fileMenu, gameMenu, strategyMenu, clockMenu, viewMenu, puzzlesMenu)
     }
   }
 

@@ -1,6 +1,6 @@
 package chess.controller
 
-import chess.model.{Board, Color, PromotableRole, Square, File, Rank, MoveResult, MoveError, GameEvent}
+import chess.model.{Board, Color, Piece, Role, PromotableRole, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.controller.io.{FenIO, PgnIO}
 import chess.controller.io.pgn.PGNParser
 import chess.util.Observable
@@ -17,6 +17,28 @@ final class GameController(initialBoard: Board)(using
   private var _boardStates: Vector[Board] = Vector(initialBoard)
   private var _pgnMoves: Vector[String] = Vector.empty
   private var _currentIndex: Int = 0
+
+  // Position repetition tracking: key → count
+  private case class PositionKey(
+    squares: Vector[Vector[Option[Piece]]],
+    castlingRights: chess.model.CastlingRights,
+    whiteToMove: Boolean,
+    enPassantFile: Option[File]
+  )
+
+  private def positionKey(board: Board, whiteToMove: Boolean): PositionKey =
+    val epFile = board.lastMove.flatMap { case (from, to) =>
+      val rankDiff = (to.rank.index - from.rank.index).abs
+      if rankDiff == 2 then
+        board.pieceAt(to) match
+          case Some(Piece(Role.Pawn, _)) => Some(to.file)
+          case _                         => None
+      else None
+    }
+    PositionKey(board.squares, board.castlingRights, whiteToMove, epFile)
+
+  private var positionCounts: Map[PositionKey, Int] =
+    Map(positionKey(initialBoard, true) -> 1)
 
   def board: Board = currentBoard
 
@@ -81,6 +103,7 @@ final class GameController(initialBoard: Board)(using
     _pgnMoves = Vector.empty
     _currentIndex = 0
     _isWhiteToMove = true
+    positionCounts = Map(positionKey(board, true) -> 1)
   }
 
   /** Notify observers about a board reset (new game, FEN load, etc.). */
@@ -161,7 +184,13 @@ final class GameController(initialBoard: Board)(using
             _boardStates = _boardStates :+ moved.board
             _pgnMoves = _pgnMoves :+ pgn
             _currentIndex = _boardStates.length - 1
-            moved
+            val key = positionKey(moved.board, _isWhiteToMove)
+            val count = positionCounts.getOrElse(key, 0) + 1
+            positionCounts = positionCounts.updated(key, count)
+            if count >= 3 then
+              MoveResult.Moved(moved.board, GameEvent.ThreefoldRepetition)
+            else
+              moved
           case failed: MoveResult.Failed =>
             failed
       case Some(_) => MoveResult.Failed(board, MoveError.WrongColor)
@@ -200,8 +229,16 @@ final class GameController(initialBoard: Board)(using
 
   def isStalemate: Boolean = board.isStalemate(activeColor)
 
+  def isThreefoldRepetition: Boolean =
+    positionCounts.getOrElse(positionKey(board, _isWhiteToMove), 0) >= 3
+
+  /** True if playing `newBoard` next would create the third occurrence. */
+  def wouldBeThirdRepetition(newBoard: Board): Boolean =
+    positionCounts.getOrElse(positionKey(newBoard, !_isWhiteToMove), 0) >= 2
+
   def gameStatus: String =
     if isCheckmate then s"Checkmate! ${activeColor.opposite} wins!"
     else if isStalemate then "Stalemate! The game is a draw."
+    else if isThreefoldRepetition then "Draw by threefold repetition."
     else if isInCheck then s"${activeColor} is in check!"
     else s"${activeColor} to move"

@@ -42,10 +42,11 @@ object PGNExample extends App {
       case MoveResult.Moved(newBoard, event) =>
         println(newBoard)
         event match {
-          case GameEvent.Check     => println("Check!")
-          case GameEvent.Checkmate => println("Checkmate!")
-          case GameEvent.Stalemate => println("Stalemate!")
-          case GameEvent.Moved     => // normal move
+          case GameEvent.Check               => println("Check!")
+          case GameEvent.Checkmate           => println("Checkmate!")
+          case GameEvent.Stalemate           => println("Stalemate!")
+          case GameEvent.ThreefoldRepetition => println("Draw by threefold repetition!")
+          case GameEvent.Moved               => // normal move
         }
       case MoveResult.Failed(_, error) =>
         println(s"Error: ${error.message}")

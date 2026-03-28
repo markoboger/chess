@@ -10,3 +10,5 @@ enum GameEvent:
   case Checkmate
   /** The move results in stalemate — the game is a draw. */
   case Stalemate
+  /** The same position has occurred three times — the game is a draw. */
+  case ThreefoldRepetition

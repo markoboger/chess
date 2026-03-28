@@ -87,8 +87,9 @@ class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
         println(
           s"Checkmate! ${if (controller.isWhiteToMove) "Black" else "White"} wins!"
         )
-      case GameEvent.Stalemate => println("Stalemate! The game is a draw.")
-      case GameEvent.Moved     => println(s"$player to move.")
+      case GameEvent.Stalemate           => println("Stalemate! The game is a draw.")
+      case GameEvent.ThreefoldRepetition => println("Draw by threefold repetition.")
+      case GameEvent.Moved               => println(s"$player to move.")
     }
   }
 
