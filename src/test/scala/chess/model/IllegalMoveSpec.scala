@@ -1,5 +1,6 @@
 package chess.model
 
+import chess.controller.io.fen.RegexFenParser
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -114,6 +115,72 @@ class IllegalMoveSpec extends AnyWordSpec with Matchers {
         val board = Board.initial
         val result = board.move(Square("e1"), Square("e3"))
         result.isFailed shouldBe true
+      }
+
+      // Regression: isValidCastling used to approve any move in the kingside
+      // direction without checking that 'to' is the correct castling square.
+      // A king at e1 could therefore "castle" all the way to h8.
+      "reject white king teleporting from e1 to h8 even if black rook is there" in {
+        // White: King e1, Rook h1 (castling rights intact).  Black: Rook h8, King e8.
+        val board = RegexFenParser.parseFEN("4k2r/8/8/8/8/8/8/4K2R").get
+        board.move(Square("e1"), Square("h8")).isFailed shouldBe true
+      }
+
+      "reject white king teleporting from e1 to h1 (rook square)" in {
+        val board = RegexFenParser.parseFEN("4k2r/8/8/8/8/8/8/4K2R").get
+        board.move(Square("e1"), Square("h1")).isFailed shouldBe true
+      }
+
+      "reject black king teleporting from e8 to h1 even if white rook is there" in {
+        // Black to move: give black the move by using a FEN where it is black's turn
+        val board = RegexFenParser.parseFEN("4k2r/8/8/8/8/8/8/4K2R").get
+        // Force it: ask Board directly whether the move is valid
+        board.move(Square("e8"), Square("h1")).isFailed shouldBe true
+      }
+
+      "reject white king moving to a non-adjacent, non-castling square (e1 to a8)" in {
+        val board = RegexFenParser.parseFEN("r3k3/8/8/8/8/8/8/4K2R").get
+        board.move(Square("e1"), Square("a8")).isFailed shouldBe true
+      }
+
+      "still allow normal kingside castling (e1 to g1)" in {
+        // King e1, Rook h1, f1 and g1 empty, castling rights intact
+        val board = RegexFenParser.parseFEN("4k3/8/8/8/8/8/8/4K2R").get
+        val result = board.move(Square("e1"), Square("g1"))
+        result.isSuccess shouldBe true
+        result.board.pieceAt(Square("g1")) shouldEqual Some(Piece(Role.King, Color.White))
+        result.board.pieceAt(Square("f1")) shouldEqual Some(Piece(Role.Rook, Color.White))
+      }
+
+      "legalMoves must not include king teleport from e1 to h8" in {
+        val board = RegexFenParser.parseFEN("4k2r/8/8/8/8/8/8/4K2R").get
+        val kingMoves = board.legalMoves(Color.White).filter(_._1 == Square("e1"))
+        kingMoves.map(_._2) should not contain Square("h8")
+      }
+
+      // Regression: white king at e6 could capture the black king on f7 because
+      // after the capture the black king was gone from the board, so isInCheck
+      // on the resulting position found no attacker and allowed the move.
+      "reject white king capturing adjacent black king (e6 takes f7)" in {
+        // White: King e6.  Black: King f7.  Kings are diagonally adjacent.
+        val board = RegexFenParser.parseFEN("8/5k2/4K3/8/8/8/8/8").get
+        board.move(Square("e6"), Square("f7")).isFailed shouldBe true
+      }
+
+      "reject white king capturing adjacent black king (d5 takes e5)" in {
+        val board = RegexFenParser.parseFEN("8/8/8/3Kk3/8/8/8/8").get
+        board.move(Square("d5"), Square("e5")).isFailed shouldBe true
+      }
+
+      "reject black king capturing adjacent white king (e5 takes d5)" in {
+        val board = RegexFenParser.parseFEN("8/8/8/3Kk3/8/8/8/8").get
+        board.move(Square("e5"), Square("d5")).isFailed shouldBe true
+      }
+
+      "legalMoves must not include white king capturing the black king" in {
+        val board = RegexFenParser.parseFEN("8/5k2/4K3/8/8/8/8/8").get
+        val kingMoves = board.legalMoves(Color.White).filter(_._1 == Square("e6"))
+        kingMoves.map(_._2) should not contain Square("f7")
       }
     }
 

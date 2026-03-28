@@ -2,7 +2,7 @@ package chess
 
 import chess.controller.GameController
 import chess.model.Board
-import chess.view.{ConsoleView, ChessGUI}
+import chess.aview.{ConsoleView, ChessGUI}
 import chess.AppBindings.given
 
 object ChessApp:

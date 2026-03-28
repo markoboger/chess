@@ -2,7 +2,7 @@ package chess.model
 
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.matchers.should.Matchers
-import chess.io.fen.RegexFenParser
+import chess.controller.io.fen.RegexFenParser
 
 class MoveResultSpec extends AnyWordSpec with Matchers {
 

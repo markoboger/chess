@@ -12,9 +12,9 @@ import chess.model.{
   MoveError,
   GameEvent
 }
-import chess.io.{FenIO, PgnIO}
-import chess.io.fen.RegexFenParser
-import chess.io.pgn.PgnFileIO
+import chess.controller.io.{FenIO, PgnIO}
+import chess.controller.io.fen.RegexFenParser
+import chess.controller.io.pgn.PgnFileIO
 import chess.util.Observer
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec

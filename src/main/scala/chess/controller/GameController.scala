@@ -1,8 +1,8 @@
 package chess.controller
 
 import chess.model.{Board, Color, PromotableRole, Square, File, Rank, MoveResult, MoveError, GameEvent}
-import chess.io.{FenIO, PgnIO}
-import chess.io.pgn.PGNParser
+import chess.controller.io.{FenIO, PgnIO}
+import chess.controller.io.pgn.PGNParser
 import chess.util.Observable
 import scala.util.{Try, Success, Failure}
 

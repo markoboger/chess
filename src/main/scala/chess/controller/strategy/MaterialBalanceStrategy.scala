@@ -27,7 +27,9 @@ class MaterialBalanceStrategy extends MoveStrategy:
     case Role.Bishop => 3
     case Role.Knight => 3
     case Role.Pawn   => 1
+    // $COVERAGE-OFF$ Kings are never capturable in legal chess
     case Role.King   => 0
+    // $COVERAGE-ON$
   }
 
   /** Net material score from `color`'s perspective. */
@@ -48,7 +50,9 @@ class MaterialBalanceStrategy extends MoveStrategy:
       board.move(from, to, promo) match
         case MoveResult.Moved(newBoard, _) =>
           Some((from, to, promo, evaluate(newBoard, color)))
+        // $COVERAGE-OFF$ legalMoves only returns moves that succeed
         case _ => None
+        // $COVERAGE-ON$
     }
 
     if scored.isEmpty then return None

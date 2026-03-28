@@ -19,7 +19,9 @@ class PieceSquareStrategy extends MoveStrategy:
       board.move(from, to, promo) match
         case MoveResult.Moved(newBoard, _) =>
           Some((from, to, promo, Evaluator.evaluate(newBoard, color)))
+        // $COVERAGE-OFF$ legalMoves only returns moves that succeed
         case _ => None
+        // $COVERAGE-ON$
     }
 
     if scored.isEmpty then return None

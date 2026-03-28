@@ -1,8 +1,8 @@
 package chess
 
-import chess.io.{FenIO, PgnIO}
-import chess.io.fen.{RegexFenParser, CombinatorFenParser, FastParseFenParser}
-import chess.io.pgn.{PgnFileIO, CombinatorPgnParser, FastParsePgnParser}
+import chess.controller.io.{FenIO, PgnIO}
+import chess.controller.io.fen.{RegexFenParser, CombinatorFenParser, FastParseFenParser}
+import chess.controller.io.pgn.{PgnFileIO, CombinatorPgnParser, FastParsePgnParser}
 
 /** Wiring of trait-based interfaces to their concrete implementations.
   *

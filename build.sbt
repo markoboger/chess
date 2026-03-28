@@ -40,7 +40,7 @@ lazy val Chess = project
       "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
       "ch.qos.logback"    % "logback-classic"   % "1.5.6" % Runtime
     ),
-    coverageExcludedFiles := ".*view/.*;.*ChessApp.*;.*FENExample.*;.*PGNExample.*;.*FastParseFenParser.*;.*FastParsePgnParser.*;.*AppBindings.*",
+    coverageExcludedFiles := ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*",
     coverageMinimumStmtTotal := 40,
     coverageFailOnMinimum := false
   )

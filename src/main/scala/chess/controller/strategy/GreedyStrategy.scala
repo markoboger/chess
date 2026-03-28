@@ -19,7 +19,9 @@ class GreedyStrategy extends MoveStrategy:
     case Role.Bishop => 3
     case Role.Knight => 3
     case Role.Pawn   => 1
+    // $COVERAGE-OFF$ Kings are never capturable in legal chess
     case Role.King   => 0
+    // $COVERAGE-ON$
   }
 
   def selectMove(board: Board, color: Color): Option[(Square, Square, Option[PromotableRole])] =

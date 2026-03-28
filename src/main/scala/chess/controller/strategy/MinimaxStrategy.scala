@@ -35,7 +35,9 @@ class MinimaxStrategy(val depth: Int = 3) extends MoveStrategy:
             bestMoves = List((from, to, promo))
           else if score == bestScore then
             bestMoves = (from, to, promo) :: bestMoves
+        // $COVERAGE-OFF$ legalMoves only returns moves that succeed
         case _ => ()
+        // $COVERAGE-ON$
 
     if bestMoves.isEmpty then None
     else Some(bestMoves(Random.nextInt(bestMoves.length)))
@@ -83,7 +85,9 @@ class MinimaxStrategy(val depth: Int = 3) extends MoveStrategy:
             if score > best then best = score
             if best > a    then a    = best
             if a >= beta   then done = true   // beta cut-off
+          // $COVERAGE-OFF$ legalMoves only returns moves that succeed
           case _ => ()
+          // $COVERAGE-ON$
       best
     else
       var best  = INF
@@ -99,5 +103,7 @@ class MinimaxStrategy(val depth: Int = 3) extends MoveStrategy:
             if score < best then best = score
             if best < b    then b    = best
             if b <= alpha  then done = true   // alpha cut-off
+          // $COVERAGE-OFF$ legalMoves only returns moves that succeed
           case _ => ()
+          // $COVERAGE-ON$
       best

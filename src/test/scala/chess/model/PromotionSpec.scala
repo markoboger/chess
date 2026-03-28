@@ -1,6 +1,6 @@
 package chess.model
 
-import chess.io.fen.RegexFenParser
+import chess.controller.io.fen.RegexFenParser
 import chess.AppBindings.given
 import chess.controller.GameController
 import org.scalatest.matchers.should.Matchers

@@ -38,7 +38,9 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
             bestMoves = List((from, to, promo))
           else if score == bestScore then
             bestMoves = (from, to, promo) :: bestMoves
+        // $COVERAGE-OFF$ legalMoves only returns moves that succeed
         case _ => ()
+        // $COVERAGE-ON$
 
     if bestMoves.isEmpty then None
     else Some(bestMoves(Random.nextInt(bestMoves.length)))
@@ -76,7 +78,9 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
             if score > best then best = score
             if best > a    then a    = best
             if a >= beta   then done = true
+          // $COVERAGE-OFF$ legalMoves only returns moves that succeed
           case _ => ()
+          // $COVERAGE-ON$
       best
     else
       var best = INF
@@ -92,7 +96,9 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
             if score < best then best = score
             if best < b    then b    = best
             if b <= alpha  then done = true
+          // $COVERAGE-OFF$ legalMoves only returns moves that succeed
           case _ => ()
+          // $COVERAGE-ON$
       best
 
   /** Search captures only until quiet, to avoid the horizon effect. */
@@ -123,7 +129,9 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
             val score = quiescence(newBoard, a, beta, maximizing = false, rootColor, remaining - 1)
             if score > a  then a = score
             if a >= beta  then done = true
+          // $COVERAGE-OFF$ legalMoves only returns moves that succeed
           case _ => ()
+          // $COVERAGE-ON$
       a
     else
       if standPat <= alpha then return alpha
@@ -142,5 +150,7 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
             val score = quiescence(newBoard, alpha, b, maximizing = true, rootColor, remaining - 1)
             if score < b    then b = score
             if b <= alpha   then done = true
+          // $COVERAGE-OFF$ legalMoves only returns moves that succeed
           case _ => ()
+          // $COVERAGE-ON$
       b

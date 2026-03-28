@@ -65,10 +65,13 @@ final case class Board(
     pieceAt(from) match
       case None        => this
       case Some(piece) =>
-        // Check if destination is occupied by own piece
+        // Check if destination is occupied by own piece, or if a king would capture a king
+        // (kings can never capture kings — the capturing king would have had to step into
+        // an attacked square, which is illegal and must be caught here before the enemy
+        // king is removed from the board and can no longer threaten the destination).
         pieceAt(to) match
-          case Some(targetPiece) if targetPiece.color == piece.color =>
-            return this
+          case Some(targetPiece) if targetPiece.color == piece.color    => return this
+          case Some(targetPiece) if targetPiece.role == Role.King       => return this
           case _ => ()
 
         // Validate move based on piece type
@@ -243,6 +246,10 @@ final case class Board(
   private def isValidCastling(from: Square, to: Square, color: Color): Boolean =
     val isKingside = to.file.index > from.file.index
     val backRank   = if color == Color.White then Rank._1 else Rank._8
+
+    // Destination must be exactly the castling target square (g or c on the back rank)
+    val expectedToFile = if isKingside then File.G else File.C
+    if to != Square(expectedToFile, backRank) then return false
 
     // King must be on its starting square and castling right must be intact
     if from != Square(File.E, backRank) then return false
