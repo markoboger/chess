@@ -26,7 +26,7 @@ import org.apache.pekko.actor.typed.ActorSystem
 import scala.compiletime.uninitialized
 import javafx.application.{Application, Platform}
 import javafx.application.Platform.{setImplicitExit}
-import javafx.scene.input.{Clipboard, ClipboardContent}
+import javafx.scene.input.{Clipboard, ClipboardContent, DragEvent, TransferMode}
 import java.awt.Desktop
 import java.io.{File => JFile, PrintWriter}
 import scala.io.Source
@@ -59,7 +59,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
   // UI components that need to be updated
   private var playerLabel: Label = uninitialized
-  private var moveInput: TextField = uninitialized
+  private var runButton: Button = uninitialized
   private var fenDisplay: TextArea = uninitialized
   private var pgnDisplay: TextFlow = uninitialized
   private var pgnScrollPane: ScrollPane = uninitialized
@@ -266,29 +266,34 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       padding = Insets(10)
     }
 
-    // Move input section
-    val moveLabel = new Label("Enter Move (PGN):") {
+    // PGN section — label + inline copy-icon button
+    val pgnLabel = new Label("Game PGN") {
       font = Font.font("Arial", FontWeight.Normal, 14)
     }
 
-    moveInput = new TextField {
-      promptText = "e.g., e4, Nf3, O-O"
-      prefWidth = 250
+    val copyPgnButton = new Button("\uD83D\uDCCB") {
+      style = "-fx-font-size: 13px; -fx-padding: 2px 6px;"
+      tooltip = new Tooltip("Copy PGN to clipboard")
+      onAction = _ => {
+        val moves = controller.pgnMoves
+        val pgn = moves.zipWithIndex.map { case (m, i) =>
+          if (i % 2 == 0) s"${i / 2 + 1}. $m" else m
+        }.mkString(" ")
+        val content = new ClipboardContent()
+        content.putString(pgn)
+        Clipboard.getSystemClipboard.setContent(content)
+        text = "\u2713"
+        new Thread(() => {
+          Thread.sleep(1500)
+          Platform.runLater(() => text = "\uD83D\uDCCB")
+        }).start()
+      }
     }
 
-    val moveButton = new Button("Make Move") {
-      prefWidth = 250
-      style = "-fx-font-size: 14px; -fx-padding: 10px;"
-      onAction = _ => handleMoveInput()
-    }
-
-    // Allow Enter key to submit move
-    moveInput.onAction = _ => handleMoveInput()
-
-    // PGN section
-    val pgnLabel = new Label("Game PGN (click move to navigate):") {
-      font = Font.font("Arial", FontWeight.Normal, 14)
+    val pgnHeader = new HBox(6) {
+      alignment = Pos.CenterLeft
       padding = Insets(10, 0, 5, 0)
+      children = Seq(pgnLabel, copyPgnButton)
     }
 
     pgnDisplay = new TextFlow {
@@ -301,25 +306,6 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       prefHeight = 120
       fitToWidth = true
       style = "-fx-background-color: white;"
-    }
-
-    val copyPgnButton = new Button("Copy PGN") {
-      prefWidth = 250
-      style = "-fx-font-size: 12px; -fx-padding: 5px;"
-      onAction = _ => {
-        val moves = controller.pgnMoves
-        val pgn = moves.zipWithIndex.map { case (m, i) =>
-          if (i % 2 == 0) s"${i / 2 + 1}. $m" else m
-        }.mkString(" ")
-        val content = new ClipboardContent()
-        content.putString(pgn)
-        Clipboard.getSystemClipboard.setContent(content)
-        text = "\u2713 Copied!"
-        new Thread(() => {
-          Thread.sleep(1500)
-          Platform.runLater(() => text = "Copy PGN")
-        }).start()
-      }
     }
 
     val backButton = new Button("\u25C0 Back") {
@@ -345,30 +331,34 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       children = Seq(backButton, forwardButton)
     }
 
-    // Paste input section — accepts both FEN and PGN
-    val pasteLabel = new Label("Paste PGN or FEN:") {
+    // Drop / paste area — accepts FEN and PGN via drag-and-drop or Ctrl+Enter
+    val pasteLabel = new Label("Drop or paste PGN / FEN:") {
       font = Font.font("Arial", FontWeight.Normal, 14)
       padding = Insets(10, 0, 5, 0)
     }
 
     val pasteInput = new TextArea {
-      promptText =
-        "Paste PGN moves (e.g. 1. e4 e5 2. Nf3 ...)\nor a FEN string here"
+      promptText = "Paste PGN/FEN here, or drop a file/text anywhere in this panel"
       prefRowCount = 4
       wrapText = true
       style = "-fx-font-family: monospace; -fx-font-size: 12px;"
     }
 
-    val loadButton = new Button("Load") {
+    // isShortcutDown = Cmd on macOS, Ctrl on Windows/Linux — covers both platforms.
+    // By key-released time the paste is already in the text property.
+    pasteInput.onKeyReleased = (e: javafx.scene.input.KeyEvent) => {
+      if (e.isShortcutDown && e.getCode == javafx.scene.input.KeyCode.V) {
+        val input = pasteInput.text.value.trim
+        if (input.nonEmpty) { loadPgnOrFen(input); selectedSquare = None }
+      }
+    }
+
+    val loadPasteButton = new Button("Load") {
       prefWidth = 120
-      style =
-        "-fx-font-size: 13px; -fx-padding: 8px; -fx-background-color: #4CAF50; -fx-text-fill: white;"
+      style = "-fx-font-size: 13px; -fx-padding: 8px; -fx-background-color: #4CAF50; -fx-text-fill: white;"
       onAction = _ => {
         val input = pasteInput.text.value.trim
-        if (input.nonEmpty) {
-          loadPgnOrFen(input)
-          selectedSquare = None
-        }
+        if (input.nonEmpty) { loadPgnOrFen(input); selectedSquare = None }
       }
     }
 
@@ -378,9 +368,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       onAction = _ => pasteInput.text = ""
     }
 
-    val loadButtonBox = new HBox(10) {
+    val pasteButtonBox = new HBox(10) {
       alignment = Pos.Center
-      children = Seq(loadButton, clearPasteButton)
+      children = Seq(loadPasteButton, clearPasteButton)
     }
 
     // FEN display (read-only)
@@ -394,8 +384,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       prefRowCount = 2
       wrapText = true
       editable = false
-      style =
-        "-fx-font-family: monospace; -fx-font-size: 11px; -fx-opacity: 0.9;"
+      style = "-fx-font-family: monospace; -fx-font-size: 11px; -fx-opacity: 0.9;"
     }
 
     // New Game button (yellow)
@@ -410,9 +399,20 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         lastPgnLength = 0
         controller.announceInitial(Board.initial)
         selectedSquare = None
-        moveInput.text = ""
         pgnDisplay.children.clear()
         pasteInput.text = ""
+        triggerComputerMoveIfNeeded()
+      }
+    }
+
+    // Run button (green) — visible in non-CvC modes; switches to CvC and starts play
+    runButton = new Button("\u25B6 Run") {
+      prefWidth = 120
+      style =
+        "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold;"
+      onAction = _ => {
+        gameMode = GameMode.ComputerVsComputer
+        updatePauseButtonVisibility()
         triggerComputerMoveIfNeeded()
       }
     }
@@ -440,30 +440,28 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
     gameButtonBox = new HBox(10) {
       alignment = Pos.Center
-      children = Seq(resetButton, pauseButton)
+      children = Seq(resetButton, runButton, pauseButton)
     }
     pauseButton.visible = false
     pauseButton.managed = false
 
-    new VBox(10) {
+    val panelNormalStyle = "-fx-border-color: #cccccc; -fx-border-width: 0 0 0 1;"
+    val panelDropStyle   = "-fx-border-color: #27ae60; -fx-border-width: 2; -fx-background-color: rgba(39,174,96,0.05);"
+
+    val controlPanel = new VBox(10) {
       padding = Insets(20)
       prefWidth = 300
-      style = "-fx-border-color: #cccccc; -fx-border-width: 0 0 0 1;"
+      style = panelNormalStyle
       children = Seq(
         playerLabel,
         new Separator(),
-        moveLabel,
-        moveInput,
-        moveButton,
-        new Separator(),
-        pgnLabel,
+        pgnHeader,
         pgnScrollPane,
-        copyPgnButton,
         navButtonBox,
         new Separator(),
         pasteLabel,
         pasteInput,
-        loadButtonBox,
+        pasteButtonBox,
         new Separator(),
         fenLabel,
         fenDisplay,
@@ -471,6 +469,35 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         gameButtonBox
       )
     }
+
+    // DnD at parent level: fires in the capture phase BEFORE any child skin filter
+    // (including TextArea's own text-insertion handler), so we always win the race.
+    controlPanel.delegate.addEventFilter(DragEvent.DRAG_OVER, (e: DragEvent) => {
+      if (e.getDragboard.hasString || e.getDragboard.hasFiles)
+        e.acceptTransferModes(TransferMode.ANY*)
+      e.consume()
+    })
+    controlPanel.delegate.addEventFilter(DragEvent.DRAG_ENTERED, (e: DragEvent) => {
+      if (e.getDragboard.hasString || e.getDragboard.hasFiles)
+        controlPanel.style = panelDropStyle
+      // do not consume — lets children still see DRAG_ENTERED for cursor feedback
+    })
+    controlPanel.delegate.addEventFilter(DragEvent.DRAG_EXITED, (e: DragEvent) => {
+      controlPanel.style = panelNormalStyle
+    })
+    controlPanel.delegate.addEventFilter(DragEvent.DRAG_DROPPED, (e: DragEvent) => {
+      val db      = e.getDragboard
+      val content: Option[String] =
+        if (db.hasString && db.getString.trim.nonEmpty) Some(db.getString.trim)
+        else if (db.hasFiles) Try(readFromFile(db.getFiles.get(0))).toOption
+        else None
+      controlPanel.style = panelNormalStyle
+      content.foreach { txt => loadPgnOrFen(txt); selectedSquare = None }
+      e.setDropCompleted(content.isDefined)
+      e.consume()
+    })
+
+    controlPanel
   }
 
   /** Update pause button label/colour to reflect current paused state. */
@@ -486,44 +513,18 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #e67e22; -fx-text-fill: white; -fx-font-weight: bold;"
     }
 
-  /** Show or hide the Pause button depending on whether C vs C mode is active. */
+  /** Show/hide Pause and Run buttons depending on whether C vs C mode is active. */
   private[aview] def updatePauseButtonVisibility(): Unit =
-    if (pauseButton == null) return
+    if (pauseButton == null || runButton == null) return
     val cvc = gameMode == GameMode.ComputerVsComputer
     pauseButton.visible = cvc
     pauseButton.managed = cvc
+    runButton.visible = !cvc
+    runButton.managed = !cvc
     if (!cvc) {
       paused = false
       updatePauseButton()
     }
-
-  private def handleMoveInput(): Unit = {
-    val move = moveInput.text.value.trim
-    if (move.nonEmpty) {
-      controller.applyPgnMove(move) match {
-        case _: MoveResult.Moved =>
-          moveInput.text = ""
-        // Board/label/FEN updated by observer update()
-        case MoveResult.Failed(_, error) =>
-          val detailedError = s"""
-            |Move: '$move'
-            |
-            |Reason: ${error.message}
-            |
-            |Valid moves in PGN notation:
-            |  • Pawn: e4, e5
-            |  • Knight: Nf3, Nc3
-            |  • Bishop: Bc4, Bf4
-            |  • Rook: Ra1, Rh1
-            |  • Queen: Qh5, Qd1
-            |  • King: Ke2, Kf1
-            |  • Castling: O-O, O-O-O
-            |  • Captures: exd5, Nxe5
-          """.stripMargin
-          showAlert("Illegal Move - Chess Rules Violation", detailedError)
-      }
-    }
-  }
 
   private def updatePgnDisplay(): Unit = {
     pgnDisplay.children.clear()
