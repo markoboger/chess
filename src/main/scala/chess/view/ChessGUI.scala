@@ -35,6 +35,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var boardSquares: Array[Array[Rectangle]] =
     Array.ofDim[Rectangle](8, 8)
   private var boardLabels: Array[Array[Text]] = Array.ofDim[Text](8, 8)
+  private var boardDots: Array[Array[scalafx.scene.shape.Circle]] =
+    Array.ofDim[scalafx.scene.shape.Circle](8, 8)
+  private[view] var showLegalMoves: Boolean = true
   private[view] var primaryStage: Stage = uninitialized
 
   // UI components that need to be updated
@@ -135,8 +138,15 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         fill = Color.Black
       }
 
+      val dot = new scalafx.scene.shape.Circle {
+        radius = 14
+        fill = Color.color(0, 0, 0, 0.2)
+        visible = false
+        mouseTransparent = true
+      }
+
       val stackPane = new StackPane {
-        children = Seq(squareRect, text)
+        children = Seq(squareRect, dot, text)
         prefWidth = 80
         prefHeight = 80
 
@@ -150,6 +160,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       boardPane.add(stackPane, col + 1, row + 1)
       boardSquares(row)(col) = squareRect
       boardLabels(row)(col) = text
+      boardDots(row)(col) = dot
     }
 
     updateBoard()
@@ -453,6 +464,24 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   }
 
   private[view] def updateBoard(): Unit = {
+    // Compute legal target squares once for the selected piece
+    val legalTargets: Set[Square] = if (showLegalMoves) {
+      selectedSquare.map { sel =>
+        controller.board
+          .legalMoves(controller.activeColor)
+          .collect { case (from, to) if from == sel => to }
+          .toSet
+      }.getOrElse(Set.empty)
+    } else Set.empty
+
+    // Determine if the active king is in check or checkmate
+    val activeColor = controller.activeColor
+    val kingInDanger: Option[Square] =
+      if (controller.isCheckmate || controller.isInCheck)
+        controller.board.findKing(activeColor)
+      else None
+    val isCheckmate = controller.isCheckmate
+
     for {
       rank <- Rank.all
       file <- File.all
@@ -463,6 +492,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
       val squareRect = boardSquares(row)(col)
       val text = boardLabels(row)(col)
+      val dot = boardDots(row)(col)
 
       // Update square color
       val isLight = (file.index + rank.index) % 2 == 0
@@ -471,7 +501,30 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
       squareRect.fill = selectedSquare match {
         case Some(sel) if sel == sq => Color.web("#baca44")
-        case _                      => baseColor
+        case _ if kingInDanger.contains(sq) =>
+          if (isCheckmate) Color.web("#c0392b") else Color.web("#e74c3c")
+        case _ => baseColor
+      }
+
+      // Update move-hint dot
+      if (legalTargets.contains(sq)) {
+        val isCapture = controller.board.pieceAt(sq).isDefined
+        if (isCapture) {
+          // Large semi-transparent ring for capture squares
+          dot.radius = 36
+          dot.fill = Color.color(0, 0, 0, 0)
+          dot.stroke = Color.color(0, 0, 0, 0.25)
+          dot.strokeWidth = 6
+        } else {
+          // Small filled dot for empty target squares
+          dot.radius = 14
+          dot.fill = Color.color(0, 0, 0, 0.2)
+          dot.stroke = Color.color(0, 0, 0, 0)
+          dot.strokeWidth = 0
+        }
+        dot.visible = true
+      } else {
+        dot.visible = false
       }
 
       // Update piece
@@ -728,8 +781,20 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       items = Seq(importMenu, exportMenu)
     }
 
+    val showMovesItem = new CheckMenuItem("Show Legal Moves") {
+      selected = showLegalMoves
+      onAction = _ => {
+        showLegalMoves = selected.value
+        updateBoard()
+      }
+    }
+
+    val viewMenu = new Menu("View") {
+      items = Seq(showMovesItem)
+    }
+
     new MenuBar {
-      menus = Seq(fileMenu)
+      menus = Seq(fileMenu, viewMenu)
     }
   }
 
