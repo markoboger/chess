@@ -13,8 +13,27 @@ import scalafx.stage.Stage
 import scalafx.stage.FileChooser
 import scalafx.stage.FileChooser.ExtensionFilter
 import chess.controller.{GameController, ComputerPlayer, MoveStrategy}
-import chess.controller.strategy.{RandomStrategy, GreedyStrategy, MaterialBalanceStrategy, PieceSquareStrategy, MinimaxStrategy, QuiescenceStrategy, IterativeDeepeningStrategy}
-import chess.model.{Board, Piece, PromotableRole, Role, Square, File, Rank, MoveResult, MoveError, GameEvent}
+import chess.controller.strategy.{
+  RandomStrategy,
+  GreedyStrategy,
+  MaterialBalanceStrategy,
+  PieceSquareStrategy,
+  MinimaxStrategy,
+  QuiescenceStrategy,
+  IterativeDeepeningStrategy
+}
+import chess.model.{
+  Board,
+  Piece,
+  PromotableRole,
+  Role,
+  Square,
+  File,
+  Rank,
+  MoveResult,
+  MoveError,
+  GameEvent
+}
 import chess.model.{Color => ChessColor}
 import chess.controller.io.FileIO
 import chess.controller.io.json.circe.CirceJsonFileIO
@@ -47,8 +66,12 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     case HumanVsHuman, HumanVsComputer, ComputerVsComputer
 
   private[aview] var gameMode: GameMode = GameMode.HumanVsHuman
-  private[aview] val whiteComputer: ComputerPlayer = new ComputerPlayer(new IterativeDeepeningStrategy(2000L))
-  private[aview] val blackComputer: ComputerPlayer = new ComputerPlayer(new IterativeDeepeningStrategy(2000L))
+  private[aview] val whiteComputer: ComputerPlayer = new ComputerPlayer(
+    new IterativeDeepeningStrategy(2000L)
+  )
+  private[aview] val blackComputer: ComputerPlayer = new ComputerPlayer(
+    new IterativeDeepeningStrategy(2000L)
+  )
   // Whether a background computer-move thread is currently scheduled
   @volatile private var computerScheduled: Boolean = false
   @volatile private[aview] var paused: Boolean = false
@@ -60,14 +83,14 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   // UI components that need to be updated
   private var playerLabel: Label = uninitialized
   private var runButton: Button = uninitialized
-  private var fenDisplay: TextArea = uninitialized
+  private var fenText: scalafx.scene.text.Text = uninitialized
   private var pgnDisplay: TextFlow = uninitialized
   private var pgnScrollPane: ScrollPane = uninitialized
   private var blackCapturesBox: HBox = uninitialized
   private var whiteCapturesBox: HBox = uninitialized
   private var materialLabel: Label = uninitialized
-  private var whiteClockLabel: Label    = uninitialized
-  private var blackClockLabel: Label    = uninitialized
+  private var whiteClockLabel: Label = uninitialized
+  private var blackClockLabel: Label = uninitialized
   private var whiteStrategyLabel: Label = uninitialized
   private var blackStrategyLabel: Label = uninitialized
 
@@ -81,7 +104,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var blackElapsedMs: Long = 0
   private var clockStarted: Boolean = false
   private var lastPgnLength: Int = 0
-  private var clockSystem: ActorSystem[chess.controller.clock.ClockActor.Command] = uninitialized
+  private var clockSystem
+      : ActorSystem[chess.controller.clock.ClockActor.Command] = uninitialized
   private[aview] var initialized: Boolean = false
 
   override def update(event: MoveResult): Unit = {
@@ -103,7 +127,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
             case GameEvent.Moved =>
               if (controller.isWhiteToMove) "White to move" else "Black to move"
           }
-          fenDisplay.text = controller.getBoardAsFEN
+          if (fenText != null) fenText.text = controller.getBoardAsFEN
           updatePgnDisplay()
           updateBoard()
           updateCapturedPanel()
@@ -116,55 +140,65 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     })
   }
 
-  private def isGameOver: Boolean = controller.isCheckmate || controller.isStalemate
+  private def isGameOver: Boolean =
+    controller.isCheckmate || controller.isStalemate
 
   private def isComputerTurn: Boolean = gameMode match
-    case GameMode.HumanVsHuman      => false
-    case GameMode.HumanVsComputer   => !controller.isWhiteToMove  // computer plays Black
+    case GameMode.HumanVsHuman => false
+    case GameMode.HumanVsComputer =>
+      !controller.isWhiteToMove // computer plays Black
     case GameMode.ComputerVsComputer => true
 
   private[aview] def triggerComputerMoveIfNeeded(): Unit =
     if (!computerScheduled && !paused && isComputerTurn && !isGameOver) {
       computerScheduled = true
       val delayMs = if (gameMode == GameMode.ComputerVsComputer) 500L else 300L
-      val t = new Thread(() => {
-        Thread.sleep(delayMs)
-        // Snapshot immutable state on background thread (Board is immutable — safe)
-        val color = controller.activeColor
-        val board = controller.board
-        // Compute AI move on background thread — does NOT block the FX thread,
-        // so Pekko's clock callbacks can fire freely via Platform.runLater
-        // Derive a per-move time budget from the remaining game clock.
-        // Aim to use roughly 1/30 of the remaining time, clamped to [200ms, 5s].
-        val remainingMs: Long = clockMode match
-          case ClockMode.Timed(initialMs, _, _) =>
-            val elapsed = if (color == chess.model.Color.White) whiteElapsedMs else blackElapsedMs
-            (initialMs - elapsed).max(0L)
-          case _ => 60_000L  // no-limit game: treat as 60 s remaining
-        val moveBudgetMs = (remainingMs / 30).max(200L).min(5000L)
+      val t = new Thread(
+        () => {
+          Thread.sleep(delayMs)
+          // Snapshot immutable state on background thread (Board is immutable — safe)
+          val color = controller.activeColor
+          val board = controller.board
+          // Compute AI move on background thread — does NOT block the FX thread,
+          // so Pekko's clock callbacks can fire freely via Platform.runLater
+          // Derive a per-move time budget from the remaining game clock.
+          // Aim to use roughly 1/30 of the remaining time, clamped to [200ms, 5s].
+          val remainingMs: Long = clockMode match
+            case ClockMode.Timed(initialMs, _, _) =>
+              val elapsed =
+                if (color == chess.model.Color.White) whiteElapsedMs
+                else blackElapsedMs
+              (initialMs - elapsed).max(0L)
+            case _ => 60_000L // no-limit game: treat as 60 s remaining
+          val moveBudgetMs = (remainingMs / 30).max(200L).min(5000L)
 
-        val player = if color == chess.model.Color.White then whiteComputer else blackComputer
-        player.strategy match
-          case ids: IterativeDeepeningStrategy => ids.timeLimitMs = moveBudgetMs
-          case _ => ()
+          val player =
+            if color == chess.model.Color.White then whiteComputer
+            else blackComputer
+          player.strategy match
+            case ids: IterativeDeepeningStrategy =>
+              ids.timeLimitMs = moveBudgetMs
+            case _ => ()
 
-        val moveOpt =
-          if (isComputerTurn && !isGameOver)
-            player.move(board, color)
-          else None
-        // Only mutate UI/controller state on the FX thread
-        Platform.runLater(() => {
-          computerScheduled = false
-          moveOpt.foreach { case (from, to, promo) =>
-            if (isComputerTurn && !isGameOver) {
-              selectedSquare = None
-              controller.applyMove(from, to, promo)
-              // update() is notified by the controller and will call
-              // triggerComputerMoveIfNeeded() again for C vs C
+          val moveOpt =
+            if (isComputerTurn && !isGameOver)
+              player.move(board, color)
+            else None
+          // Only mutate UI/controller state on the FX thread
+          Platform.runLater(() => {
+            computerScheduled = false
+            moveOpt.foreach { case (from, to, promo) =>
+              if (isComputerTurn && !isGameOver) {
+                selectedSquare = None
+                controller.applyMove(from, to, promo)
+                // update() is notified by the controller and will call
+                // triggerComputerMoveIfNeeded() again for C vs C
+              }
             }
-          }
-        })
-      }, "computer-move")
+          })
+        },
+        "computer-move"
+      )
       t.setDaemon(true)
       t.start()
     }
@@ -276,9 +310,11 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       tooltip = new Tooltip("Copy PGN to clipboard")
       onAction = _ => {
         val moves = controller.pgnMoves
-        val pgn = moves.zipWithIndex.map { case (m, i) =>
-          if (i % 2 == 0) s"${i / 2 + 1}. $m" else m
-        }.mkString(" ")
+        val pgn = moves.zipWithIndex
+          .map { case (m, i) =>
+            if (i % 2 == 0) s"${i / 2 + 1}. $m" else m
+          }
+          .mkString(" ")
         val content = new ClipboardContent()
         content.putString(pgn)
         Clipboard.getSystemClipboard.setContent(content)
@@ -290,10 +326,19 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       }
     }
 
+    val dropHint = new Label("\u2318V or drop a file to load") {
+      style =
+        "-fx-font-size: 10px; -fx-font-style: italic; -fx-text-fill: #888888;"
+    }
+    scalafx.scene.layout.HBox
+      .setHgrow(dropHint, scalafx.scene.layout.Priority.Always)
+    dropHint.maxWidth = Double.MaxValue
+    dropHint.alignment = Pos.CenterRight
+
     val pgnHeader = new HBox(6) {
       alignment = Pos.CenterLeft
       padding = Insets(10, 0, 5, 0)
-      children = Seq(pgnLabel, copyPgnButton)
+      children = Seq(pgnLabel, copyPgnButton, dropHint)
     }
 
     pgnDisplay = new TextFlow {
@@ -303,7 +348,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
     pgnScrollPane = new ScrollPane {
       content = pgnDisplay
-      prefHeight = 120
+      prefHeight = 320
       fitToWidth = true
       style = "-fx-background-color: white;"
     }
@@ -331,60 +376,48 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       children = Seq(backButton, forwardButton)
     }
 
-    // Drop / paste area — accepts FEN and PGN via drag-and-drop or Ctrl+Enter
-    val pasteLabel = new Label("Drop or paste PGN / FEN:") {
+    // FEN display — styled to match the PGN area
+    val fenLabel = new Label("FEN") {
       font = Font.font("Arial", FontWeight.Normal, 14)
-      padding = Insets(10, 0, 5, 0)
     }
 
-    val pasteInput = new TextArea {
-      promptText = "Paste PGN/FEN here, or drop a file/text anywhere in this panel"
-      prefRowCount = 4
-      wrapText = true
-      style = "-fx-font-family: monospace; -fx-font-size: 12px;"
-    }
-
-    // isShortcutDown = Cmd on macOS, Ctrl on Windows/Linux — covers both platforms.
-    // By key-released time the paste is already in the text property.
-    pasteInput.onKeyReleased = (e: javafx.scene.input.KeyEvent) => {
-      if (e.isShortcutDown && e.getCode == javafx.scene.input.KeyCode.V) {
-        val input = pasteInput.text.value.trim
-        if (input.nonEmpty) { loadPgnOrFen(input); selectedSquare = None }
-      }
-    }
-
-    val loadPasteButton = new Button("Load") {
-      prefWidth = 120
-      style = "-fx-font-size: 13px; -fx-padding: 8px; -fx-background-color: #4CAF50; -fx-text-fill: white;"
+    val copyFenButton = new Button("\uD83D\uDCCB") {
+      style = "-fx-font-size: 13px; -fx-padding: 2px 6px;"
+      tooltip = new Tooltip("Copy FEN to clipboard")
       onAction = _ => {
-        val input = pasteInput.text.value.trim
-        if (input.nonEmpty) { loadPgnOrFen(input); selectedSquare = None }
+        val content = new ClipboardContent()
+        content.putString(controller.getBoardAsFEN)
+        Clipboard.getSystemClipboard.setContent(content)
+        text = "\u2713"
+        new Thread(() => {
+          Thread.sleep(1500)
+          Platform.runLater(() => text = "\uD83D\uDCCB")
+        }).start()
       }
     }
 
-    val clearPasteButton = new Button("Clear") {
-      prefWidth = 120
-      style = "-fx-font-size: 13px; -fx-padding: 8px;"
-      onAction = _ => pasteInput.text = ""
-    }
-
-    val pasteButtonBox = new HBox(10) {
-      alignment = Pos.Center
-      children = Seq(loadPasteButton, clearPasteButton)
-    }
-
-    // FEN display (read-only)
-    val fenLabel = new Label("FEN:") {
-      font = Font.font("Arial", FontWeight.Normal, 14)
+    val fenHeader = new HBox(6) {
+      alignment = Pos.CenterLeft
       padding = Insets(10, 0, 5, 0)
+      children = Seq(fenLabel, copyFenButton)
     }
 
-    fenDisplay = new TextArea {
+    fenText = new scalafx.scene.text.Text {
+      font = Font.font("Monospaced", FontWeight.Normal, 11)
       text = controller.getBoardAsFEN
-      prefRowCount = 2
-      wrapText = true
-      editable = false
-      style = "-fx-font-family: monospace; -fx-font-size: 11px; -fx-opacity: 0.9;"
+    }
+
+    val fenTextFlow = new TextFlow {
+      padding = Insets(5)
+      prefWidth = 250
+      children = Seq(fenText)
+    }
+
+    val fenScrollPane = new ScrollPane {
+      content = fenTextFlow
+      prefHeight = 55
+      fitToWidth = true
+      style = "-fx-background-color: white;"
     }
 
     // New Game button (yellow)
@@ -400,7 +433,6 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         controller.announceInitial(Board.initial)
         selectedSquare = None
         pgnDisplay.children.clear()
-        pasteInput.text = ""
         triggerComputerMoveIfNeeded()
       }
     }
@@ -432,7 +464,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
             controller.goToMove(controller.boardStates.length - 1)
             selectedSquare = None
           }
-          if (clockStarted && clockSystem != null) clockSystem ! ClockActor.Start
+          if (clockStarted && clockSystem != null)
+            clockSystem ! ClockActor.Start
           triggerComputerMoveIfNeeded()
         }
       }
@@ -445,8 +478,10 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     pauseButton.visible = false
     pauseButton.managed = false
 
-    val panelNormalStyle = "-fx-border-color: #cccccc; -fx-border-width: 0 0 0 1;"
-    val panelDropStyle   = "-fx-border-color: #27ae60; -fx-border-width: 2; -fx-background-color: rgba(39,174,96,0.05);"
+    val panelNormalStyle =
+      "-fx-border-color: #cccccc; -fx-border-width: 0 0 0 1;"
+    val panelDropStyle =
+      "-fx-border-color: #27ae60; -fx-border-width: 2; -fx-background-color: rgba(39,174,96,0.05);"
 
     val controlPanel = new VBox(10) {
       padding = Insets(20)
@@ -459,12 +494,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         pgnScrollPane,
         navButtonBox,
         new Separator(),
-        pasteLabel,
-        pasteInput,
-        pasteButtonBox,
-        new Separator(),
-        fenLabel,
-        fenDisplay,
+        fenHeader,
+        fenScrollPane,
         new Separator(),
         gameButtonBox
       )
@@ -472,30 +503,45 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
     // DnD at parent level: fires in the capture phase BEFORE any child skin filter
     // (including TextArea's own text-insertion handler), so we always win the race.
-    controlPanel.delegate.addEventFilter(DragEvent.DRAG_OVER, (e: DragEvent) => {
-      if (e.getDragboard.hasString || e.getDragboard.hasFiles)
-        e.acceptTransferModes(TransferMode.ANY*)
-      e.consume()
-    })
-    controlPanel.delegate.addEventFilter(DragEvent.DRAG_ENTERED, (e: DragEvent) => {
-      if (e.getDragboard.hasString || e.getDragboard.hasFiles)
-        controlPanel.style = panelDropStyle
-      // do not consume — lets children still see DRAG_ENTERED for cursor feedback
-    })
-    controlPanel.delegate.addEventFilter(DragEvent.DRAG_EXITED, (e: DragEvent) => {
-      controlPanel.style = panelNormalStyle
-    })
-    controlPanel.delegate.addEventFilter(DragEvent.DRAG_DROPPED, (e: DragEvent) => {
-      val db      = e.getDragboard
-      val content: Option[String] =
-        if (db.hasString && db.getString.trim.nonEmpty) Some(db.getString.trim)
-        else if (db.hasFiles) Try(readFromFile(db.getFiles.get(0))).toOption
-        else None
-      controlPanel.style = panelNormalStyle
-      content.foreach { txt => loadPgnOrFen(txt); selectedSquare = None }
-      e.setDropCompleted(content.isDefined)
-      e.consume()
-    })
+    controlPanel.delegate.addEventFilter(
+      DragEvent.DRAG_OVER,
+      (e: DragEvent) => {
+        if (e.getDragboard.hasString || e.getDragboard.hasFiles)
+          e.acceptTransferModes(TransferMode.ANY*)
+        e.consume()
+      }
+    )
+    controlPanel.delegate.addEventFilter(
+      DragEvent.DRAG_ENTERED,
+      (e: DragEvent) => {
+        if (e.getDragboard.hasString || e.getDragboard.hasFiles)
+          controlPanel.style = panelDropStyle
+        // do not consume — lets children still see DRAG_ENTERED for cursor feedback
+      }
+    )
+    controlPanel.delegate.addEventFilter(
+      DragEvent.DRAG_EXITED,
+      (e: DragEvent) => {
+        controlPanel.style = panelNormalStyle
+      }
+    )
+    controlPanel.delegate.addEventFilter(
+      DragEvent.DRAG_DROPPED,
+      (e: DragEvent) => {
+        val db = e.getDragboard
+        val content: Option[String] =
+          if (db.hasString && db.getString.trim.nonEmpty)
+            Some(db.getString.trim)
+          else if (db.hasFiles) Try(readFromFile(db.getFiles.get(0))).toOption
+          else None
+        controlPanel.style = panelNormalStyle
+        content.foreach { txt =>
+          loadPgnOrFen(txt); selectedSquare = None
+        }
+        e.setDropCompleted(content.isDefined)
+        e.consume()
+      }
+    )
 
     controlPanel
   }
@@ -513,7 +559,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #e67e22; -fx-text-fill: white; -fx-font-weight: bold;"
     }
 
-  /** Show/hide Pause and Run buttons depending on whether C vs C mode is active. */
+  /** Show/hide Pause and Run buttons depending on whether C vs C mode is
+    * active.
+    */
   private[aview] def updatePauseButtonVisibility(): Unit =
     if (pauseButton == null || runButton == null) return
     val cvc = gameMode == GameMode.ComputerVsComputer
@@ -528,8 +576,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
   private def updatePgnDisplay(): Unit = {
     pgnDisplay.children.clear()
-    val moves      = controller.pgnMoves
-    val activeIdx  = controller.currentIndex - 1 // index of the move that produced the current board
+    val moves = controller.pgnMoves
+    val activeIdx =
+      controller.currentIndex - 1 // index of the move that produced the current board
     var activeNode = Option.empty[Text]
 
     moves.zipWithIndex.foreach { case (move, i) =>
@@ -541,12 +590,16 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
       val isActive = i == activeIdx
       val moveText = new Text(move + " ") {
-        font  = Font.font("monospace", if (isActive) FontWeight.Bold else FontWeight.Normal, 13)
-        fill  = if (isActive) Color.web("#1565C0") else Color.Black
+        font = Font.font(
+          "monospace",
+          if (isActive) FontWeight.Bold else FontWeight.Normal,
+          13
+        )
+        fill = if (isActive) Color.web("#1565C0") else Color.Black
         style = "-fx-cursor: hand;"
 
         onMouseEntered = _ => if (!isActive) fill = Color.web("#1565C0")
-        onMouseExited  = _ => if (!isActive) fill = Color.Black
+        onMouseExited = _ => if (!isActive) fill = Color.Black
         onMouseClicked = _ => {
           controller.goToMove(i + 1)
           selectedSquare = None
@@ -561,7 +614,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       activeNode match {
         case Some(node) =>
           val totalH = pgnDisplay.delegate.prefHeight(-1)
-          val viewH  = pgnScrollPane.height.value
+          val viewH = pgnScrollPane.height.value
           if (totalH > viewH) {
             val nodeY = node.delegate.getBoundsInParent.getMinY
             pgnScrollPane.vvalue = Math.min(1.0, nodeY / (totalH - viewH))
@@ -585,7 +638,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       padding = Insets(4, 20, 8, 20)
       children = Seq(blackCapturesBox, materialLabel, whiteCapturesBox)
     }
-    scalafx.scene.layout.HBox.setHgrow(capturesVBox, scalafx.scene.layout.Priority.Always)
+    scalafx.scene.layout.HBox
+      .setHgrow(capturesVBox, scalafx.scene.layout.Priority.Always)
 
     blackClockLabel = new Label("--:--") {
       font = Font.font("Monospaced", FontWeight.Bold, 30)
@@ -613,10 +667,16 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       alignment = Pos.CenterRight
       padding = Insets(4, 8, 4, 0)
       children = Seq(
-        new Label("BLACK") { font = Font.font("Arial", FontWeight.Bold, 10); padding = Insets(0, 16, 0, 16) },
+        new Label("BLACK") {
+          font = Font.font("Arial", FontWeight.Bold, 10);
+          padding = Insets(0, 16, 0, 16)
+        },
         blackStrategyLabel,
         blackClockLabel,
-        new Label("WHITE") { font = Font.font("Arial", FontWeight.Bold, 10); padding = Insets(4, 16, 0, 16) },
+        new Label("WHITE") {
+          font = Font.font("Arial", FontWeight.Bold, 10);
+          padding = Insets(4, 16, 0, 16)
+        },
         whiteStrategyLabel,
         whiteClockLabel
       )
@@ -626,21 +686,29 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     updateClockDisplay()
 
     new HBox {
-      style = "-fx-background-color: #ebebeb; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;"
+      style =
+        "-fx-background-color: #ebebeb; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;"
       children = Seq(capturesVBox, clockVBox)
     }
   }
 
   private def updateCapturedPanel(): Unit = {
     val startingCounts = Map(
-      Role.Pawn -> 8, Role.Knight -> 2, Role.Bishop -> 2,
-      Role.Rook -> 2, Role.Queen  -> 1
+      Role.Pawn -> 8,
+      Role.Knight -> 2,
+      Role.Bishop -> 2,
+      Role.Rook -> 2,
+      Role.Queen -> 1
     )
     val pieceValues = Map(
-      Role.Pawn -> 1, Role.Knight -> 3, Role.Bishop -> 3,
-      Role.Rook -> 5, Role.Queen  -> 9
+      Role.Pawn -> 1,
+      Role.Knight -> 3,
+      Role.Bishop -> 3,
+      Role.Rook -> 5,
+      Role.Queen -> 9
     )
-    val displayRoles = Seq(Role.Queen, Role.Rook, Role.Bishop, Role.Knight, Role.Pawn)
+    val displayRoles =
+      Seq(Role.Queen, Role.Rook, Role.Bishop, Role.Knight, Role.Pawn)
 
     val liveCounts = controller.board.squares.flatten.flatten
       .groupBy(p => (p.color, p.role))
@@ -667,8 +735,10 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     whiteCapturesBox.children.clear()
     whiteCaptures.foreach(t => whiteCapturesBox.children.add(t))
 
-    val whiteMaterial = displayRoles.map(r => captured(ChessColor.Black, r) * pieceValues(r)).sum
-    val blackMaterial = displayRoles.map(r => captured(ChessColor.White, r) * pieceValues(r)).sum
+    val whiteMaterial =
+      displayRoles.map(r => captured(ChessColor.Black, r) * pieceValues(r)).sum
+    val blackMaterial =
+      displayRoles.map(r => captured(ChessColor.White, r) * pieceValues(r)).sum
     val adv = whiteMaterial - blackMaterial
     materialLabel.text =
       if adv > 0 then s"White +$adv"
@@ -686,8 +756,10 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     if h > 0 then f"$h%d:$m%02d:$s%02d" else f"$m%02d:$s%02d"
 
   private[aview] def updateStrategyLabels(): Unit =
-    if (whiteStrategyLabel != null) whiteStrategyLabel.text = whiteComputer.strategy.name
-    if (blackStrategyLabel != null) blackStrategyLabel.text = blackComputer.strategy.name
+    if (whiteStrategyLabel != null)
+      whiteStrategyLabel.text = whiteComputer.strategy.name
+    if (blackStrategyLabel != null)
+      blackStrategyLabel.text = blackComputer.strategy.name
 
   private def updateClockDisplay(): Unit =
     if (whiteClockLabel == null || blackClockLabel == null) return
@@ -705,18 +777,23 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private def highlightActiveClockLabel(): Unit =
     if (whiteClockLabel == null || blackClockLabel == null) return
     def colorFor(elapsedMs: Long): String = clockMode match
-      case ClockMode.Timed(initialMs, _, _) if (initialMs - elapsedMs) < 30000 => "#e74c3c"
+      case ClockMode.Timed(initialMs, _, _)
+          if (initialMs - elapsedMs) < 30000 =>
+        "#e74c3c"
       case _ => "#333333"
-    val activeBase   = "-fx-background-color: #d5e8d4; -fx-background-radius: 4;"
+    val activeBase = "-fx-background-color: #d5e8d4; -fx-background-radius: 4;"
     val inactiveBase = "-fx-background-color: transparent;"
     if controller.isWhiteToMove then
-      whiteClockLabel.style = s"-fx-text-fill: ${colorFor(whiteElapsedMs)}; $activeBase"
+      whiteClockLabel.style =
+        s"-fx-text-fill: ${colorFor(whiteElapsedMs)}; $activeBase"
       blackClockLabel.style = s"-fx-text-fill: #888888; $inactiveBase"
     else
-      blackClockLabel.style = s"-fx-text-fill: ${colorFor(blackElapsedMs)}; $activeBase"
+      blackClockLabel.style =
+        s"-fx-text-fill: ${colorFor(blackElapsedMs)}; $activeBase"
       whiteClockLabel.style = s"-fx-text-fill: #888888; $inactiveBase"
 
-  /** Switch the active clock after a real move and start it if not yet running. */
+  /** Switch the active clock after a real move and start it if not yet running.
+    */
   private def switchClock(): Unit =
     val incMs = clockMode match
       case ClockMode.Timed(_, inc, _) => inc
@@ -732,7 +809,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private[aview] def resetClock(): Unit =
     whiteElapsedMs = 0
     blackElapsedMs = 0
-    clockStarted   = false
+    clockStarted = false
     if clockSystem != null then clockSystem ! ClockActor.Reset
     updateClockDisplay()
 
@@ -745,32 +822,36 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     if clockSystem != null then clockSystem ! ClockActor.SetMode(initMs, incMs)
     whiteElapsedMs = 0
     blackElapsedMs = 0
-    clockStarted   = false
+    clockStarted = false
     updateClockDisplay()
 
   private def handleTimeout(color: chess.model.Color): Unit =
     val winner = if color == chess.model.Color.White then "Black" else "White"
-    new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION) {
+    new javafx.scene.control.Alert(
+      javafx.scene.control.Alert.AlertType.INFORMATION
+    ) {
       initOwner(primaryStage.delegate)
       setTitle("Time Out!")
       setHeaderText(null)
       setContentText(s"${color.toString} ran out of time. $winner wins!")
     }.showAndWait()
 
-  /** Spawn the ClockActor inside its own ActorSystem.
-    * Callbacks marshal to the JavaFX thread via Platform.runLater.
+  /** Spawn the ClockActor inside its own ActorSystem. Callbacks marshal to the
+    * JavaFX thread via Platform.runLater.
     */
   private[aview] def initClockActor(): Unit =
     clockSystem = ActorSystem(
       ClockActor(
-        onUpdate  = (wMs, bMs) => Platform.runLater { () =>
-          whiteElapsedMs = wMs
-          blackElapsedMs = bMs
-          updateClockDisplay()
-        },
-        onTimeout = color => Platform.runLater { () =>
-          handleTimeout(color)
-        }
+        onUpdate = (wMs, bMs) =>
+          Platform.runLater { () =>
+            whiteElapsedMs = wMs
+            blackElapsedMs = bMs
+            updateClockDisplay()
+          },
+        onTimeout = color =>
+          Platform.runLater { () =>
+            handleTimeout(color)
+          }
       ),
       "chess-clock"
     )
@@ -778,12 +859,14 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private[aview] def updateBoard(): Unit = {
     // Compute legal target squares once for the selected piece
     val legalTargets: Set[Square] = if (showLegalMoves) {
-      selectedSquare.map { sel =>
-        controller.board
-          .legalMoves(controller.activeColor)
-          .collect { case (from, to) if from == sel => to }
-          .toSet
-      }.getOrElse(Set.empty)
+      selectedSquare
+        .map { sel =>
+          controller.board
+            .legalMoves(controller.activeColor)
+            .collect { case (from, to) if from == sel => to }
+            .toSet
+        }
+        .getOrElse(Set.empty)
     } else Set.empty
 
     // Determine if the active king is in check or checkmate
@@ -823,7 +906,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         case _ if kingInDanger.contains(sq) =>
           if (isCheckmate) Color.web("#c0392b") else Color.web("#e74c3c")
         case _ if lastMoveSquares.contains(sq) => lastMoveColor
-        case _ => baseColor
+        case _                                 => baseColor
       }
 
       // Update move-hint dot
@@ -871,17 +954,17 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
           selectedSquare = None
         } else {
           // Detect promotion before applying: pawn moving to the back rank
-          val needsPromotion = controller.board.pieceAt(fromSquare).exists { p =>
-            p.role == Role.Pawn &&
+          val needsPromotion =
+            controller.board.pieceAt(fromSquare).exists { p =>
+              p.role == Role.Pawn &&
               ((p.color == ChessColor.White && square.rank == Rank._8) ||
                 (p.color == ChessColor.Black && square.rank == Rank._1))
-          }
+            }
           val promotion: Option[PromotableRole] =
             if needsPromotion then showPromotionDialog() else None
 
           // If the user cancelled the promotion dialog, deselect and stop
-          if needsPromotion && promotion.isEmpty then
-            selectedSquare = None
+          if needsPromotion && promotion.isEmpty then selectedSquare = None
           else
             controller.applyMove(fromSquare, square, promotion) match {
               case _: MoveResult.Moved =>
@@ -892,9 +975,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
                 playerLabel.text = error match {
                   case MoveError.LeavesKingInCheck =>
                     "Illegal: move leaves king in check!"
-                  case MoveError.WrongColor        => "That's not your piece!"
-                  case MoveError.NoPiece           => "No piece on that square!"
-                  case MoveError.InvalidMove       => "That piece can't move there!"
+                  case MoveError.WrongColor  => "That's not your piece!"
+                  case MoveError.NoPiece     => "No piece on that square!"
+                  case MoveError.InvalidMove => "That piece can't move there!"
                   case MoveError.PromotionRequired => "Promotion required!"
                   case MoveError.ParseError(msg)   => s"Error: $msg"
                 }
@@ -913,7 +996,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     }
   }
 
-  private def loadPgnOrFen(input: String): Unit = {
+  private[aview] def loadPgnOrFen(input: String): Unit = {
     // Heuristic: FEN strings contain '/' for rank separators and typically
     // have 7 slashes (8 ranks). PGN move text does not.
     val isFen = input.count(_ == '/') >= 7 && !input.contains('\n')
@@ -921,17 +1004,14 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     if (isFen) {
       controller.loadFromFEN(input) match {
         case Right(_) =>
-          showInfo("FEN Loaded", "Position loaded from FEN string.")
+          playerLabel.text = "FEN imported."
         case Left(error) =>
           showAlert("Invalid FEN", error)
       }
     } else {
       controller.loadPgnMoves(input) match {
         case Right(_) =>
-          showInfo(
-            "PGN Loaded",
-            s"Loaded ${controller.pgnMoves.length} moves from PGN."
-          )
+          playerLabel.text = "PGN imported."
         case Left(error) =>
           showAlert("Invalid PGN", error)
       }
@@ -1120,26 +1200,29 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     val hvhItem = new RadioMenuItem("Human vs Human") {
       toggleGroup = modeGroup
       selected = true
-      onAction = _ => if (selected.value) {
-        gameMode = GameMode.HumanVsHuman
-        updatePauseButtonVisibility()
-      }
+      onAction = _ =>
+        if (selected.value) {
+          gameMode = GameMode.HumanVsHuman
+          updatePauseButtonVisibility()
+        }
     }
     val hvcItem = new RadioMenuItem("Human vs Computer") {
       toggleGroup = modeGroup
-      onAction = _ => if (selected.value) {
-        gameMode = GameMode.HumanVsComputer
-        updatePauseButtonVisibility()
-        triggerComputerMoveIfNeeded()
-      }
+      onAction = _ =>
+        if (selected.value) {
+          gameMode = GameMode.HumanVsComputer
+          updatePauseButtonVisibility()
+          triggerComputerMoveIfNeeded()
+        }
     }
     val cvcItem = new RadioMenuItem("Computer vs Computer") {
       toggleGroup = modeGroup
-      onAction = _ => if (selected.value) {
-        gameMode = GameMode.ComputerVsComputer
-        updatePauseButtonVisibility()
-        triggerComputerMoveIfNeeded()
-      }
+      onAction = _ =>
+        if (selected.value) {
+          gameMode = GameMode.ComputerVsComputer
+          updatePauseButtonVisibility()
+          triggerComputerMoveIfNeeded()
+        }
     }
 
     val gameMenu = new Menu("Game") {
@@ -1148,16 +1231,16 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
     // Per-player strategy selection
     val strategies: Seq[(String, () => MoveStrategy)] = Seq(
-      "Random"                  -> (() => new RandomStrategy()),
-      "Greedy"                  -> (() => new GreedyStrategy()),
-      "Material Balance"        -> (() => new MaterialBalanceStrategy()),
-      "Piece-Square Tables"     -> (() => new PieceSquareStrategy()),
-      "Minimax (d=2)"           -> (() => new MinimaxStrategy(2)),
-      "Minimax (d=3)"           -> (() => new MinimaxStrategy(3)),
-      "Minimax (d=4)"           -> (() => new MinimaxStrategy(4)),
-      "Minimax+QSearch (d=3)"   -> (() => new QuiescenceStrategy(3)),
-      "Minimax+QSearch (d=4)"   -> (() => new QuiescenceStrategy(4)),
-      "Iterative Deepening"     -> (() => new IterativeDeepeningStrategy())
+      "Random" -> (() => new RandomStrategy()),
+      "Greedy" -> (() => new GreedyStrategy()),
+      "Material Balance" -> (() => new MaterialBalanceStrategy()),
+      "Piece-Square Tables" -> (() => new PieceSquareStrategy()),
+      "Minimax (d=2)" -> (() => new MinimaxStrategy(2)),
+      "Minimax (d=3)" -> (() => new MinimaxStrategy(3)),
+      "Minimax (d=4)" -> (() => new MinimaxStrategy(4)),
+      "Minimax+QSearch (d=3)" -> (() => new QuiescenceStrategy(3)),
+      "Minimax+QSearch (d=4)" -> (() => new QuiescenceStrategy(4)),
+      "Iterative Deepening" -> (() => new IterativeDeepeningStrategy())
     )
 
     def makeStrategySubmenu(label: String, player: ComputerPlayer): Menu = {
@@ -1166,7 +1249,10 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         new RadioMenuItem(name) {
           toggleGroup = group
           selected = player.strategy.name == name
-          onAction = _ => if (selected.value) { player.strategy = factory(); updateStrategyLabels() }
+          onAction = _ =>
+            if (selected.value) {
+              player.strategy = factory(); updateStrategyLabels()
+            }
         }
       }
       val m = new Menu(label); m.items = items; m
@@ -1181,26 +1267,28 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
     // Clock mode menu
     val clockModes: Seq[(String, ClockMode)] = Seq(
-      "No Limit"       -> ClockMode.NoLimit,
-      "Bullet  1+0"    -> ClockMode.Timed(  1 * 60 * 1000L,  0,        "Bullet 1+0"),
-      "Bullet  2+1"    -> ClockMode.Timed(  2 * 60 * 1000L,  1 * 1000L,"Bullet 2+1"),
-      "Blitz   3+0"    -> ClockMode.Timed(  3 * 60 * 1000L,  0,        "Blitz 3+0"),
-      "Blitz   3+2"    -> ClockMode.Timed(  3 * 60 * 1000L,  2 * 1000L,"Blitz 3+2"),
-      "Blitz   5+0"    -> ClockMode.Timed(  5 * 60 * 1000L,  0,        "Blitz 5+0"),
-      "Blitz   5+3"    -> ClockMode.Timed(  5 * 60 * 1000L,  3 * 1000L,"Blitz 5+3"),
-      "Rapid  10+0"    -> ClockMode.Timed( 10 * 60 * 1000L,  0,        "Rapid 10+0"),
-      "Rapid  15+10"   -> ClockMode.Timed( 15 * 60 * 1000L, 10 * 1000L,"Rapid 15+10"),
-      "Classical 30+0" -> ClockMode.Timed( 30 * 60 * 1000L,  0,        "Classical 30+0")
+      "No Limit" -> ClockMode.NoLimit,
+      "Bullet  1+0" -> ClockMode.Timed(1 * 60 * 1000L, 0, "Bullet 1+0"),
+      "Bullet  2+1" -> ClockMode.Timed(2 * 60 * 1000L, 1 * 1000L, "Bullet 2+1"),
+      "Blitz   3+0" -> ClockMode.Timed(3 * 60 * 1000L, 0, "Blitz 3+0"),
+      "Blitz   3+2" -> ClockMode.Timed(3 * 60 * 1000L, 2 * 1000L, "Blitz 3+2"),
+      "Blitz   5+0" -> ClockMode.Timed(5 * 60 * 1000L, 0, "Blitz 5+0"),
+      "Blitz   5+3" -> ClockMode.Timed(5 * 60 * 1000L, 3 * 1000L, "Blitz 5+3"),
+      "Rapid  10+0" -> ClockMode.Timed(10 * 60 * 1000L, 0, "Rapid 10+0"),
+      "Rapid  15+10" -> ClockMode
+        .Timed(15 * 60 * 1000L, 10 * 1000L, "Rapid 15+10"),
+      "Classical 30+0" -> ClockMode.Timed(30 * 60 * 1000L, 0, "Classical 30+0")
     )
     val clockGroup = new ToggleGroup()
     val clockItems = clockModes.zipWithIndex.map { case ((label, mode), idx) =>
       new RadioMenuItem(label) {
         toggleGroup = clockGroup
         selected = idx == 0
-        onAction = _ => if (selected.value) {
-          applyClockMode(mode)
-          updateClockDisplay()
-        }
+        onAction = _ =>
+          if (selected.value) {
+            applyClockMode(mode)
+            updateClockDisplay()
+          }
       }
     }
     val clockMenu = new Menu("Clock") {
@@ -1213,15 +1301,16 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   }
 
   private def showPromotionDialog(): Option[PromotableRole] = {
-    val queenBtn  = new ButtonType("♛ Queen")
-    val rookBtn   = new ButtonType("♜ Rook")
+    val queenBtn = new ButtonType("♛ Queen")
+    val rookBtn = new ButtonType("♜ Rook")
     val bishopBtn = new ButtonType("♝ Bishop")
     val knightBtn = new ButtonType("♞ Knight")
     new Alert(Alert.AlertType.Confirmation) {
       initOwner(primaryStage)
       title = "Pawn Promotion"
       headerText = "Choose a piece to promote to:"
-      buttonTypes = Seq(queenBtn, rookBtn, bishopBtn, knightBtn, ButtonType.Cancel)
+      buttonTypes =
+        Seq(queenBtn, rookBtn, bishopBtn, knightBtn, ButtonType.Cancel)
     }.showAndWait() match {
       case Some(btn) if btn == queenBtn  => Some(PromotableRole.Queen)
       case Some(btn) if btn == rookBtn   => Some(PromotableRole.Rook)
@@ -1306,10 +1395,22 @@ class ChessGUILauncher extends javafx.application.Application {
       javafx.scene.input.KeyEvent.KEY_PRESSED,
       (event: javafx.scene.input.KeyEvent) => {
         event.getCode match {
-          case javafx.scene.input.KeyCode.LEFT  =>
+          case javafx.scene.input.KeyCode.LEFT =>
             gui.controller.backward(); gui.selectedSquare = None
           case javafx.scene.input.KeyCode.RIGHT =>
-            gui.controller.forward();  gui.selectedSquare = None
+            gui.controller.forward(); gui.selectedSquare = None
+          case javafx.scene.input.KeyCode.V if event.isShortcutDown =>
+            // Read clipboard directly — works regardless of which node has focus
+            val cb = Clipboard.getSystemClipboard
+            if (cb.hasString) {
+              val txt = cb.getString.trim
+              if (txt.nonEmpty) {
+                Platform.runLater(() => {
+                  gui.loadPgnOrFen(txt); gui.selectedSquare = None
+                })
+              }
+            }
+            event.consume()
           case _ => ()
         }
       }
