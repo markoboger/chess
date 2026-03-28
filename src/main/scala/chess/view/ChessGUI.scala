@@ -12,7 +12,8 @@ import scalafx.scene.text.{Font, FontWeight, Text, TextFlow}
 import scalafx.stage.Stage
 import scalafx.stage.FileChooser
 import scalafx.stage.FileChooser.ExtensionFilter
-import chess.controller.GameController
+import chess.controller.{GameController, ComputerPlayer, MoveStrategy}
+import chess.controller.strategy.{RandomStrategy, GreedyStrategy, MaterialBalanceStrategy}
 import chess.model.{Board, Piece, PromotableRole, Role, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.model.{Color => ChessColor}
 import chess.io.FileIO
@@ -38,6 +39,14 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var boardDots: Array[Array[scalafx.scene.shape.Circle]] =
     Array.ofDim[scalafx.scene.shape.Circle](8, 8)
   private[view] var showLegalMoves: Boolean = true
+
+  enum GameMode:
+    case HumanVsHuman, HumanVsComputer, ComputerVsComputer
+
+  private[view] var gameMode: GameMode = GameMode.HumanVsHuman
+  private[view] val computerPlayer: ComputerPlayer = new ComputerPlayer()
+  // Whether a background computer-move thread is currently scheduled
+  @volatile private var computerScheduled: Boolean = false
   private[view] var primaryStage: Stage = uninitialized
 
   // UI components that need to be updated
@@ -68,6 +77,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
           updatePgnDisplay()
           updateBoard()
           updateCapturedPanel()
+          triggerComputerMoveIfNeeded()
         case MoveResult.Failed(_, _) =>
           // Errors are handled inline by the originating action
           // (click vs text input require different UI feedback)
@@ -75,6 +85,37 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       }
     })
   }
+
+  private def isGameOver: Boolean = controller.isCheckmate || controller.isStalemate
+
+  private def isComputerTurn: Boolean = gameMode match
+    case GameMode.HumanVsHuman      => false
+    case GameMode.HumanVsComputer   => !controller.isWhiteToMove  // computer plays Black
+    case GameMode.ComputerVsComputer => true
+
+  private[view] def triggerComputerMoveIfNeeded(): Unit =
+    if (!computerScheduled && isComputerTurn && !isGameOver) {
+      computerScheduled = true
+      val delayMs = if (gameMode == GameMode.ComputerVsComputer) 500L else 300L
+      val t = new Thread(() => {
+        Thread.sleep(delayMs)
+        Platform.runLater(() => {
+          computerScheduled = false
+          if (isComputerTurn && !isGameOver) {
+            val color = controller.activeColor
+            computerPlayer.move(controller.board, color).foreach {
+              case (from, to, promo) =>
+                selectedSquare = None
+                controller.applyMove(from, to, promo)
+                // update() is notified by the controller and will call
+                // triggerComputerMoveIfNeeded() again for C vs C
+            }
+          }
+        })
+      }, "computer-move")
+      t.setDaemon(true)
+      t.start()
+    }
 
   private[view] def createBoardPane(): GridPane = {
     val boardPane = new GridPane {
@@ -536,6 +577,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   }
 
   private def handleSquareClick(square: Square): Unit = {
+    if (isComputerTurn || isGameOver) return
     selectedSquare match {
       case None =>
         controller.board.pieceAt(square) match {
@@ -793,8 +835,55 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       items = Seq(showMovesItem)
     }
 
+    // Game mode toggle group
+    val modeGroup = new ToggleGroup()
+
+    val hvhItem = new RadioMenuItem("Human vs Human") {
+      toggleGroup = modeGroup
+      selected = true
+      onAction = _ => if (selected.value) {
+        gameMode = GameMode.HumanVsHuman
+      }
+    }
+    val hvcItem = new RadioMenuItem("Human vs Computer") {
+      toggleGroup = modeGroup
+      onAction = _ => if (selected.value) {
+        gameMode = GameMode.HumanVsComputer
+        triggerComputerMoveIfNeeded()
+      }
+    }
+    val cvcItem = new RadioMenuItem("Computer vs Computer") {
+      toggleGroup = modeGroup
+      onAction = _ => if (selected.value) {
+        gameMode = GameMode.ComputerVsComputer
+        triggerComputerMoveIfNeeded()
+      }
+    }
+
+    val gameMenu = new Menu("Game") {
+      items = Seq(hvhItem, hvcItem, cvcItem)
+    }
+
+    // Strategy selection (applies to any computer-controlled side)
+    val strategyGroup = new ToggleGroup()
+    val strategies: Seq[(String, () => MoveStrategy)] = Seq(
+      "Random"           -> (() => new RandomStrategy()),
+      "Greedy"           -> (() => new GreedyStrategy()),
+      "Material Balance" -> (() => new MaterialBalanceStrategy())
+    )
+    val strategyItems = strategies.zipWithIndex.map { case ((label, factory), idx) =>
+      new RadioMenuItem(label) {
+        toggleGroup = strategyGroup
+        selected = idx == 0
+        onAction = _ => if (selected.value) computerPlayer.strategy = factory()
+      }
+    }
+    val strategyMenu = new Menu("Strategy") {
+      items = strategyItems
+    }
+
     new MenuBar {
-      menus = Seq(fileMenu, viewMenu)
+      menus = Seq(fileMenu, gameMenu, strategyMenu, viewMenu)
     }
   }
 
