@@ -4,8 +4,8 @@ import chess.controller.MoveStrategy
 import chess.model.{Board, Color, Square, PromotableRole, MoveResult}
 import scala.util.Random
 
-/** Depth-1 evaluation using material balance and piece-square tables.
-  * Uses [[Evaluator]] for scoring; see that object for table details.
+/** Depth-1 evaluation using material balance and piece-square tables. Uses [[Evaluator]] for scoring; see that object
+  * for table details.
   */
 class PieceSquareStrategy extends MoveStrategy:
   val name = "Piece-Square Tables"
@@ -19,9 +19,7 @@ class PieceSquareStrategy extends MoveStrategy:
       board.move(from, to, promo) match
         case MoveResult.Moved(newBoard, _) =>
           Some((from, to, promo, Evaluator.evaluate(newBoard, color)))
-        // $COVERAGE-OFF$ legalMoves only returns moves that succeed
         case _ => None
-        // $COVERAGE-ON$
     }
 
     if scored.isEmpty then return None

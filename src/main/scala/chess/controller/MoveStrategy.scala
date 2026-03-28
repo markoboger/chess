@@ -4,9 +4,8 @@ import chess.model.{Board, Color, Square, Rank, Role, PromotableRole}
 
 /** Selects a move for the computer player.
   *
-  * Implementations receive the current board and the color to move, and
-  * return the chosen move as `(from, to, promotionPiece)`, or `None` when
-  * there are no legal moves (game over).
+  * Implementations receive the current board and the color to move, and return the chosen move as `(from, to,
+  * promotionPiece)`, or `None` when there are no legal moves (game over).
   */
 trait MoveStrategy:
   def name: String

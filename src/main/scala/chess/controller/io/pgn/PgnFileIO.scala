@@ -5,8 +5,8 @@ import scala.util.{Try, Success, Failure}
 
 /** PGN serialization implementation.
   *
-  * Formats move lists as standard PGN move text and parses PGN text back into
-  * move tokens, stripping comments, variations, and results.
+  * Formats move lists as standard PGN move text and parses PGN text back into move tokens, stripping comments,
+  * variations, and results.
   */
 class PgnFileIO extends PgnIO:
 
@@ -26,9 +26,7 @@ class PgnFileIO extends PgnIO:
         .map(_.trim)
         .filter(_.nonEmpty)
         .filter(t => !t.matches("\\d+\\.+")) // strip move numbers
-        .filter(t =>
-          !Set("1-0", "0-1", "1/2-1/2", "*").contains(t)
-        ) // strip results
+        .filter(t => !Set("1-0", "0-1", "1/2-1/2", "*").contains(t)) // strip results
         .toVector
 
       if (tokens.isEmpty)

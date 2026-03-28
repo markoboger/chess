@@ -6,8 +6,8 @@ import scala.util.{Try, Success, Failure}
 
 object RegexFenParser extends FenIO {
 
-  /** Parses a FEN (Forsyth-Edwards Notation) string and returns a Board. FEN
-    * format: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+  /** Parses a FEN (Forsyth-Edwards Notation) string and returns a Board. FEN format:
+    * "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
     *
     * @param fen
     *   The FEN string
@@ -25,8 +25,8 @@ object RegexFenParser extends FenIO {
     }
   }
 
-  /** Parses just the board position part of a FEN string (first component).
-    * Format: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+  /** Parses just the board position part of a FEN string (first component). Format:
+    * "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
     */
   private def parseBoardFromFEN(boardPart: String): Board = {
     val ranks = boardPart.split("/")
@@ -40,8 +40,7 @@ object RegexFenParser extends FenIO {
     Board(squares)
   }
 
-  /** Parses a single rank from FEN notation. Example: "rnbqkbnr" or "8" or
-    * "r1bqkb1r"
+  /** Parses a single rank from FEN notation. Example: "rnbqkbnr" or "8" or "r1bqkb1r"
     */
   private def parseRank(rankStr: String): Vector[Option[Piece]] = {
     val squares = scala.collection.mutable.ArrayBuffer[Option[Piece]]()
@@ -68,9 +67,8 @@ object RegexFenParser extends FenIO {
     squares.toVector
   }
 
-  /** Parses a single piece character from FEN notation. Uppercase = White,
-    * Lowercase = Black p/P = Pawn, n/N = Knight, b/B = Bishop, r/R = Rook, q/Q
-    * \= Queen, k/K = King
+  /** Parses a single piece character from FEN notation. Uppercase = White, Lowercase = Black p/P = Pawn, n/N = Knight,
+    * b/B = Bishop, r/R = Rook, q/Q \= Queen, k/K = King
     */
   private def parsePiece(char: Char): Option[Piece] = {
     val color = if (char.isUpper) Color.White else Color.Black

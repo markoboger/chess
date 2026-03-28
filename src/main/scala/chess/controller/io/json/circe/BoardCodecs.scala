@@ -5,8 +5,8 @@ import _root_.io.circe.{Encoder, Decoder, Json, HCursor, DecodingFailure}
 
 /** Circe [[Encoder]]/[[Decoder]] instances for the chess model types.
   *
-  * All codecs are defined here — the model classes carry no Circe annotations,
-  * keeping the library dependency contained in this package.
+  * All codecs are defined here — the model classes carry no Circe annotations, keeping the library dependency contained
+  * in this package.
   */
 object BoardCodecs:
 

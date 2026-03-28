@@ -5,11 +5,11 @@ import _root_.upickle.default.*
 
 /** uPickle [[ReadWriter]] instances for the chess model types.
   *
-  * All codecs are defined here — the model classes carry no uPickle
-  * annotations, keeping the library dependency contained in this package.
+  * All codecs are defined here — the model classes carry no uPickle annotations, keeping the library dependency
+  * contained in this package.
   *
-  * The JSON structure is identical to the Circe implementation so that
-  * files produced by one library can be read by the other.
+  * The JSON structure is identical to the Circe implementation so that files produced by one library can be read by the
+  * other.
   */
 object BoardCodecs:
 

@@ -5,11 +5,11 @@ import scala.util.Try
 
 /** A format-agnostic interface for serializing and deserializing a [[Board]].
   *
-  * Implementations provide concrete strategies for specific formats
-  * (e.g. JSON, FEN, PGN). The controller and views depend only on this
-  * trait, making it easy to swap or add formats without changing consumers.
+  * Implementations provide concrete strategies for specific formats (e.g. JSON, FEN, PGN). The controller and views
+  * depend only on this trait, making it easy to swap or add formats without changing consumers.
   *
-  * @see [[chess.controller.io.json.circe.CirceJsonFileIO]]
+  * @see
+  *   [[chess.controller.io.json.circe.CirceJsonFileIO]]
   */
 trait FileIO:
 
@@ -27,7 +27,6 @@ trait FileIO:
     * @param input
     *   the serialized string
     * @return
-    *   `Success(board)` if parsing succeeds, `Failure` with a descriptive
-    *   error otherwise
+    *   `Success(board)` if parsing succeeds, `Failure` with a descriptive error otherwise
     */
   def load(input: String): Try[Board]

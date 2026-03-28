@@ -6,17 +6,15 @@ import scala.util.Random
 
 /** Depth-1 minimax with a pure material evaluation function.
   *
-  * For every legal move, the resulting board is evaluated as:
-  *   score = Σ(own piece values) − Σ(opponent piece values)
+  * For every legal move, the resulting board is evaluated as: score = Σ(own piece values) − Σ(opponent piece values)
   *
   * The move with the highest score is chosen; ties are broken randomly.
   *
   * Piece values: Q=9, R=5, B=3, N=3, P=1.
   *
-  * Improvement over [[GreedyStrategy]]: Greedy only considers what is
-  * captured on this move. MaterialBalance scores the whole board after the
-  * move, so it also prefers moves that keep own pieces safe and naturally
-  * values promotions at their full worth.
+  * Improvement over [[GreedyStrategy]]: Greedy only considers what is captured on this move. MaterialBalance scores the
+  * whole board after the move, so it also prefers moves that keep own pieces safe and naturally values promotions at
+  * their full worth.
   */
 class MaterialBalanceStrategy extends MoveStrategy:
   val name = "Material Balance"
@@ -27,18 +25,16 @@ class MaterialBalanceStrategy extends MoveStrategy:
     case Role.Bishop => 3
     case Role.Knight => 3
     case Role.Pawn   => 1
-    // $COVERAGE-OFF$ Kings are never capturable in legal chess
     case Role.King   => 0
-    // $COVERAGE-ON$
   }
 
   /** Net material score from `color`'s perspective. */
   private def evaluate(board: Board, color: Color): Int =
     Square.all.foldLeft(0) { (acc, sq) =>
       board.pieceAt(sq) match
-        case Some(p) if p.color == color          => acc + pieceValue(p.role)
-        case Some(p) if p.color != color          => acc - pieceValue(p.role)
-        case _                                     => acc
+        case Some(p) if p.color == color => acc + pieceValue(p.role)
+        case Some(p) if p.color != color => acc - pieceValue(p.role)
+        case _                           => acc
     }
 
   def selectMove(board: Board, color: Color): Option[(Square, Square, Option[PromotableRole])] =
@@ -50,9 +46,7 @@ class MaterialBalanceStrategy extends MoveStrategy:
       board.move(from, to, promo) match
         case MoveResult.Moved(newBoard, _) =>
           Some((from, to, promo, evaluate(newBoard, color)))
-        // $COVERAGE-OFF$ legalMoves only returns moves that succeed
         case _ => None
-        // $COVERAGE-ON$
     }
 
     if scored.isEmpty then return None

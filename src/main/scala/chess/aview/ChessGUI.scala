@@ -24,18 +24,7 @@ import chess.controller.strategy.{
   QuiescenceStrategy,
   IterativeDeepeningStrategy
 }
-import chess.model.{
-  Board,
-  Piece,
-  PromotableRole,
-  Role,
-  Square,
-  File,
-  Rank,
-  MoveResult,
-  MoveError,
-  GameEvent
-}
+import chess.model.{Board, Piece, PromotableRole, Role, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.model.{Color => ChessColor}
 import chess.controller.io.FileIO
 import chess.controller.io.json.circe.CirceJsonFileIO
@@ -114,8 +103,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var gameOverByTimeout: Boolean = false
   private var moveDelayEnabled: Boolean = true
   private var lastPgnLength: Int = 0
-  private var clockSystem
-      : ActorSystem[chess.controller.clock.ClockActor.Command] = uninitialized
+  private var clockSystem: ActorSystem[chess.controller.clock.ClockActor.Command] = uninitialized
   private[aview] var initialized: Boolean = false
 
   override def update(event: MoveResult): Unit = {
@@ -342,8 +330,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     }
 
     val dropHint = new Label("\u2318V or drop a file to load") {
-      style =
-        "-fx-font-size: 10px; -fx-font-style: italic; -fx-text-fill: #888888;"
+      style = "-fx-font-size: 10px; -fx-font-style: italic; -fx-text-fill: #888888;"
     }
     scalafx.scene.layout.HBox
       .setHgrow(dropHint, scalafx.scene.layout.Priority.Always)
@@ -607,8 +594,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #e67e22; -fx-text-fill: white; -fx-font-weight: bold;"
     }
 
-  /** Show/hide Pause and Run buttons depending on whether C vs C mode is
-    * active.
+  /** Show/hide Pause and Run buttons depending on whether C vs C mode is active.
     */
   private[aview] def updatePauseButtonVisibility(): Unit =
     if (pauseButton == null || runButton == null) return
@@ -734,8 +720,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     updateClockDisplay()
 
     new HBox {
-      style =
-        "-fx-background-color: #ebebeb; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;"
+      style = "-fx-background-color: #ebebeb; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;"
       children = Seq(capturesVBox, clockVBox)
     }
   }
@@ -825,19 +810,16 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private def highlightActiveClockLabel(): Unit =
     if (whiteClockLabel == null || blackClockLabel == null) return
     def colorFor(elapsedMs: Long): String = clockMode match
-      case ClockMode.Timed(initialMs, _, _)
-          if (initialMs - elapsedMs) < 30000 =>
+      case ClockMode.Timed(initialMs, _, _) if (initialMs - elapsedMs) < 30000 =>
         "#e74c3c"
       case _ => "#333333"
     val activeBase = "-fx-background-color: #d5e8d4; -fx-background-radius: 4;"
     val inactiveBase = "-fx-background-color: transparent;"
     if controller.isWhiteToMove then
-      whiteClockLabel.style =
-        s"-fx-text-fill: ${colorFor(whiteElapsedMs)}; $activeBase"
+      whiteClockLabel.style = s"-fx-text-fill: ${colorFor(whiteElapsedMs)}; $activeBase"
       blackClockLabel.style = s"-fx-text-fill: #888888; $inactiveBase"
     else
-      blackClockLabel.style =
-        s"-fx-text-fill: ${colorFor(blackElapsedMs)}; $activeBase"
+      blackClockLabel.style = s"-fx-text-fill: ${colorFor(blackElapsedMs)}; $activeBase"
       whiteClockLabel.style = s"-fx-text-fill: #888888; $inactiveBase"
 
   /** Switch the active clock after a real move and start it if not yet running.
@@ -879,11 +861,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     gameMode = GameMode.HumanVsHuman
     updatePauseButtonVisibility()
     if clockSystem != null then clockSystem ! ClockActor.Stop
-    if playerLabel != null then
-      playerLabel.text = s"Time out! $winner wins."
+    if playerLabel != null then playerLabel.text = s"Time out! $winner wins."
 
-  /** Spawn the ClockActor inside its own ActorSystem. Callbacks marshal to the
-    * JavaFX thread via Platform.runLater.
+  /** Spawn the ClockActor inside its own ActorSystem. Callbacks marshal to the JavaFX thread via Platform.runLater.
     */
   private[aview] def initClockActor(): Unit =
     clockSystem = ActorSystem(
@@ -1021,9 +1001,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
                 playerLabel.text = error match {
                   case MoveError.LeavesKingInCheck =>
                     "Illegal: move leaves king in check!"
-                  case MoveError.WrongColor  => "That's not your piece!"
-                  case MoveError.NoPiece     => "No piece on that square!"
-                  case MoveError.InvalidMove => "That piece can't move there!"
+                  case MoveError.WrongColor        => "That's not your piece!"
+                  case MoveError.NoPiece           => "No piece on that square!"
+                  case MoveError.InvalidMove       => "That piece can't move there!"
                   case MoveError.PromotionRequired => "Promotion required!"
                   case MoveError.ParseError(msg)   => s"Error: $msg"
                 }
@@ -1398,8 +1378,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       initOwner(primaryStage)
       title = "Pawn Promotion"
       headerText = "Choose a piece to promote to:"
-      buttonTypes =
-        Seq(queenBtn, rookBtn, bishopBtn, knightBtn, ButtonType.Cancel)
+      buttonTypes = Seq(queenBtn, rookBtn, bishopBtn, knightBtn, ButtonType.Cancel)
     }.showAndWait() match {
       case Some(btn) if btn == queenBtn  => Some(PromotableRole.Queen)
       case Some(btn) if btn == rookBtn   => Some(PromotableRole.Rook)

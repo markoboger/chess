@@ -6,10 +6,8 @@ import chess.controller.io.pgn.{PgnFileIO, CombinatorPgnParser, FastParsePgnPars
 
 /** Wiring of trait-based interfaces to their concrete implementations.
   *
-  * Import `chess.AppBindings.given` (or `chess.AppBindings.*`) wherever a
-  * `given FenIO` or `given PgnIO` is needed. To swap an implementation,
-  * uncomment the desired line and comment out the others — no other code needs
-  * to be touched.
+  * Import `chess.AppBindings.given` (or `chess.AppBindings.*`) wherever a `given FenIO` or `given PgnIO` is needed. To
+  * swap an implementation, uncomment the desired line and comment out the others — no other code needs to be touched.
   */
 object AppBindings:
 

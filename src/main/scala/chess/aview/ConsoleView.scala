@@ -1,26 +1,14 @@
 package chess.aview
 
 import chess.controller.GameController
-import chess.model.{
-  Board,
-  Piece,
-  Color,
-  PromotableRole,
-  Square,
-  File,
-  Rank,
-  MoveResult,
-  MoveError,
-  GameEvent
-}
+import chess.model.{Board, Piece, Color, PromotableRole, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.util.Observer
 import scala.io.StdIn
 
 /** A console-based view for the chess game.
   *
-  * Implements [[Observer]] to react to move results published by the
-  * [[GameController]]. Both successful moves and errors are handled in
-  * [[update]], making the TUI fully event-driven.
+  * Implements [[Observer]] to react to move results published by the [[GameController]]. Both successful moves and
+  * errors are handled in [[update]], making the TUI fully event-driven.
   */
 class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
   controller.add(this)
@@ -73,9 +61,7 @@ class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
     try {
       System.console() != null || System.in.available() >= 0
     } catch {
-      // $COVERAGE-OFF$ IOException from System.in is not triggerable in unit tests
       case _: Exception => false
-      // $COVERAGE-ON$
     }
   }
 
@@ -100,7 +86,6 @@ class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
     println(showBoard(controller.board))
 
     // Check if we can read input
-    // $COVERAGE-OFF$ stdin check and infinite loop only run in non-interactive mode
     if (!isInputAvailable) {
       println("\n[Console Mode: Read-Only Observer]")
       println("Input not available - displaying board updates only")
@@ -112,7 +97,6 @@ class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
         Thread.sleep(1000)
       }
     }
-    // $COVERAGE-ON$
 
     var running = true
     while (running) {
@@ -133,12 +117,10 @@ class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
               case Some((from, to, promo)) =>
                 val result = controller.applyMove(from, to, promo)
                 result match {
-                  // $COVERAGE-OFF$ coordinate promotion: PGN always catches pawn moves first
                   case MoveResult.Failed(_, MoveError.PromotionRequired) =>
                     promptForPromotion().foreach { pr =>
                       controller.applyMove(from, to, Some(pr))
                     }
-                  // $COVERAGE-ON$
                   case _ => // displayed by update()
                 }
               case None =>
@@ -164,7 +146,7 @@ class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
     if (coords.length == 4) {
       for
         from <- Square.fromString(coords.substring(0, 2))
-        to   <- Square.fromString(coords.substring(2, 4))
+        to <- Square.fromString(coords.substring(2, 4))
       yield
         val promo = promoStr.toUpperCase match {
           case "Q" => Some(PromotableRole.Queen)
@@ -183,14 +165,15 @@ class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
     print("Promote to (Q=Queen, R=Rook, B=Bishop, N=Knight): ")
     val input = StdIn.readLine()
     if (input == null) None
-    else input.trim.toUpperCase match {
-      case "Q" | "QUEEN"  => Some(PromotableRole.Queen)
-      case "R" | "ROOK"   => Some(PromotableRole.Rook)
-      case "B" | "BISHOP" => Some(PromotableRole.Bishop)
-      case "N" | "KNIGHT" => Some(PromotableRole.Knight)
-      case _ =>
-        println("Invalid choice. Defaulting to Queen.")
-        Some(PromotableRole.Queen)
-    }
+    else
+      input.trim.toUpperCase match {
+        case "Q" | "QUEEN"  => Some(PromotableRole.Queen)
+        case "R" | "ROOK"   => Some(PromotableRole.Rook)
+        case "B" | "BISHOP" => Some(PromotableRole.Bishop)
+        case "N" | "KNIGHT" => Some(PromotableRole.Knight)
+        case _ =>
+          println("Invalid choice. Defaulting to Queen.")
+          Some(PromotableRole.Queen)
+      }
   }
 }

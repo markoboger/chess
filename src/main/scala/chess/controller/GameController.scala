@@ -20,10 +20,10 @@ final class GameController(initialBoard: Board)(using
 
   // Position repetition tracking: key → count
   private case class PositionKey(
-    squares: Vector[Vector[Option[Piece]]],
-    castlingRights: chess.model.CastlingRights,
-    whiteToMove: Boolean,
-    enPassantFile: Option[File]
+      squares: Vector[Vector[Option[Piece]]],
+      castlingRights: chess.model.CastlingRights,
+      whiteToMove: Boolean,
+      enPassantFile: Option[File]
   )
 
   private def positionKey(board: Board, whiteToMove: Boolean): PositionKey =
@@ -47,8 +47,7 @@ final class GameController(initialBoard: Board)(using
   /** All board states from initial to latest. */
   def boardStates: Vector[Board] = _boardStates
 
-  /** PGN move strings in order. `pgnMoves(i)` transitions from `boardStates(i)`
-    * to `boardStates(i+1)`.
+  /** PGN move strings in order. `pgnMoves(i)` transitions from `boardStates(i)` to `boardStates(i+1)`.
     */
   def pgnMoves: Vector[String] = _pgnMoves
 
@@ -82,7 +81,8 @@ final class GameController(initialBoard: Board)(using
   }
 
   /** Jump directly to any position in the game history.
-    * @param index 0 = initial position, N = position after move N
+    * @param index
+    *   0 = initial position, N = position after move N
     */
   def goToMove(index: Int): Unit =
     if index >= 0 && index < _boardStates.length then
@@ -91,8 +91,8 @@ final class GameController(initialBoard: Board)(using
       _isWhiteToMove = _currentIndex % 2 == 0
       notifyObservers(MoveResult.Moved(currentBoard, gameEventAt(_currentIndex)))
 
-  /** Compute the GameEvent for a board state at the given history index.
-    * The active color at that index is the player whose turn it is to move.
+  /** Compute the GameEvent for a board state at the given history index. The active color at that index is the player
+    * whose turn it is to move.
     */
   private def gameEventAt(index: Int): GameEvent =
     val activeColorAtIndex = if index % 2 == 0 then Color.White else Color.Black
@@ -141,8 +141,8 @@ final class GameController(initialBoard: Board)(using
 
   /** Apply a move using PGN notation (e.g., "e4", "Nf3", "O-O", "e8=Q").
     * @return
-    *   [[MoveResult]] — [[MoveResult.Moved]] with board and game event on
-    *   success, or [[MoveResult.Failed]] with error reason on failure
+    *   [[MoveResult]] — [[MoveResult.Moved]] with board and game event on success, or [[MoveResult.Failed]] with error
+    *   reason on failure
     */
   def applyPgnMove(pgnMove: String): MoveResult =
     PGNParser.parseMove(pgnMove, board, _isWhiteToMove) match
@@ -161,8 +161,8 @@ final class GameController(initialBoard: Board)(using
 
   /** Apply a move using file/rank coordinates.
     * @return
-    *   [[MoveResult]] — [[MoveResult.Moved]] with board and game event on
-    *   success, or [[MoveResult.Failed]] with error reason on failure
+    *   [[MoveResult]] — [[MoveResult.Moved]] with board and game event on success, or [[MoveResult.Failed]] with error
+    *   reason on failure
     */
   def applyMove(from: Square, to: Square, promotion: Option[PromotableRole] = None): MoveResult =
     if !isAtLatest then return MoveResult.Failed(board, MoveError.InvalidMove)
@@ -187,10 +187,8 @@ final class GameController(initialBoard: Board)(using
             val key = positionKey(moved.board, _isWhiteToMove)
             val count = positionCounts.getOrElse(key, 0) + 1
             positionCounts = positionCounts.updated(key, count)
-            if count >= 3 then
-              MoveResult.Moved(moved.board, GameEvent.ThreefoldRepetition)
-            else
-              moved
+            if count >= 3 then MoveResult.Moved(moved.board, GameEvent.ThreefoldRepetition)
+            else moved
           case failed: MoveResult.Failed =>
             failed
       case Some(_) => MoveResult.Failed(board, MoveError.WrongColor)
@@ -198,8 +196,8 @@ final class GameController(initialBoard: Board)(using
     notifyObservers(result)
     result
 
-  /** Load a game from PGN move text (e.g. "1. e4 e5 2. Nf3 Nc6"). Resets to the
-    * initial board and applies all moves in sequence.
+  /** Load a game from PGN move text (e.g. "1. e4 e5 2. Nf3 Nc6"). Resets to the initial board and applies all moves in
+    * sequence.
     * @return
     *   Right(board) on success, Left(error) if any move fails
     */

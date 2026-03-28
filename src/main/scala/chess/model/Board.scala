@@ -39,8 +39,7 @@ final case class Board(
       case Some(piece) =>
         val candidate = applyMoveUnchecked(from, to, promotion)
         if candidate eq this then MoveResult.Failed(this, MoveError.InvalidMove)
-        else if candidate.isInCheck(piece.color) then
-          MoveResult.Failed(this, MoveError.LeavesKingInCheck)
+        else if candidate.isInCheck(piece.color) then MoveResult.Failed(this, MoveError.LeavesKingInCheck)
         else if promotion.isEmpty && isPromotionSquare(piece, to) then
           MoveResult.Failed(this, MoveError.PromotionRequired)
         else
@@ -54,8 +53,8 @@ final case class Board(
       ((piece.color == Color.White && to.rank == Rank._8) ||
         (piece.color == Color.Black && to.rank == Rank._1))
 
-  /** Returns true if the piece at `from` can move to `to` by the movement rules,
-    * without checking whether the king is left in check.
+  /** Returns true if the piece at `from` can move to `to` by the movement rules, without checking whether the king is
+    * left in check.
     */
   def canMoveIgnoringCheck(from: Square, to: Square): Boolean =
     !(applyMoveUnchecked(from, to) eq this)
@@ -70,9 +69,9 @@ final case class Board(
         // an attacked square, which is illegal and must be caught here before the enemy
         // king is removed from the board and can no longer threaten the destination).
         pieceAt(to) match
-          case Some(targetPiece) if targetPiece.color == piece.color    => return this
-          case Some(targetPiece) if targetPiece.role == Role.King       => return this
-          case _ => ()
+          case Some(targetPiece) if targetPiece.color == piece.color => return this
+          case Some(targetPiece) if targetPiece.role == Role.King    => return this
+          case _                                                     => ()
 
         // Validate move based on piece type
         val isValid = piece.role match
@@ -113,9 +112,9 @@ final case class Board(
         if piece.role == Role.King && (to.file - from.file).abs == 2 then
           val isKingside = to.file.index > from.file.index
           val rookFromFile = if isKingside then File.H else File.A
-          val rookToFile   = if isKingside then File.F else File.D
+          val rookToFile = if isKingside then File.F else File.D
           val rookFrom = Square(rookFromFile, from.rank)
-          val rookTo   = Square(rookToFile, from.rank)
+          val rookTo = Square(rookToFile, from.rank)
           finalSquares = updateSquare(finalSquares, rookFrom, None)
           finalSquares = updateSquare(finalSquares, rookTo, Some(Piece(Role.Rook, piece.color)))
 
@@ -142,8 +141,7 @@ final case class Board(
     if rankDiff * direction <= 0 then return false
 
     // Single square forward (must be empty)
-    if rankDiff * direction == 1 && fileDiff == 0 then
-      return pieceAt(to).isEmpty
+    if rankDiff * direction == 1 && fileDiff == 0 then return pieceAt(to).isEmpty
 
     // Two squares forward from starting position (must be empty)
     if rankDiff * direction == 2 && fileDiff == 0 && from.rank == startRank then
@@ -205,8 +203,7 @@ final case class Board(
         // Verify there's an opponent pawn at the captured square
         val capturedSquare = Square(to.file, from.rank)
         pieceAt(capturedSquare) match
-          case Some(capturedPiece)
-              if capturedPiece.role == Role.Pawn && capturedPiece.color != color =>
+          case Some(capturedPiece) if capturedPiece.role == Role.Pawn && capturedPiece.color != color =>
             true
           case _ => false
       case None => false
@@ -233,8 +230,7 @@ final case class Board(
 
     // Queen moves like rook or bishop
     // Same-square moves are already rejected by the own-piece capture check
-    if from.file != to.file && from.rank != to.rank && fileDiff != rankDiff then
-      return false
+    if from.file != to.file && from.rank != to.rank && fileDiff != rankDiff then return false
 
     isPathClear(from, to)
 
@@ -245,7 +241,7 @@ final case class Board(
 
   private def isValidCastling(from: Square, to: Square, color: Color): Boolean =
     val isKingside = to.file.index > from.file.index
-    val backRank   = if color == Color.White then Rank._1 else Rank._8
+    val backRank = if color == Color.White then Rank._1 else Rank._8
 
     // Destination must be exactly the castling target square (g or c on the back rank)
     val expectedToFile = if isKingside then File.G else File.C

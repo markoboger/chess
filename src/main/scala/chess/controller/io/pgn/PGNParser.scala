@@ -209,9 +209,7 @@ object PGNParser {
             case Role.Rook   => "R"
             case Role.Bishop => "B"
             case Role.Knight => "N"
-            // $COVERAGE-OFF$ pawns can only promote to Q/R/B/N
             case _           => ""
-            // $COVERAGE-ON$
           })
       }
 

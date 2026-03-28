@@ -4,9 +4,8 @@ import scala.util.Try
 
 /** PGN-specific game serialization interface.
   *
-  * Unlike [[chess.controller.io.FileIO]] which serializes a single board
-  * position, PGN represents a game as a sequence of moves. The save/load
-  * contract therefore operates on move lists rather than boards.
+  * Unlike [[chess.controller.io.FileIO]] which serializes a single board position, PGN represents a game as a sequence
+  * of moves. The save/load contract therefore operates on move lists rather than boards.
   */
 trait PgnIO:
 
@@ -26,7 +25,6 @@ trait PgnIO:
     * @param input
     *   the PGN text
     * @return
-    *   `Success(moves)` with the ordered move tokens, or `Failure` with a
-    *   descriptive error
+    *   `Success(moves)` with the ordered move tokens, or `Failure` with a descriptive error
     */
   def load(input: String): Try[Vector[String]]

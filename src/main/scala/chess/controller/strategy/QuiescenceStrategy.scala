@@ -4,17 +4,16 @@ import chess.controller.MoveStrategy
 import chess.model.{Board, Color, Square, Role, PromotableRole, MoveResult}
 import scala.util.Random
 
-/** Minimax with alpha-beta pruning extended by a quiescence search at the
-  * leaves.
+/** Minimax with alpha-beta pruning extended by a quiescence search at the leaves.
   *
-  * At depth 0, instead of returning the static evaluation immediately, the
-  * engine keeps searching *captures only* until the position is "quiet" (no
-  * captures remain or the max quiescence depth is reached).  This eliminates
-  * the horizon effect where a fixed-depth search misses that a piece is
-  * recaptured on the very next move.
+  * At depth 0, instead of returning the static evaluation immediately, the engine keeps searching *captures only* until
+  * the position is "quiet" (no captures remain or the max quiescence depth is reached). This eliminates the horizon
+  * effect where a fixed-depth search misses that a piece is recaptured on the very next move.
   *
-  * @param depth     Main search depth in plies (half-moves).
-  * @param qDepth    Maximum additional plies of capture-only search (default 6).
+  * @param depth
+  *   Main search depth in plies (half-moves).
+  * @param qDepth
+  *   Maximum additional plies of capture-only search (default 6).
   */
 class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveStrategy:
   val name = s"Minimax+QSearch (d=$depth)"
@@ -36,11 +35,8 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
           if score > bestScore then
             bestScore = score
             bestMoves = List((from, to, promo))
-          else if score == bestScore then
-            bestMoves = (from, to, promo) :: bestMoves
-        // $COVERAGE-OFF$ legalMoves only returns moves that succeed
+          else if score == bestScore then bestMoves = (from, to, promo) :: bestMoves
         case _ => ()
-        // $COVERAGE-ON$
 
     if bestMoves.isEmpty then None
     else Some(bestMoves(Random.nextInt(bestMoves.length)))
@@ -53,15 +49,13 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
       maximizing: Boolean,
       rootColor: Color
   ): Int =
-    if depth == 0 then
-      return quiescence(board, alpha, beta, maximizing, rootColor, qDepth)
+    if depth == 0 then return quiescence(board, alpha, beta, maximizing, rootColor, qDepth)
 
     val currentColor = if maximizing then rootColor else rootColor.opposite
     val moves = board.legalMoves(currentColor)
 
     if moves.isEmpty then
-      return if board.isInCheck(currentColor) then
-        if maximizing then -INF + (depth * 100) else INF - (depth * 100)
+      return if board.isInCheck(currentColor) then if maximizing then -INF + (depth * 100) else INF - (depth * 100)
       else 0
 
     if maximizing then
@@ -76,11 +70,9 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
           case MoveResult.Moved(newBoard, _) =>
             val score = alphaBeta(newBoard, depth - 1, a, beta, maximizing = false, rootColor)
             if score > best then best = score
-            if best > a    then a    = best
-            if a >= beta   then done = true
-          // $COVERAGE-OFF$ legalMoves only returns moves that succeed
+            if best > a then a = best
+            if a >= beta then done = true
           case _ => ()
-          // $COVERAGE-ON$
       best
     else
       var best = INF
@@ -94,11 +86,9 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
           case MoveResult.Moved(newBoard, _) =>
             val score = alphaBeta(newBoard, depth - 1, alpha, b, maximizing = true, rootColor)
             if score < best then best = score
-            if best < b    then b    = best
-            if b <= alpha  then done = true
-          // $COVERAGE-OFF$ legalMoves only returns moves that succeed
+            if best < b then b = best
+            if b <= alpha then done = true
           case _ => ()
-          // $COVERAGE-ON$
       best
 
   /** Search captures only until quiet, to avoid the horizon effect. */
@@ -113,11 +103,12 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
     val standPat = Evaluator.evaluate(board, rootColor)
 
     if maximizing then
-      if standPat >= beta  then return beta
-      if remaining == 0    then return standPat
+      if standPat >= beta then return beta
+      if remaining == 0 then return standPat
       var a = alpha.max(standPat)
       val currentColor = rootColor
-      val captures = board.legalMoves(currentColor)
+      val captures = board
+        .legalMoves(currentColor)
         .filter((_, to) => board.pieceAt(to).isDefined)
       var done = false
       val iter = captures.iterator
@@ -127,18 +118,17 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
         board.move(from, to, promo) match
           case MoveResult.Moved(newBoard, _) =>
             val score = quiescence(newBoard, a, beta, maximizing = false, rootColor, remaining - 1)
-            if score > a  then a = score
-            if a >= beta  then done = true
-          // $COVERAGE-OFF$ legalMoves only returns moves that succeed
+            if score > a then a = score
+            if a >= beta then done = true
           case _ => ()
-          // $COVERAGE-ON$
       a
     else
       if standPat <= alpha then return alpha
-      if remaining == 0   then return standPat
+      if remaining == 0 then return standPat
       var b = beta.min(standPat)
       val currentColor = rootColor.opposite
-      val captures = board.legalMoves(currentColor)
+      val captures = board
+        .legalMoves(currentColor)
         .filter((_, to) => board.pieceAt(to).isDefined)
       var done = false
       val iter = captures.iterator
@@ -148,9 +138,7 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
         board.move(from, to, promo) match
           case MoveResult.Moved(newBoard, _) =>
             val score = quiescence(newBoard, alpha, b, maximizing = true, rootColor, remaining - 1)
-            if score < b    then b = score
-            if b <= alpha   then done = true
-          // $COVERAGE-OFF$ legalMoves only returns moves that succeed
+            if score < b then b = score
+            if b <= alpha then done = true
           case _ => ()
-          // $COVERAGE-ON$
       b

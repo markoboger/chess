@@ -3,8 +3,8 @@ package chess.controller
 import chess.controller.strategy.{RandomStrategy, Evaluator}
 import chess.model.{Board, Color, Square, PromotableRole, MoveResult}
 
-/** Delegates move selection to the current [[MoveStrategy]].
-  * The strategy can be swapped at any time (e.g., from the GUI menu).
+/** Delegates move selection to the current [[MoveStrategy]]. The strategy can be swapped at any time (e.g., from the
+  * GUI menu).
   */
 class ComputerPlayer(var strategy: MoveStrategy = new RandomStrategy):
 
@@ -24,22 +24,21 @@ class ComputerPlayer(var strategy: MoveStrategy = new RandomStrategy):
 
     // Check whether the candidate move leads to a repeated position.
     val candidateRepeats = candidate.exists { case (from, to, promo) =>
-      board.move(from, to, promo) match
-        case MoveResult.Moved(newBoard, _) => wouldRepeat(newBoard)
-        case _                             => false
+      board.move(from, to, promo).toOption.exists(wouldRepeat)
     }
     if !candidateRepeats then return candidate
 
     // Find the best-scoring non-repeating legal move as a fallback.
     val alternatives = board.legalMoves(color).flatMap { case (from, to) =>
       val promo = MoveStrategy.promotionFor(board, from, to, color)
-      board.move(from, to, promo) match
-        case MoveResult.Moved(newBoard, _) if !wouldRepeat(newBoard) =>
-          Some((from, to, promo, Evaluator.evaluate(newBoard, color)))
-        case _ => None
+      board
+        .move(from, to, promo)
+        .toOption
+        .filterNot(wouldRepeat)
+        .map(newBoard => (from, to, promo, Evaluator.evaluate(newBoard, color)))
     }
 
-    if alternatives.isEmpty then candidate  // all moves repeat — accept the draw
+    if alternatives.isEmpty then candidate // all moves repeat — accept the draw
     else
       val best = alternatives.maxBy(_._4)
       Some((best._1, best._2, best._3))

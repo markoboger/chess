@@ -6,13 +6,11 @@ import scala.util.Random
 
 /** Alpha-beta minimax with iterative deepening and a wall-clock time budget.
   *
-  * Searches depth 1, 2, 3, … until `timeLimitMs` milliseconds have elapsed.
-  * When the clock expires mid-search, the last *fully completed* depth's best
-  * move is returned, so the answer is always sound.
+  * Searches depth 1, 2, 3, … until `timeLimitMs` milliseconds have elapsed. When the clock expires mid-search, the last
+  * *fully completed* depth's best move is returned, so the answer is always sound.
   *
-  * `timeLimitMs` is a `var` so the caller (e.g. the GUI) can adjust it
-  * per-move based on remaining game-clock time before calling
-  * [[chess.controller.ComputerPlayer.move]].
+  * `timeLimitMs` is a `var` so the caller (e.g. the GUI) can adjust it per-move based on remaining game-clock time
+  * before calling [[chess.controller.ComputerPlayer.move]].
   */
 class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStrategy:
 
@@ -38,7 +36,7 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
         (from, to, MoveStrategy.promotionFor(board, from, to, color))
       }
 
-    var depth     = 1
+    var depth = 1
     var keepGoing = true
 
     while keepGoing do
@@ -56,10 +54,10 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
       depth: Int,
       deadline: Long
   ): (Option[(Square, Square, Option[PromotableRole])], Boolean) =
-    var bestScore  = -INF
-    var bestMoves  = List.empty[(Square, Square, Option[PromotableRole])]
-    var aborted    = false
-    var mateFound  = false
+    var bestScore = -INF
+    var bestMoves = List.empty[(Square, Square, Option[PromotableRole])]
+    var aborted = false
+    var mateFound = false
 
     // Seed the path with the root position (maximizing = true at root).
     val rootPath: Set[NodeKey] = Set(nodeKey(board, maximizing = true))
@@ -68,30 +66,28 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
     while !aborted && iter.hasNext do
       val (from, to) = iter.next()
       val promo = MoveStrategy.promotionFor(board, from, to, color)
-      board.move(from, to, promo) match
-        case MoveResult.Moved(_, GameEvent.Checkmate) =>
-          // Mate in 1 found — nothing can be better, accept immediately.
-          bestScore = INF
-          bestMoves = List((from, to, promo))
-          mateFound = true
-          aborted   = true   // early exit; mateFound prevents discarding result
-        case MoveResult.Moved(_, GameEvent.Stalemate) =>
-          if 0 > bestScore then
-            bestScore = 0
+      board.move(from, to, promo).movedOption.foreach { (newBoard, event) =>
+        event match
+          case GameEvent.Checkmate =>
+            // Mate in 1 found — nothing can be better, accept immediately.
+            bestScore = INF
             bestMoves = List((from, to, promo))
-          else if 0 == bestScore then
-            bestMoves = (from, to, promo) :: bestMoves
-        case MoveResult.Moved(newBoard, _) =>
-          val (score, ab) =
-            alphaBeta(newBoard, depth - 1, -INF, INF, maximizing = false, color, deadline, rootPath)
-          if ab then aborted = true
-          else
-            if score > bestScore then
+            mateFound = true
+            aborted = true
+          case GameEvent.Stalemate =>
+            if 0 > bestScore then
+              bestScore = 0
+              bestMoves = List((from, to, promo))
+            else if 0 == bestScore then bestMoves = (from, to, promo) :: bestMoves
+          case _ =>
+            val (score, ab) =
+              alphaBeta(newBoard, depth - 1, -INF, INF, maximizing = false, color, deadline, rootPath)
+            if ab then aborted = true
+            else if score > bestScore then
               bestScore = score
               bestMoves = List((from, to, promo))
-            else if score == bestScore then
-              bestMoves = (from, to, promo) :: bestMoves
-        case _ => ()
+            else if score == bestScore then bestMoves = (from, to, promo) :: bestMoves
+      }
 
     val result =
       if bestMoves.isEmpty then None
@@ -117,72 +113,59 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
     if depth == 0 then return (Evaluator.evaluate(board, rootColor), false)
 
     val currentColor = if maximizing then rootColor else rootColor.opposite
-    val moves        = board.legalMoves(currentColor)
+    val moves = board.legalMoves(currentColor)
 
     if moves.isEmpty then
       val score =
-        if board.isInCheck(currentColor) then
-          if maximizing then -INF + (depth * 100) else INF - (depth * 100)
+        if board.isInCheck(currentColor) then if maximizing then -INF + (depth * 100) else INF - (depth * 100)
         else 0
       return (score, false)
 
     val nextSeen = seenInPath + key
 
     if maximizing then
-      var best    = -INF
-      var a       = alpha
-      var done    = false
+      var best = -INF
+      var a = alpha
+      var done = false
       var aborted = false
-      val iter    = moves.iterator
+      val iter = moves.iterator
       while !done && !aborted && iter.hasNext do
         val (from, to) = iter.next()
         val promo = MoveStrategy.promotionFor(board, from, to, currentColor)
-        board.move(from, to, promo) match
-          case MoveResult.Moved(_, GameEvent.Checkmate) =>
-            val score = INF - (depth * 100)
-            if score > best then best = score
-            if best > a    then a    = best
-            if a >= beta   then done = true
-          case MoveResult.Moved(_, GameEvent.Stalemate) =>
-            if 0 > best then best = 0
-            if best > a  then a   = best
-            if a >= beta then done = true
-          case MoveResult.Moved(newBoard, _) =>
-            val (score, ab) =
-              alphaBeta(newBoard, depth - 1, a, beta, maximizing = false, rootColor, deadline, nextSeen)
-            if ab then aborted = true
-            else
-              if score > best then best = score
-              if best > a    then a    = best
-              if a >= beta   then done = true
-          case _ => ()
+        board.move(from, to, promo).movedOption.foreach { (newBoard, event) =>
+          val score = event match
+            case GameEvent.Checkmate => INF - (depth * 100)
+            case GameEvent.Stalemate => 0
+            case _ =>
+              val (s, ab) =
+                alphaBeta(newBoard, depth - 1, a, beta, maximizing = false, rootColor, deadline, nextSeen)
+              if ab then aborted = true
+              s
+          if score > best then best = score
+          if best > a then a = best
+          if a >= beta then done = true
+        }
       (best, aborted)
     else
-      var best    = INF
-      var b       = beta
-      var done    = false
+      var best = INF
+      var b = beta
+      var done = false
       var aborted = false
-      val iter    = moves.iterator
+      val iter = moves.iterator
       while !done && !aborted && iter.hasNext do
         val (from, to) = iter.next()
         val promo = MoveStrategy.promotionFor(board, from, to, currentColor)
-        board.move(from, to, promo) match
-          case MoveResult.Moved(_, GameEvent.Checkmate) =>
-            val score = -INF + (depth * 100)
-            if score < best then best = score
-            if best < b    then b    = best
-            if b <= alpha  then done = true
-          case MoveResult.Moved(_, GameEvent.Stalemate) =>
-            if 0 < best  then best = 0
-            if best < b  then b    = best
-            if b <= alpha then done = true
-          case MoveResult.Moved(newBoard, _) =>
-            val (score, ab) =
-              alphaBeta(newBoard, depth - 1, alpha, b, maximizing = true, rootColor, deadline, nextSeen)
-            if ab then aborted = true
-            else
-              if score < best then best = score
-              if best < b    then b    = best
-              if b <= alpha  then done = true
-          case _ => ()
+        board.move(from, to, promo).movedOption.foreach { (newBoard, event) =>
+          val score = event match
+            case GameEvent.Checkmate => -INF + (depth * 100)
+            case GameEvent.Stalemate => 0
+            case _ =>
+              val (s, ab) =
+                alphaBeta(newBoard, depth - 1, alpha, b, maximizing = true, rootColor, deadline, nextSeen)
+              if ab then aborted = true
+              s
+          if score < best then best = score
+          if best < b then b = best
+          if b <= alpha then done = true
+        }
       (best, aborted)

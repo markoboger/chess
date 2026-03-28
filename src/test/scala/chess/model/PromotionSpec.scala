@@ -22,7 +22,7 @@ class PromotionSpec extends AnyWordSpec with Matchers {
       result.isFailed shouldBe true
       result match {
         case MoveResult.Failed(_, MoveError.PromotionRequired) => succeed
-        case _ => fail("Expected PromotionRequired")
+        case _                                                 => fail("Expected PromotionRequired")
       }
     }
 
@@ -31,7 +31,7 @@ class PromotionSpec extends AnyWordSpec with Matchers {
       result.isFailed shouldBe true
       result match {
         case MoveResult.Failed(_, MoveError.PromotionRequired) => succeed
-        case _ => fail("Expected PromotionRequired")
+        case _                                                 => fail("Expected PromotionRequired")
       }
     }
 
@@ -111,7 +111,7 @@ class PromotionSpec extends AnyWordSpec with Matchers {
       result.isFailed shouldBe true
       result match {
         case MoveResult.Failed(_, MoveError.PromotionRequired) => succeed
-        case _ => fail(s"Expected PromotionRequired, got $result")
+        case _                                                 => fail(s"Expected PromotionRequired, got $result")
       }
     }
 
@@ -130,7 +130,7 @@ class PromotionSpec extends AnyWordSpec with Matchers {
     "apply black pawn promotion from PGN d1=Q" in {
       // White king must move first; then black can promote
       val controller = new GameController(blackNearPromotionBoard)
-      controller.applyMove(Square("h1"), Square("g1"))  // white king step
+      controller.applyMove(Square("h1"), Square("g1")) // white king step
       controller.applyPgnMove("d1=Q").isSuccess shouldBe true
       controller.board.pieceAt(Square("d1")) shouldEqual Some(Piece(Role.Queen, Color.Black))
     }
@@ -149,7 +149,7 @@ class PromotionSpec extends AnyWordSpec with Matchers {
       val result = controller.applyMove(Square("e7"), Square("e8"))
       result match {
         case MoveResult.Failed(_, MoveError.PromotionRequired) => succeed
-        case _ => fail(s"Expected PromotionRequired, got $result")
+        case _                                                 => fail(s"Expected PromotionRequired, got $result")
       }
     }
   }

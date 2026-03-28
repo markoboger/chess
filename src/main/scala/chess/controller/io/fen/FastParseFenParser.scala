@@ -77,9 +77,8 @@ object FastParseFenParser extends FenIO {
       }
     }
 
-  /** Converts a Board to FEN notation (board position only). Delegates to
-    * [[RegexFenParser.boardToFEN]] because serialization does not benefit from
-    * parsing libraries.
+  /** Converts a Board to FEN notation (board position only). Delegates to [[RegexFenParser.boardToFEN]] because
+    * serialization does not benefit from parsing libraries.
     */
   def boardToFEN(board: Board): String =
     RegexFenParser.boardToFEN(board)

@@ -4,9 +4,8 @@ import chess.controller.MoveStrategy
 import chess.model.{Board, Color, Square, Role, PromotableRole}
 import scala.util.Random
 
-/** Greedy capture strategy: prefers captures ordered by the value of the
-  * captured piece (highest first). Falls back to a random move when no
-  * capture is available.
+/** Greedy capture strategy: prefers captures ordered by the value of the captured piece (highest first). Falls back to
+  * a random move when no capture is available.
   *
   * Piece values: Q=9, R=5, B=3, N=3, P=1.
   */
@@ -19,9 +18,7 @@ class GreedyStrategy extends MoveStrategy:
     case Role.Bishop => 3
     case Role.Knight => 3
     case Role.Pawn   => 1
-    // $COVERAGE-OFF$ Kings are never capturable in legal chess
     case Role.King   => 0
-    // $COVERAGE-ON$
   }
 
   def selectMove(board: Board, color: Color): Option[(Square, Square, Option[PromotableRole])] =
@@ -40,7 +37,6 @@ class GreedyStrategy extends MoveStrategy:
         val bestCaptures = captures.filter(_._3 == best)
         val pick = bestCaptures(Random.nextInt(bestCaptures.length))
         (pick._1, pick._2)
-      else
-        moves(Random.nextInt(moves.length))
+      else moves(Random.nextInt(moves.length))
 
     Some((from, to, MoveStrategy.promotionFor(board, from, to, color)))

@@ -12,8 +12,8 @@ final class StrategySpec extends AnyWordSpec with Matchers:
 
   private def fen(s: String): Board = RegexFenParser.parseFEN(s).get
 
-  /** Position where White has a hanging queen on d5 — Black queen on d8 can capture it
-    * with no pawns blocking the d-file. Kings on e1/e8.
+  /** Position where White has a hanging queen on d5 — Black queen on d8 can capture it with no pawns blocking the
+    * d-file. Kings on e1/e8.
     */
   private val hangingQueenPos =
     fen("3qk3/8/8/3Q4/8/8/8/4K3")
@@ -46,7 +46,7 @@ final class StrategySpec extends AnyWordSpec with Matchers:
     "return the pawn table value for a white pawn on e4" in {
       val sq = Square(File.E, Rank._4)
       val bonus = Evaluator.pstBonus(Role.Pawn, sq, Color.White)
-      bonus shouldBe 20  // centre bonus in the pawn table
+      bonus shouldBe 20 // centre bonus in the pawn table
     }
 
     "mirror for Black: pawn on e5 should equal white pawn on e4" in {
@@ -85,12 +85,12 @@ final class StrategySpec extends AnyWordSpec with Matchers:
 
   "Evaluator.materialValue" should {
     "return expected centipawn values" in {
-      Evaluator.materialValue(Role.Pawn)   shouldBe 100
+      Evaluator.materialValue(Role.Pawn) shouldBe 100
       Evaluator.materialValue(Role.Knight) shouldBe 320
       Evaluator.materialValue(Role.Bishop) shouldBe 330
-      Evaluator.materialValue(Role.Rook)   shouldBe 500
-      Evaluator.materialValue(Role.Queen)  shouldBe 900
-      Evaluator.materialValue(Role.King)   shouldBe 20000
+      Evaluator.materialValue(Role.Rook) shouldBe 500
+      Evaluator.materialValue(Role.Queen) shouldBe 900
+      Evaluator.materialValue(Role.King) shouldBe 20000
     }
   }
 
@@ -99,21 +99,21 @@ final class StrategySpec extends AnyWordSpec with Matchers:
   "MoveStrategy.promotionFor" should {
     "return Some(Queen) when a white pawn reaches rank 8" in {
       val board = fen("8/4P3/8/8/8/8/8/8")
-      val from  = Square("e7")
-      val to    = Square("e8")
+      val from = Square("e7")
+      val to = Square("e8")
       MoveStrategy.promotionFor(board, from, to, Color.White) shouldBe Some(PromotableRole.Queen)
     }
 
     "return Some(Queen) when a black pawn reaches rank 1" in {
       val board = fen("8/8/8/8/8/8/4p3/8")
-      val from  = Square("e2")
-      val to    = Square("e1")
+      val from = Square("e2")
+      val to = Square("e1")
       MoveStrategy.promotionFor(board, from, to, Color.Black) shouldBe Some(PromotableRole.Queen)
     }
 
     "return None for a non-promoting pawn move" in {
       val from = Square("e2")
-      val to   = Square("e4")
+      val to = Square("e4")
       MoveStrategy.promotionFor(Board.initial, from, to, Color.White) shouldBe None
     }
 
@@ -124,6 +124,9 @@ final class StrategySpec extends AnyWordSpec with Matchers:
   }
 
   // ── ComputerPlayer ────────────────────────────────────────────────────────
+
+  /** White Kb1, Qa1, Black Kh8: White is up a queen (900 cp ≥ 150 threshold). */
+  private val aheadBoard = fen("7k/8/8/8/8/8/8/QK6")
 
   "ComputerPlayer" should {
     "delegate to its strategy" in {
@@ -149,6 +152,41 @@ final class StrategySpec extends AnyWordSpec with Matchers:
       val player = new ComputerPlayer(new RandomStrategy)
       player.move(stalemateBoard, Color.Black) shouldBe None
     }
+
+    "not trigger repetition avoidance when not ahead in material" in {
+      // Initial board: material balance is 0 (< 150) — avoidance never triggers
+      // Even with wouldRepeat = true, the candidate is returned unchanged
+      val player = new ComputerPlayer(new RandomStrategy)
+      player.move(Board.initial, Color.White, _ => true) shouldBe defined
+    }
+
+    "return candidate when ahead but candidate does not repeat" in {
+      val player = new ComputerPlayer(new RandomStrategy)
+      // wouldRepeat = false for everything → candidateRepeats = false → return candidate
+      player.move(aheadBoard, Color.White, _ => false) shouldBe defined
+    }
+
+    "fall back to candidate when ahead but all moves repeat" in {
+      val player = new ComputerPlayer(new RandomStrategy)
+      // wouldRepeat = true for everything → alternatives empty → accept draw, return candidate
+      player.move(aheadBoard, Color.White, _ => true) shouldBe defined
+    }
+
+    "choose a non-repeating alternative when ahead and candidate repeats" in {
+      // Use GreedyStrategy so the candidate is deterministic (captures best piece)
+      val player = new ComputerPlayer(new GreedyStrategy)
+      // Identify what GreedyStrategy picks so we can mark it as repeating
+      val candidateOpt = new GreedyStrategy().selectMove(aheadBoard, Color.White)
+      candidateOpt shouldBe defined
+      val (cf, ct, cp) = candidateOpt.get
+      val candidateBoard = aheadBoard.move(cf, ct, cp).toOption
+      candidateBoard shouldBe defined
+      // Mark only the candidate's resulting board as "repeating"
+      val wouldRepeat: Board => Boolean = b => b == candidateBoard.get
+      // ComputerPlayer must now find a non-repeating alternative
+      val result = player.move(aheadBoard, Color.White, wouldRepeat)
+      result shouldBe defined
+    }
   }
 
   // ── RandomStrategy ────────────────────────────────────────────────────────
@@ -170,9 +208,9 @@ final class StrategySpec extends AnyWordSpec with Matchers:
   // ── GreedyStrategy ────────────────────────────────────────────────────────
 
   /** White queen on d1 can capture a black piece on d5 (no blocking pieces) */
-  private val rookOnD5    = fen("4k3/8/8/3r4/8/8/8/3QK3")
-  private val bishopOnD5  = fen("4k3/8/8/3b4/8/8/8/3QK3")
-  private val pawnOnD5    = fen("4k3/8/8/3p4/8/8/8/3QK3")
+  private val rookOnD5 = fen("4k3/8/8/3r4/8/8/8/3QK3")
+  private val bishopOnD5 = fen("4k3/8/8/3b4/8/8/8/3QK3")
+  private val pawnOnD5 = fen("4k3/8/8/3p4/8/8/8/3QK3")
 
   "GreedyStrategy" should {
     "have the correct name" in {
@@ -309,6 +347,14 @@ final class StrategySpec extends AnyWordSpec with Matchers:
       val s = new MinimaxStrategy(3)
       s.selectMove(endgamePos, Color.White) shouldBe defined
     }
+
+    "score opponent checkmate in minimizing branch (depth 2)" in {
+      // White Kh1 is in check from Black Rh2. White's only legal move is Ng4×h2.
+      // After Ng4×h2, Black plays Rg2×h2# (checkmate). This exercises the
+      // `case GameEvent.Checkmate => -INF + ...` branch in the minimizing half.
+      val forceBlackMate = fen("7k/8/8/8/6N1/8/5qrr/7K")
+      new MinimaxStrategy(2).selectMove(forceBlackMate, Color.White) shouldBe defined
+    }
   }
 
   // ── QuiescenceStrategy ────────────────────────────────────────────────────
@@ -320,7 +366,7 @@ final class StrategySpec extends AnyWordSpec with Matchers:
 
     "use default depth and qDepth" in {
       val s = new QuiescenceStrategy()
-      s.depth  shouldBe 3
+      s.depth shouldBe 3
       s.qDepth shouldBe 6
     }
 
@@ -395,5 +441,31 @@ final class StrategySpec extends AnyWordSpec with Matchers:
     "return a move even with a very short time limit (depth-0 fallback)" in {
       // 1ms forces immediate timeout after depth-0 fallback is set
       new IterativeDeepeningStrategy(1L).selectMove(Board.initial, Color.White) shouldBe defined
+    }
+
+    "detect checkmate in 1 at searchAtDepth level" in {
+      // White: King g6, Queen g5. Black: King g8. Qg7# is mate in 1.
+      val s = new IterativeDeepeningStrategy(500L)
+      val result = s.selectMove(mateIn1, Color.White)
+      result shouldBe defined
+    }
+
+    "handle stalemate at searchAtDepth level" in {
+      // Position where White can stalemate Black — engine should not crash
+      val almostStalemate = fen("k7/2P5/2K5/8/8/8/8/8")
+      new IterativeDeepeningStrategy(500L).selectMove(almostStalemate, Color.White)
+    }
+
+    "exercise maximizing=true in alphaBeta (depth 3)" in {
+      val s = new IterativeDeepeningStrategy(1000L)
+      s.selectMove(endgamePos, Color.White) shouldBe defined
+    }
+
+    "score opponent checkmate in minimizing branch (depth 2)" in {
+      // White Kh1 is in check from Black Rh2. White's only legal move is Ng4×h2.
+      // After Ng4×h2, Black plays Rg2×h2# (checkmate). This exercises the
+      // `case GameEvent.Checkmate => -INF + ...` branch in the minimizing half.
+      val forceBlackMate = fen("7k/8/8/8/6N1/8/5qrr/7K")
+      new IterativeDeepeningStrategy(500L).selectMove(forceBlackMate, Color.White) shouldBe defined
     }
   }

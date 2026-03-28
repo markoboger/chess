@@ -70,9 +70,8 @@ object CombinatorFenParser extends RegexParsers with FenIO {
         )
     }
 
-  /** Converts a Board to FEN notation (board position only). Delegates to
-    * [[RegexFenParser.boardToFEN]] because serialization does not benefit from
-    * parser combinators.
+  /** Converts a Board to FEN notation (board position only). Delegates to [[RegexFenParser.boardToFEN]] because
+    * serialization does not benefit from parser combinators.
     */
   def boardToFEN(board: Board): String =
     RegexFenParser.boardToFEN(board)

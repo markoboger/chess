@@ -28,8 +28,7 @@ object CombinatorPgnParser extends RegexParsers with PgnIO {
   private def result: Parser[Unit] =
     ("1/2-1/2" | "1-0" | "0-1" | "*") ^^^ (())
 
-  /** A move token: any non-whitespace that isn't a comment, variation, move
-    * number, or result.
+  /** A move token: any non-whitespace that isn't a comment, variation, move number, or result.
     */
   private def moveToken: Parser[String] =
     """[a-hA-Z][a-h1-8x+#=NBRQKO\-]+|[a-h][1-8]""".r

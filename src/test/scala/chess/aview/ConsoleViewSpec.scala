@@ -16,7 +16,7 @@ final class ConsoleViewSpec extends AnyWordSpec with Matchers:
 
   private def withOutput(block: => Unit): String = {
     val bos = new ByteArrayOutputStream
-    val ps  = new PrintStream(bos)
+    val ps = new PrintStream(bos)
     Console.withOut(ps)(block)
     ps.flush()
     bos.toString
@@ -99,6 +99,15 @@ final class ConsoleViewSpec extends AnyWordSpec with Matchers:
         view.update(MoveResult.Moved(Board.initial, GameEvent.Stalemate))
       }
       out should include("Stalemate")
+    }
+
+    "announce threefold repetition" in {
+      val controller = new GameController(Board.initial)
+      val view = new ConsoleView(controller)
+      val out = withOutput {
+        view.update(MoveResult.Moved(Board.initial, GameEvent.ThreefoldRepetition))
+      }
+      out should include("threefold repetition")
     }
   }
 
@@ -241,8 +250,9 @@ final class ConsoleViewSpec extends AnyWordSpec with Matchers:
 
     "handle PromotionRequired error via PGN path" in {
       // Set up a board where a pawn is about to promote
-      val controller = new GameController(Board.initial)(
-        using RegexFenParser, PgnFileIO()
+      val controller = new GameController(Board.initial)(using
+        RegexFenParser,
+        PgnFileIO()
       )
       controller.loadFromFEN("8/4P3/8/8/8/8/8/k6K")
       // e7e8 without promotion piece → PromotionRequired
@@ -259,8 +269,9 @@ final class ConsoleViewSpec extends AnyWordSpec with Matchers:
     "exercise coordinate path when PGN fails (rook move looks like pawn move)" in {
       // Board with rook on e2: PGN parses 'e2e4' as 'pawn from e2 to e4' but
       // there is no pawn at e2 → PGN ParseError → falls through to coordinate path
-      val controller = new GameController(Board.initial)(
-        using RegexFenParser, PgnFileIO()
+      val controller = new GameController(Board.initial)(using
+        RegexFenParser,
+        PgnFileIO()
       )
       controller.loadFromFEN("8/8/8/8/8/8/4R3/4K3")
       val in = new ByteArrayInputStream("e2e4\nquit\n".getBytes)
@@ -276,8 +287,9 @@ final class ConsoleViewSpec extends AnyWordSpec with Matchers:
     "exercise PGN-success-but-model-rejects path (pinned piece)" in {
       // White king e1, White rook e4, Black queen e8: rook is pinned on e-file.
       // 'Rd4' — PGN finds the rook but the model rejects the move (exposes king).
-      val controller = new GameController(Board.initial)(
-        using RegexFenParser, PgnFileIO()
+      val controller = new GameController(Board.initial)(using
+        RegexFenParser,
+        PgnFileIO()
       )
       controller.loadFromFEN("4q3/8/8/8/4R3/8/8/4K3")
       val in = new ByteArrayInputStream("Rd4\nquit\n".getBytes)

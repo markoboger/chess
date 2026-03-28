@@ -1,17 +1,6 @@
 package chess.controller
 
-import chess.model.{
-  Board,
-  Color,
-  Piece,
-  Role,
-  Square,
-  File,
-  Rank,
-  MoveResult,
-  MoveError,
-  GameEvent
-}
+import chess.model.{Board, Color, Piece, Role, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.controller.io.{FenIO, PgnIO}
 import chess.controller.io.fen.RegexFenParser
 import chess.controller.io.pgn.PgnFileIO
@@ -109,7 +98,7 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       result.isFailed shouldBe true
       result match {
         case MoveResult.Failed(_, MoveError.WrongColor) => // expected
-        case other => fail(s"Expected WrongColor, got: $other")
+        case other                                      => fail(s"Expected WrongColor, got: $other")
       }
       controller.isWhiteToMove shouldBe true
     }
@@ -240,6 +229,47 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       // So stalemate!
       ctrl.isStalemate shouldBe true
       ctrl.gameStatus should include("Stalemate")
+    }
+
+    "report threefold repetition via gameStatus after position repeated 3 times" in {
+      // Use knights (Nh1/Nh8) that shuttle g3↔h1 / g6↔h8.
+      // Knight moves don't change castling rights, so the position key is
+      // identical every time the knights return to h1/h8.
+      // After 2 full round-trips (8 ply) the starting position appears for the 3rd time.
+      val ctrl = new GameController(
+        RegexFenParser.parseFEN("4k2n/8/8/8/8/8/8/4K2N").get
+      )
+      for _ <- 1 to 2 do
+        ctrl.applyMove(Square("h1"), Square("g3")) // White Nh1→g3
+        ctrl.applyMove(Square("h8"), Square("g6")) // Black Nh8→g6
+        ctrl.applyMove(Square("g3"), Square("h1")) // White Ng3→h1
+        ctrl.applyMove(Square("g6"), Square("h8")) // Black Ng6→h8 → position count increments
+      ctrl.isThreefoldRepetition shouldBe true
+      ctrl.gameStatus should include("threefold repetition")
+    }
+
+    "wouldBeThirdRepetition returns true after 7 plies (one ply short of threefold)" in {
+      // After 7 ply the starting knight position (White to move) has been seen twice.
+      // Black's next Ng6→h8 would make it 3 — wouldBeThirdRepetition must be true.
+      val ctrl = new GameController(
+        RegexFenParser.parseFEN("4k2n/8/8/8/8/8/8/4K2N").get
+      )
+      ctrl.applyMove(Square("h1"), Square("g3")) // ply 1
+      ctrl.applyMove(Square("h8"), Square("g6")) // ply 2
+      ctrl.applyMove(Square("g3"), Square("h1")) // ply 3
+      ctrl.applyMove(Square("g6"), Square("h8")) // ply 4  count(starting, White)=2
+      ctrl.applyMove(Square("h1"), Square("g3")) // ply 5
+      ctrl.applyMove(Square("h8"), Square("g6")) // ply 6
+      ctrl.applyMove(Square("g3"), Square("h1")) // ply 7  it's Black's turn
+      // Black considering Ng6→h8 would create the 3rd occurrence
+      val nextBoard = ctrl.board.move(Square("g6"), Square("h8"), None).get
+      ctrl.wouldBeThirdRepetition(nextBoard) shouldBe true
+    }
+
+    "wouldBeThirdRepetition returns false for a fresh position" in {
+      val ctrl = new GameController(Board.initial)
+      val nextBoard = ctrl.board.move(Square("e2"), Square("e4"), None).get
+      ctrl.wouldBeThirdRepetition(nextBoard) shouldBe false
     }
 
     "track board states in history" in {

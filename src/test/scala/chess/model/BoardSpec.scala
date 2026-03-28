@@ -269,7 +269,7 @@ final class BoardSpec extends AnyWordSpec with Matchers:
 
   "Castling" should {
     // Minimal boards: king on e1/e8, rook on h1 or a1
-    def kingsideBoard: Board  = RegexFenParser.parseFEN("4k3/8/8/8/8/8/8/4K2R").get
+    def kingsideBoard: Board = RegexFenParser.parseFEN("4k3/8/8/8/8/8/8/4K2R").get
     def queensideBoard: Board = RegexFenParser.parseFEN("4k3/8/8/8/8/8/8/R3K3").get
 
     "execute white kingside castling — king to g1, rook to f1" in {
