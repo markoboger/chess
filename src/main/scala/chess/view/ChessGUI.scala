@@ -126,17 +126,25 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       val delayMs = if (gameMode == GameMode.ComputerVsComputer) 500L else 300L
       val t = new Thread(() => {
         Thread.sleep(delayMs)
+        // Snapshot immutable state on background thread (Board is immutable — safe)
+        val color = controller.activeColor
+        val board = controller.board
+        // Compute AI move on background thread — does NOT block the FX thread,
+        // so Pekko's clock callbacks can fire freely via Platform.runLater
+        val moveOpt =
+          if (isComputerTurn && !isGameOver)
+            (if color == chess.model.Color.White then whiteComputer else blackComputer)
+              .move(board, color)
+          else None
+        // Only mutate UI/controller state on the FX thread
         Platform.runLater(() => {
           computerScheduled = false
-          if (isComputerTurn && !isGameOver) {
-            val color = controller.activeColor
-            val player = if color == chess.model.Color.White then whiteComputer else blackComputer
-            player.move(controller.board, color).foreach {
-              case (from, to, promo) =>
-                selectedSquare = None
-                controller.applyMove(from, to, promo)
-                // update() is notified by the controller and will call
-                // triggerComputerMoveIfNeeded() again for C vs C
+          moveOpt.foreach { case (from, to, promo) =>
+            if (isComputerTurn && !isGameOver) {
+              selectedSquare = None
+              controller.applyMove(from, to, promo)
+              // update() is notified by the controller and will call
+              // triggerComputerMoveIfNeeded() again for C vs C
             }
           }
         })
