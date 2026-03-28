@@ -12,3 +12,5 @@ enum MoveError(val message: String):
   case WrongColor extends MoveError("Not your piece to move")
   /** The move input could not be parsed (e.g., invalid PGN notation). */
   case ParseError(msg: String) extends MoveError(msg)
+  /** A pawn reached the back rank but no promotion piece was specified. */
+  case PromotionRequired extends MoveError("Promotion required — use e8=Q, e8=R, e8=B, or e8=N")

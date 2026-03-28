@@ -3,6 +3,8 @@ package chess.controller
 import chess.model.{
   Board,
   Color,
+  Piece,
+  Role,
   Square,
   File,
   Rank,
@@ -329,6 +331,51 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       controller.forward()
       controller.currentIndex shouldBe 1
       controller.isAtLatest shouldBe true
+    }
+
+    "jump directly to any position with goToMove" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.applyMove(Square("e7"), Square("e5"))
+      controller.applyMove(Square("g1"), Square("f3"))
+
+      controller.goToMove(1)
+      controller.currentIndex shouldBe 1
+      controller.board.pieceAt(Square("e4")) shouldEqual Some(Piece(Role.Pawn, Color.White))
+      controller.board.pieceAt(Square("e5")) shouldBe None
+
+      controller.goToMove(0)
+      controller.currentIndex shouldBe 0
+      controller.board shouldEqual Board.initial
+
+      controller.goToMove(3)
+      controller.currentIndex shouldBe 3
+      controller.isAtLatest shouldBe true
+    }
+
+    "ignore goToMove with out-of-range index" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+
+      controller.goToMove(-1)
+      controller.currentIndex shouldBe 1
+
+      controller.goToMove(99)
+      controller.currentIndex shouldBe 1
+    }
+
+    "notify observer when goToMove is called" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.applyMove(Square("e7"), Square("e5"))
+
+      var notified = false
+      controller.add(new chess.util.Observer[MoveResult] {
+        def update(e: MoveResult): Unit = notified = true
+      })
+
+      controller.goToMove(1)
+      notified shouldBe true
     }
 
     "reject moves when not at the latest position" in {

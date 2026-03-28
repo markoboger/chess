@@ -1,6 +1,6 @@
 package chess.io.pgn
 
-import chess.model.{Board, Piece, Role, Color, Square, File, Rank}
+import chess.model.{Board, Role, Color, Square, File, Rank}
 import scala.util.matching.Regex
 import scala.util.{Try, Success, Failure}
 
@@ -125,80 +125,7 @@ object PGNParser {
       val rankMatches =
         rankHint.isEmpty || Rank.fromInt(rankHint.toInt).contains(square.rank)
 
-      fileMatches && rankMatches && isValidMove(
-        square,
-        target,
-        pieceType,
-        color,
-        board
-      )
-    }
-  }
-
-  private def isValidMove(
-      from: Square,
-      to: Square,
-      pieceType: Role,
-      color: Color,
-      board: Board
-  ): Boolean = {
-    // This is a simplified version - a real implementation would need to handle all chess rules
-    // including check detection, en passant, castling rights, etc.
-    pieceType match {
-      case Role.Pawn =>
-        val direction = if (color == Color.White) 1 else -1
-        val startRank = if (color == Color.White) Rank._2 else Rank._7
-        val isCapture = (to.file - from.file).abs == 1
-
-        if (isCapture) {
-          // Pawn capture
-          (to.rank - from.rank == direction) &&
-          (to.file - from.file).abs == 1 &&
-          board.pieceAt(to).exists(_.color != color)
-        } else {
-          // Pawn move forward
-          val isStartPosition = from.rank == startRank
-          val singleMove =
-            (to.rank - from.rank == direction) && (to.file == from.file) && board
-              .pieceAt(to)
-              .isEmpty
-          val middleSquare =
-            from.rank.offset(direction).map(r => Square(to.file, r))
-          val doubleMove =
-            isStartPosition && (to.rank - from.rank == 2 * direction) && (to.file == from.file) &&
-              board.pieceAt(to).isEmpty && middleSquare.exists(sq =>
-                board.pieceAt(sq).isEmpty
-              )
-          singleMove || doubleMove
-        }
-
-      case Role.Knight =>
-        val dx = (to.file - from.file).abs
-        val dy = (to.rank - from.rank).abs
-        (dx == 2 && dy == 1) || (dx == 1 && dy == 2)
-
-      case Role.Bishop =>
-        val dx = (to.file - from.file).abs
-        val dy = (to.rank - from.rank).abs
-        dx == dy && isPathClear(from, to, board)
-
-      case Role.Rook =>
-        (from.file == to.file || from.rank == to.rank) && isPathClear(
-          from,
-          to,
-          board
-        )
-
-      case Role.Queen =>
-        val dx = (to.file - from.file).abs
-        val dy = (to.rank - from.rank).abs
-        ((dx == dy) || (from.file == to.file || from.rank == to.rank)) &&
-        isPathClear(from, to, board)
-
-      case Role.King =>
-        val dx = (to.file - from.file).abs
-        val dy = (to.rank - from.rank).abs
-        dx <= 1 && dy <= 1
+      fileMatches && rankMatches && board.canMoveIgnoringCheck(square, target)
     }
   }
 
@@ -258,7 +185,7 @@ object PGNParser {
         boardBefore
           .pieceAt(sq)
           .exists(p => p.role == piece.role && p.color == piece.color) &&
-        isValidMove(sq, to, piece.role, piece.color, boardBefore)
+        boardBefore.canMoveIgnoringCheck(sq, to)
       }
       if (others.nonEmpty) {
         val sameFile = others.exists(_.file == from.file)
@@ -272,6 +199,20 @@ object PGNParser {
     if (isCapture) sb.append("x")
     sb.append(to.toString)
 
+    // Pawn promotion
+    if piece.role == Role.Pawn then
+      boardAfter.pieceAt(to).foreach { arrived =>
+        if arrived.role != Role.Pawn then
+          sb.append("=")
+          sb.append(arrived.role match {
+            case Role.Queen  => "Q"
+            case Role.Rook   => "R"
+            case Role.Bishop => "B"
+            case Role.Knight => "N"
+            case _           => ""
+          })
+      }
+
     // Check / checkmate
     if (boardAfter.isCheckmate(opponent)) sb.append("#")
     else if (boardAfter.isInCheck(opponent)) sb.append("+")
@@ -279,22 +220,4 @@ object PGNParser {
     sb.toString
   }
 
-  private def isPathClear(from: Square, to: Square, board: Board): Boolean = {
-    val dx = (to.file - from.file).sign
-    val dy = (to.rank - from.rank).sign
-    var f = from.file.index + dx
-    var r = from.rank.index + dy
-
-    while (f != to.file.index || r != to.rank.index) {
-      (for
-        sq <- Square.fromCoords(f, r)
-        _ <- board.pieceAt(sq)
-      yield sq).foreach(_ => return false)
-      f += dx
-      r += dy
-    }
-
-    // Check the target square (can be occupied by opponent's piece)
-    board.pieceAt(to).forall(_.color != board.pieceAt(from).get.color)
-  }
 }

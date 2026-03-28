@@ -128,14 +128,17 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
     }
 
     "handle disambiguation with file hint" in {
+      // Move d-pawn out of d2, then develop both knights so both can reach d2
       val board = (for
-        b1 <- Board.initial.move(Square("g1"), Square("f3"))
-        b2 <- b1.move(Square("g8"), Square("f6"))
-      yield b2).get
+        b1 <- Board.initial.move(Square("d2"), Square("d4"))
+        b2 <- b1.move(Square("d7"), Square("d5"))
+        b3 <- b2.move(Square("g1"), Square("f3"))
+        b4 <- b3.move(Square("g8"), Square("f6"))
+      yield b4).get
 
-      // Nbd2 (knight from b-file to d2)
+      // Both Nb1 and Nf3 can reach d2; Nbd2 must resolve to b1
       val result = PGNParser.parseMove("Nbd2", board, isWhiteToMove = true)
-      result.isSuccess shouldBe true
+      result shouldBe Success((Square("b1"), Square("d2")))
     }
   }
 
@@ -313,6 +316,19 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
       // dxe5
       val result = PGNParser.parseMove("dxe5", board, isWhiteToMove = true)
       result.isSuccess shouldBe true
+    }
+
+    "parse en passant capture" in {
+      // White pawn on e5, black pawn just moved d7-d5: en passant exd6 is legal
+      val board = (for
+        b1 <- Board.initial.move(Square("e2"), Square("e4"))
+        b2 <- b1.move(Square("a7"), Square("a6"))
+        b3 <- b2.move(Square("e4"), Square("e5"))
+        b4 <- b3.move(Square("d7"), Square("d5"))
+      yield b4).get
+
+      val result = PGNParser.parseMove("exd6", board, isWhiteToMove = true)
+      result shouldBe Success((Square("e5"), Square("d6")))
     }
 
     "parse move with rank hint disambiguation" in {

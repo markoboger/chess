@@ -5,6 +5,7 @@ import chess.model.{
   Board,
   Piece,
   Color,
+  PromotableRole,
   Square,
   File,
   Rank,
@@ -116,17 +117,26 @@ class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
         println("Thanks for playing!")
         running = false
       } else {
-        // Try PGN notation first; display is handled by update() observer
+        // Try PGN notation first (e.g. e4, Nf3, e8=Q); display handled by update()
         controller.applyPgnMove(input) match {
           case _: MoveResult.Moved => // displayed by update()
+          case MoveResult.Failed(_, MoveError.PromotionRequired) =>
+            println("Promotion required. Include the piece: e8=Q, e8=R, e8=B, or e8=N.")
           case MoveResult.Failed(_, MoveError.ParseError(_)) =>
-            // PGN parsing failed, try coordinate notation
+            // PGN parsing failed — try coordinate notation (e.g. e2e4, e7e8=Q)
             parseMove(input) match {
-              case Some((from, to)) =>
-                controller.applyMove(from, to) // result displayed by update()
+              case Some((from, to, promo)) =>
+                val result = controller.applyMove(from, to, promo)
+                result match {
+                  case MoveResult.Failed(_, MoveError.PromotionRequired) =>
+                    promptForPromotion().foreach { pr =>
+                      controller.applyMove(from, to, Some(pr))
+                    }
+                  case _ => // displayed by update()
+                }
               case None =>
                 println(
-                  "Invalid move format. Use PGN (e4, Nf3, O-O) or coordinates (e2e4)."
+                  "Invalid move format. Use PGN (e4, Nf3, O-O, e8=Q) or coordinates (e2e4, e7e8=Q)."
                 )
             }
           case _: MoveResult.Failed => // error displayed by update()
@@ -135,18 +145,45 @@ class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
     }
   }
 
-  /** Parse a move in coordinate notation (e.g., "e2e4")
+  /** Parse a move in coordinate notation (e.g., "e2e4", "e7e8=Q").
     * @return
-    *   Tuple of (from, to) Squares if valid, None otherwise
+    *   Tuple of (from, to, promotion) if valid, None otherwise
     */
-  private def parseMove(move: String): Option[(Square, Square)] = {
-    if (move.length == 4) {
+  private def parseMove(move: String): Option[(Square, Square, Option[PromotableRole])] = {
+    val (coords, promoStr) = move.indexOf('=') match {
+      case -1  => (move, "")
+      case idx => (move.take(idx), move.drop(idx + 1))
+    }
+    if (coords.length == 4) {
       for
-        from <- Square.fromString(move.substring(0, 2))
-        to <- Square.fromString(move.substring(2, 4))
-      yield (from, to)
+        from <- Square.fromString(coords.substring(0, 2))
+        to   <- Square.fromString(coords.substring(2, 4))
+      yield
+        val promo = promoStr.toUpperCase match {
+          case "Q" => Some(PromotableRole.Queen)
+          case "R" => Some(PromotableRole.Rook)
+          case "B" => Some(PromotableRole.Bishop)
+          case "N" => Some(PromotableRole.Knight)
+          case _   => None
+        }
+        (from, to, promo)
     } else {
       None
+    }
+  }
+
+  private def promptForPromotion(): Option[PromotableRole] = {
+    print("Promote to (Q=Queen, R=Rook, B=Bishop, N=Knight): ")
+    val input = StdIn.readLine()
+    if (input == null) None
+    else input.trim.toUpperCase match {
+      case "Q" | "QUEEN"  => Some(PromotableRole.Queen)
+      case "R" | "ROOK"   => Some(PromotableRole.Rook)
+      case "B" | "BISHOP" => Some(PromotableRole.Bishop)
+      case "N" | "KNIGHT" => Some(PromotableRole.Knight)
+      case _ =>
+        println("Invalid choice. Defaulting to Queen.")
+        Some(PromotableRole.Queen)
     }
   }
 }

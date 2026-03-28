@@ -266,3 +266,87 @@ final class BoardSpec extends AnyWordSpec with Matchers:
       lines.length shouldBe 10 // 8 ranks + 2 file labels
     }
   }
+
+  "Castling" should {
+    // Minimal boards: king on e1/e8, rook on h1 or a1
+    def kingsideBoard: Board  = RegexFenParser.parseFEN("4k3/8/8/8/8/8/8/4K2R").get
+    def queensideBoard: Board = RegexFenParser.parseFEN("4k3/8/8/8/8/8/8/R3K3").get
+
+    "execute white kingside castling — king to g1, rook to f1" in {
+      val result = kingsideBoard.move(Square("e1"), Square("g1"))
+      result.isSuccess shouldBe true
+      result.board.pieceAt(Square("g1")) shouldEqual Some(Piece(Role.King, Color.White))
+      result.board.pieceAt(Square("f1")) shouldEqual Some(Piece(Role.Rook, Color.White))
+      result.board.pieceAt(Square("e1")) shouldBe None
+      result.board.pieceAt(Square("h1")) shouldBe None
+    }
+
+    "execute white queenside castling — king to c1, rook to d1" in {
+      val result = queensideBoard.move(Square("e1"), Square("c1"))
+      result.isSuccess shouldBe true
+      result.board.pieceAt(Square("c1")) shouldEqual Some(Piece(Role.King, Color.White))
+      result.board.pieceAt(Square("d1")) shouldEqual Some(Piece(Role.Rook, Color.White))
+      result.board.pieceAt(Square("e1")) shouldBe None
+      result.board.pieceAt(Square("a1")) shouldBe None
+    }
+
+    "execute black kingside castling — king to g8, rook to f8" in {
+      val board = RegexFenParser.parseFEN("4k2r/8/8/8/8/8/8/4K3").get
+      val result = board.move(Square("e8"), Square("g8"))
+      result.isSuccess shouldBe true
+      result.board.pieceAt(Square("g8")) shouldEqual Some(Piece(Role.King, Color.Black))
+      result.board.pieceAt(Square("f8")) shouldEqual Some(Piece(Role.Rook, Color.Black))
+    }
+
+    "execute black queenside castling — king to c8, rook to d8" in {
+      val board = RegexFenParser.parseFEN("r3k3/8/8/8/8/8/8/4K3").get
+      val result = board.move(Square("e8"), Square("c8"))
+      result.isSuccess shouldBe true
+      result.board.pieceAt(Square("c8")) shouldEqual Some(Piece(Role.King, Color.Black))
+      result.board.pieceAt(Square("d8")) shouldEqual Some(Piece(Role.Rook, Color.Black))
+    }
+
+    "revoke both castling rights after king moves" in {
+      val b1 = kingsideBoard.move(Square("e1"), Square("f1")).get
+      b1.castlingRights.whiteKingside shouldBe false
+      b1.castlingRights.whiteQueenside shouldBe false
+    }
+
+    "revoke only kingside right after h-rook moves" in {
+      val b1 = kingsideBoard.move(Square("h1"), Square("h2")).get
+      b1.castlingRights.whiteKingside shouldBe false
+      b1.castlingRights.whiteQueenside shouldBe true
+    }
+
+    "revoke only queenside right after a-rook moves" in {
+      val b1 = queensideBoard.move(Square("a1"), Square("a2")).get
+      b1.castlingRights.whiteKingside shouldBe true
+      b1.castlingRights.whiteQueenside shouldBe false
+    }
+
+    "reject castling after king has moved" in {
+      val b1 = kingsideBoard.move(Square("e1"), Square("f1")).get
+      val b2 = b1.move(Square("f1"), Square("e1")).get
+      b2.move(Square("e1"), Square("g1")).isFailed shouldBe true
+    }
+
+    "reject castling when rook is absent" in {
+      val board = RegexFenParser.parseFEN("4k3/8/8/8/8/8/8/4K3").get
+      board.move(Square("e1"), Square("g1")).isFailed shouldBe true
+    }
+
+    "reject castling when path is blocked" in {
+      val board = RegexFenParser.parseFEN("4k3/8/8/8/8/8/8/4KB1R").get
+      board.move(Square("e1"), Square("g1")).isFailed shouldBe true
+    }
+
+    "reject castling when king is in check" in {
+      val board = RegexFenParser.parseFEN("4r3/8/8/8/8/8/8/4K2R").get
+      board.move(Square("e1"), Square("g1")).isFailed shouldBe true
+    }
+
+    "reject castling when king passes through check" in {
+      val board = RegexFenParser.parseFEN("5r2/8/8/8/8/8/8/4K2R").get
+      board.move(Square("e1"), Square("g1")).isFailed shouldBe true
+    }
+  }

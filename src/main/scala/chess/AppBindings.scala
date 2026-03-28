@@ -19,6 +19,6 @@ object AppBindings:
   // given FenIO = FastParseFenParser
 
   // --- PgnIO ----------------------------------------------------------------
-  given PgnIO = PgnFileIO()
-  // given PgnIO = CombinatorPgnParser
+  // given PgnIO = PgnFileIO()
+  given PgnIO = CombinatorPgnParser
   // given PgnIO = FastParsePgnParser

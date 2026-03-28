@@ -1,28 +1,66 @@
 package chess.model
 
+final case class CastlingRights(
+    whiteKingside: Boolean = true,
+    whiteQueenside: Boolean = true,
+    blackKingside: Boolean = true,
+    blackQueenside: Boolean = true
+):
+  def can(color: Color, kingside: Boolean): Boolean =
+    (color, kingside) match
+      case (Color.White, true)  => whiteKingside
+      case (Color.White, false) => whiteQueenside
+      case (Color.Black, true)  => blackKingside
+      case (Color.Black, false) => blackQueenside
+
+  def revokeKing(color: Color): CastlingRights = color match
+    case Color.White => copy(whiteKingside = false, whiteQueenside = false)
+    case Color.Black => copy(blackKingside = false, blackQueenside = false)
+
+  def revokeRook(from: Square): CastlingRights = from match
+    case Square(File.H, Rank._1) => copy(whiteKingside = false)
+    case Square(File.A, Rank._1) => copy(whiteQueenside = false)
+    case Square(File.H, Rank._8) => copy(blackKingside = false)
+    case Square(File.A, Rank._8) => copy(blackQueenside = false)
+    case _                       => this
+
 final case class Board(
     squares: Vector[Vector[Option[Piece]]],
-    lastMove: Option[(Square, Square)] = None
+    lastMove: Option[(Square, Square)] = None,
+    castlingRights: CastlingRights = CastlingRights()
 ):
 
   def pieceAt(square: Square): Option[Piece] =
     squares(8 - square.rank.index)(square.file.index - 1)
 
-  def move(from: Square, to: Square): MoveResult =
+  def move(from: Square, to: Square, promotion: Option[PromotableRole] = None): MoveResult =
     pieceAt(from) match
       case None => MoveResult.Failed(this, MoveError.NoPiece)
       case Some(piece) =>
-        val candidate = applyMoveUnchecked(from, to)
+        val candidate = applyMoveUnchecked(from, to, promotion)
         if candidate eq this then MoveResult.Failed(this, MoveError.InvalidMove)
         else if candidate.isInCheck(piece.color) then
           MoveResult.Failed(this, MoveError.LeavesKingInCheck)
+        else if promotion.isEmpty && isPromotionSquare(piece, to) then
+          MoveResult.Failed(this, MoveError.PromotionRequired)
         else
           MoveResult.Moved(
             candidate,
             candidate.detectGameEvent(piece.color.opposite)
           )
 
-  private[model] def applyMoveUnchecked(from: Square, to: Square): Board =
+  private def isPromotionSquare(piece: Piece, to: Square): Boolean =
+    piece.role == Role.Pawn &&
+      ((piece.color == Color.White && to.rank == Rank._8) ||
+        (piece.color == Color.Black && to.rank == Rank._1))
+
+  /** Returns true if the piece at `from` can move to `to` by the movement rules,
+    * without checking whether the king is left in check.
+    */
+  def canMoveIgnoringCheck(from: Square, to: Square): Boolean =
+    !(applyMoveUnchecked(from, to) eq this)
+
+  private[model] def applyMoveUnchecked(from: Square, to: Square, promotion: Option[PromotableRole] = None): Board =
     // Check if source square has a piece
     pieceAt(from) match
       case None        => this
@@ -40,7 +78,7 @@ final case class Board(
           case Role.Bishop => isValidBishopMove(from, to)
           case Role.Rook   => isValidRookMove(from, to)
           case Role.Queen  => isValidQueenMove(from, to)
-          case Role.King   => isValidKingMove(from, to)
+          case Role.King   => isValidKingMove(from, to) || isValidCastling(from, to, piece.color)
 
         if !isValid then return this
 
@@ -59,16 +97,31 @@ final case class Board(
         finalSquares = updateSquare(finalSquares, to, Some(piece))
 
         // Handle en passant capture
-        if piece.role == Role.Pawn && isEnPassantCapture(
-            from,
-            to,
-            piece.color
-          )
-        then
+        if piece.role == Role.Pawn && isEnPassantCapture(from, to, piece.color) then
           val capturedSquare = Square(to.file, from.rank)
           finalSquares = updateSquare(finalSquares, capturedSquare, None)
 
-        copy(squares = finalSquares, lastMove = Some((from, to)))
+        // Handle pawn promotion — default to Queen when no piece specified (for legality checks)
+        if piece.role == Role.Pawn && isPromotionSquare(piece, to) then
+          val promotedRole = promotion.getOrElse(PromotableRole.Queen).toRole
+          finalSquares = updateSquare(finalSquares, to, Some(Piece(promotedRole, piece.color)))
+
+        // Handle castling — relocate the rook
+        if piece.role == Role.King && (to.file - from.file).abs == 2 then
+          val isKingside = to.file.index > from.file.index
+          val rookFromFile = if isKingside then File.H else File.A
+          val rookToFile   = if isKingside then File.F else File.D
+          val rookFrom = Square(rookFromFile, from.rank)
+          val rookTo   = Square(rookToFile, from.rank)
+          finalSquares = updateSquare(finalSquares, rookFrom, None)
+          finalSquares = updateSquare(finalSquares, rookTo, Some(Piece(Role.Rook, piece.color)))
+
+        val newCastlingRights = piece.role match
+          case Role.King => castlingRights.revokeKing(piece.color)
+          case Role.Rook => castlingRights.revokeRook(from)
+          case _         => castlingRights
+
+        copy(squares = finalSquares, lastMove = Some((from, to)), castlingRights = newCastlingRights)
 
   private def isValidPawnMove(
       from: Square,
@@ -187,6 +240,31 @@ final case class Board(
     val rankDiff = (to.rank - from.rank).abs
     fileDiff <= 1 && rankDiff <= 1 && (fileDiff != 0 || rankDiff != 0)
 
+  private def isValidCastling(from: Square, to: Square, color: Color): Boolean =
+    val isKingside = to.file.index > from.file.index
+    val backRank   = if color == Color.White then Rank._1 else Rank._8
+
+    // King must be on its starting square and castling right must be intact
+    if from != Square(File.E, backRank) then return false
+    if !castlingRights.can(color, isKingside) then return false
+
+    // Rook must still be on its corner square
+    val rookFile = if isKingside then File.H else File.A
+    if !pieceAt(Square(rookFile, backRank)).contains(Piece(Role.Rook, color)) then return false
+
+    // All squares between king and rook must be empty
+    val emptyFiles = if isKingside then List(File.F, File.G) else List(File.B, File.C, File.D)
+    if emptyFiles.exists(f => pieceAt(Square(f, backRank)).isDefined) then return false
+
+    // King must not currently be in check
+    if isInCheck(color) then return false
+
+    // King must not pass through an attacked square
+    val passingFile = if isKingside then File.F else File.D
+    if isAttackedBy(Square(passingFile, backRank), color.opposite) then return false
+
+    true
+
   private def isPathClear(from: Square, to: Square): Boolean =
     val fileStep = (to.file - from.file).sign
     val rankStep = (to.rank - from.rank).sign
@@ -246,10 +324,10 @@ final case class Board(
     }.toVector
 
   def isCheckmate(color: Color): Boolean =
-    isInCheck(color) && legalMoves(color).isEmpty
+    isInCheck(color) && !hasLegalMoves(color)
 
   def isStalemate(color: Color): Boolean =
-    !isInCheck(color) && legalMoves(color).isEmpty
+    !isInCheck(color) && !hasLegalMoves(color)
 
   private def hasLegalMoves(color: Color): Boolean =
     Square.all.exists { from =>
@@ -262,7 +340,7 @@ final case class Board(
         case _ => false
     }
 
-  private def detectGameEvent(opponent: Color): GameEvent =
+  private[chess] def detectGameEvent(opponent: Color): GameEvent =
     val inCheck = isInCheck(opponent)
     if inCheck then
       if !hasLegalMoves(opponent) then GameEvent.Checkmate

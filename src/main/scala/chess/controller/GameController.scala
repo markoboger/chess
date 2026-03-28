@@ -1,6 +1,6 @@
 package chess.controller
 
-import chess.model.{Board, Color, Square, File, Rank, MoveResult, MoveError}
+import chess.model.{Board, Color, PromotableRole, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.io.{FenIO, PgnIO}
 import chess.io.pgn.PGNParser
 import chess.util.Observable
@@ -44,9 +44,8 @@ final class GameController(initialBoard: Board)(using
     if (_currentIndex > 0) {
       _currentIndex -= 1
       currentBoard = _boardStates(_currentIndex)
-      // Reconstruct whose turn it is at this position
       _isWhiteToMove = _currentIndex % 2 == 0
-      notifyObservers(MoveResult.Moved(currentBoard))
+      notifyObservers(MoveResult.Moved(currentBoard, gameEventAt(_currentIndex)))
     }
   }
 
@@ -56,9 +55,26 @@ final class GameController(initialBoard: Board)(using
       _currentIndex += 1
       currentBoard = _boardStates(_currentIndex)
       _isWhiteToMove = _currentIndex % 2 == 0
-      notifyObservers(MoveResult.Moved(currentBoard))
+      notifyObservers(MoveResult.Moved(currentBoard, gameEventAt(_currentIndex)))
     }
   }
+
+  /** Jump directly to any position in the game history.
+    * @param index 0 = initial position, N = position after move N
+    */
+  def goToMove(index: Int): Unit =
+    if index >= 0 && index < _boardStates.length then
+      _currentIndex = index
+      currentBoard = _boardStates(_currentIndex)
+      _isWhiteToMove = _currentIndex % 2 == 0
+      notifyObservers(MoveResult.Moved(currentBoard, gameEventAt(_currentIndex)))
+
+  /** Compute the GameEvent for a board state at the given history index.
+    * The active color at that index is the player whose turn it is to move.
+    */
+  private def gameEventAt(index: Int): GameEvent =
+    val activeColorAtIndex = if index % 2 == 0 then Color.White else Color.Black
+    _boardStates(index).detectGameEvent(activeColorAtIndex)
 
   private def resetHistory(board: Board): Unit = {
     _boardStates = Vector(board)
@@ -100,29 +116,38 @@ final class GameController(initialBoard: Board)(using
     fenIO.save(board)
   }
 
-  /** Apply a move using PGN notation (e.g., "e4", "Nf3", "O-O").
+  /** Apply a move using PGN notation (e.g., "e4", "Nf3", "O-O", "e8=Q").
     * @return
     *   [[MoveResult]] — [[MoveResult.Moved]] with board and game event on
     *   success, or [[MoveResult.Failed]] with error reason on failure
     */
   def applyPgnMove(pgnMove: String): MoveResult =
     PGNParser.parseMove(pgnMove, board, _isWhiteToMove) match
-      case Success((from, to)) => applyMove(from, to)
+      case Success((from, to)) => applyMove(from, to, parsePromotion(pgnMove))
       case Failure(e) =>
         MoveResult.Failed(board, MoveError.ParseError(e.getMessage))
+
+  private def parsePromotion(pgnMove: String): Option[PromotableRole] =
+    val promoRegex = """.*=([QRBN]).*""".r
+    pgnMove match
+      case promoRegex("Q") => Some(PromotableRole.Queen)
+      case promoRegex("R") => Some(PromotableRole.Rook)
+      case promoRegex("B") => Some(PromotableRole.Bishop)
+      case promoRegex("N") => Some(PromotableRole.Knight)
+      case _               => None
 
   /** Apply a move using file/rank coordinates.
     * @return
     *   [[MoveResult]] — [[MoveResult.Moved]] with board and game event on
     *   success, or [[MoveResult.Failed]] with error reason on failure
     */
-  def applyMove(from: Square, to: Square): MoveResult =
+  def applyMove(from: Square, to: Square, promotion: Option[PromotableRole] = None): MoveResult =
     if !isAtLatest then return MoveResult.Failed(board, MoveError.InvalidMove)
     val boardBefore = board
     val wasWhite = _isWhiteToMove
     val result = board.pieceAt(from) match
       case Some(piece) if piece.color == activeColor =>
-        board.move(from, to) match
+        board.move(from, to, promotion) match
           case moved: MoveResult.Moved =>
             val pgn = PGNParser.toAlgebraic(
               from,

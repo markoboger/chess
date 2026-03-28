@@ -13,7 +13,7 @@ import scalafx.stage.Stage
 import scalafx.stage.FileChooser
 import scalafx.stage.FileChooser.ExtensionFilter
 import chess.controller.GameController
-import chess.model.{Board, Square, File, Rank, MoveResult, MoveError, GameEvent}
+import chess.model.{Board, Piece, PromotableRole, Role, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.model.{Color => ChessColor}
 import chess.io.FileIO
 import chess.io.json.circe.CirceJsonFileIO
@@ -31,7 +31,7 @@ import scala.util.{Try, Success, Failure}
 class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   controller.add(this)
 
-  private var selectedSquare: Option[Square] = None
+  private[view] var selectedSquare: Option[Square] = None
   private var boardSquares: Array[Array[Rectangle]] =
     Array.ofDim[Rectangle](8, 8)
   private var boardLabels: Array[Array[Text]] = Array.ofDim[Text](8, 8)
@@ -43,6 +43,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var fenDisplay: TextArea = uninitialized
   private var pgnDisplay: TextFlow = uninitialized
   private var pgnScrollPane: ScrollPane = uninitialized
+  private var blackCapturesBox: HBox = uninitialized
+  private var whiteCapturesBox: HBox = uninitialized
+  private var materialLabel: Label = uninitialized
   private[view] var initialized: Boolean = false
 
   override def update(event: MoveResult): Unit = {
@@ -61,6 +64,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
           fenDisplay.text = controller.getBoardAsFEN
           updatePgnDisplay()
           updateBoard()
+          updateCapturedPanel()
         case MoveResult.Failed(_, _) =>
           // Errors are handled inline by the originating action
           // (click vs text input require different UI feedback)
@@ -178,7 +182,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     moveInput.onAction = _ => handleMoveInput()
 
     // PGN section
-    val pgnLabel = new Label("Game PGN:") {
+    val pgnLabel = new Label("Game PGN (click move to navigate):") {
       font = Font.font("Arial", FontWeight.Normal, 14)
       padding = Insets(10, 0, 5, 0)
     }
@@ -343,37 +347,109 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
   private def updatePgnDisplay(): Unit = {
     pgnDisplay.children.clear()
-    val moves = controller.pgnMoves
-    val boldIndex =
-      controller.currentIndex - 1 // move that led to the current position
+    val moves      = controller.pgnMoves
+    val activeIdx  = controller.currentIndex - 1 // index of the move that produced the current board
+    var activeNode = Option.empty[Text]
 
     moves.zipWithIndex.foreach { case (move, i) =>
-      // Add move number before white's moves (even indices)
       if (i % 2 == 0) {
-        val numText = new Text(s"${i / 2 + 1}. ") {
+        pgnDisplay.children.add(new Text(s"${i / 2 + 1}. ") {
           font = Font.font("monospace", FontWeight.Normal, 13)
-        }
-        pgnDisplay.children.add(numText)
+        })
       }
 
-      val moveText = new Text(move) {
-        font =
-          if (i == boldIndex)
-            Font.font("monospace", FontWeight.Bold, 13)
-          else
-            Font.font("monospace", FontWeight.Normal, 13)
+      val isActive = i == activeIdx
+      val moveText = new Text(move + " ") {
+        font  = Font.font("monospace", if (isActive) FontWeight.Bold else FontWeight.Normal, 13)
+        fill  = if (isActive) Color.web("#1565C0") else Color.Black
+        style = "-fx-cursor: hand;"
+
+        onMouseEntered = _ => if (!isActive) fill = Color.web("#1565C0")
+        onMouseExited  = _ => if (!isActive) fill = Color.Black
+        onMouseClicked = _ => {
+          controller.goToMove(i + 1)
+          selectedSquare = None
+        }
       }
       pgnDisplay.children.add(moveText)
-
-      // Add space after move
-      val space = new Text(" ") {
-        font = Font.font("monospace", FontWeight.Normal, 13)
-      }
-      pgnDisplay.children.add(space)
+      if (isActive) activeNode = Some(moveText)
     }
 
-    // Auto-scroll to bottom
-    pgnScrollPane.vvalue = 1.0
+    // Scroll so the active move is visible; fall back to bottom if none
+    Platform.runLater(() => {
+      activeNode match {
+        case Some(node) =>
+          val totalH = pgnDisplay.delegate.prefHeight(-1)
+          val viewH  = pgnScrollPane.height.value
+          if (totalH > viewH) {
+            val nodeY = node.delegate.getBoundsInParent.getMinY
+            pgnScrollPane.vvalue = Math.min(1.0, nodeY / (totalH - viewH))
+          }
+        case None =>
+          pgnScrollPane.vvalue = 1.0
+      }
+    })
+  }
+
+  private[view] def createCapturedPanel(): VBox = {
+    blackCapturesBox = new HBox(3) { padding = Insets(2, 0, 2, 0) }
+    whiteCapturesBox = new HBox(3) { padding = Insets(2, 0, 2, 0) }
+    materialLabel = new Label("=") {
+      font = Font.font("Arial", FontWeight.Bold, 13)
+      maxWidth = Double.MaxValue
+      alignment = Pos.Center
+    }
+    updateCapturedPanel()
+    new VBox(2) {
+      padding = Insets(4, 20, 8, 20)
+      style = "-fx-background-color: #ebebeb; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;"
+      children = Seq(blackCapturesBox, materialLabel, whiteCapturesBox)
+    }
+  }
+
+  private def updateCapturedPanel(): Unit = {
+    val startingCounts = Map(
+      Role.Pawn -> 8, Role.Knight -> 2, Role.Bishop -> 2,
+      Role.Rook -> 2, Role.Queen  -> 1
+    )
+    val pieceValues = Map(
+      Role.Pawn -> 1, Role.Knight -> 3, Role.Bishop -> 3,
+      Role.Rook -> 5, Role.Queen  -> 9
+    )
+    val displayRoles = Seq(Role.Queen, Role.Rook, Role.Bishop, Role.Knight, Role.Pawn)
+
+    val liveCounts = controller.board.squares.flatten.flatten
+      .groupBy(p => (p.color, p.role))
+      .map((k, v) => k -> v.size)
+
+    def captured(color: ChessColor, role: Role): Int =
+      (startingCounts(role) - liveCounts.getOrElse((color, role), 0)).max(0)
+
+    def pieceSymbols(color: ChessColor): Seq[Text] =
+      displayRoles.flatMap { role =>
+        Seq.fill(captured(color, role))(new Text(Piece(role, color).toString) {
+          font = Font.font("Arial", FontWeight.Normal, 28)
+          fill = Color.Black
+        })
+      }
+
+    // Pieces black captured = white pieces removed from the board
+    val blackCaptures = pieceSymbols(ChessColor.White)
+    // Pieces white captured = black pieces removed from the board
+    val whiteCaptures = pieceSymbols(ChessColor.Black)
+
+    blackCapturesBox.children.clear()
+    blackCaptures.foreach(t => blackCapturesBox.children.add(t))
+    whiteCapturesBox.children.clear()
+    whiteCaptures.foreach(t => whiteCapturesBox.children.add(t))
+
+    val whiteMaterial = displayRoles.map(r => captured(ChessColor.Black, r) * pieceValues(r)).sum
+    val blackMaterial = displayRoles.map(r => captured(ChessColor.White, r) * pieceValues(r)).sum
+    val adv = whiteMaterial - blackMaterial
+    materialLabel.text =
+      if adv > 0 then s"White +$adv"
+      else if adv < 0 then s"Black +${-adv}"
+      else "="
   }
 
   private[view] def updateBoard(): Unit = {
@@ -420,31 +496,45 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         if (square == fromSquare) {
           selectedSquare = None
         } else {
-          controller.applyMove(fromSquare, square) match {
-            case _: MoveResult.Moved =>
-              selectedSquare = None
-            // Board/label/FEN updated by observer update()
-            case MoveResult.Failed(_, error) =>
-              // Show error briefly in the player label
-              playerLabel.text = error match {
-                case MoveError.LeavesKingInCheck =>
-                  "Illegal: move leaves king in check!"
-                case MoveError.WrongColor      => "That's not your piece!"
-                case MoveError.NoPiece         => "No piece on that square!"
-                case MoveError.InvalidMove     => "That piece can't move there!"
-                case MoveError.ParseError(msg) => s"Error: $msg"
-              }
-              // Try to re-select if clicking on own piece
-              controller.board.pieceAt(square) match {
-                case Some(piece)
-                    if piece.color == (if (controller.isWhiteToMove)
-                                         ChessColor.White
-                                       else ChessColor.Black) =>
-                  selectedSquare = Some(square)
-                case _ =>
-                  selectedSquare = None
-              }
+          // Detect promotion before applying: pawn moving to the back rank
+          val needsPromotion = controller.board.pieceAt(fromSquare).exists { p =>
+            p.role == Role.Pawn &&
+              ((p.color == ChessColor.White && square.rank == Rank._8) ||
+                (p.color == ChessColor.Black && square.rank == Rank._1))
           }
+          val promotion: Option[PromotableRole] =
+            if needsPromotion then showPromotionDialog() else None
+
+          // If the user cancelled the promotion dialog, deselect and stop
+          if needsPromotion && promotion.isEmpty then
+            selectedSquare = None
+          else
+            controller.applyMove(fromSquare, square, promotion) match {
+              case _: MoveResult.Moved =>
+                selectedSquare = None
+              // Board/label/FEN updated by observer update()
+              case MoveResult.Failed(_, error) =>
+                // Show error briefly in the player label
+                playerLabel.text = error match {
+                  case MoveError.LeavesKingInCheck =>
+                    "Illegal: move leaves king in check!"
+                  case MoveError.WrongColor        => "That's not your piece!"
+                  case MoveError.NoPiece           => "No piece on that square!"
+                  case MoveError.InvalidMove       => "That piece can't move there!"
+                  case MoveError.PromotionRequired => "Promotion required!"
+                  case MoveError.ParseError(msg)   => s"Error: $msg"
+                }
+                // Try to re-select if clicking on own piece
+                controller.board.pieceAt(square) match {
+                  case Some(piece)
+                      if piece.color == (if (controller.isWhiteToMove)
+                                           ChessColor.White
+                                         else ChessColor.Black) =>
+                    selectedSquare = Some(square)
+                  case _ =>
+                    selectedSquare = None
+                }
+            }
         }
     }
   }
@@ -643,6 +733,25 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     }
   }
 
+  private def showPromotionDialog(): Option[PromotableRole] = {
+    val queenBtn  = new ButtonType("♛ Queen")
+    val rookBtn   = new ButtonType("♜ Rook")
+    val bishopBtn = new ButtonType("♝ Bishop")
+    val knightBtn = new ButtonType("♞ Knight")
+    new Alert(Alert.AlertType.Confirmation) {
+      initOwner(primaryStage)
+      title = "Pawn Promotion"
+      headerText = "Choose a piece to promote to:"
+      buttonTypes = Seq(queenBtn, rookBtn, bishopBtn, knightBtn, ButtonType.Cancel)
+    }.showAndWait() match {
+      case Some(btn) if btn == queenBtn  => Some(PromotableRole.Queen)
+      case Some(btn) if btn == rookBtn   => Some(PromotableRole.Rook)
+      case Some(btn) if btn == bishopBtn => Some(PromotableRole.Bishop)
+      case Some(btn) if btn == knightBtn => Some(PromotableRole.Knight)
+      case _                             => None
+    }
+  }
+
   private def showAlert(alertTitle: String, message: String): Unit = {
     new Alert(Alert.AlertType.Error) {
       initOwner(primaryStage)
@@ -704,14 +813,28 @@ class ChessGUILauncher extends javafx.application.Application {
 
     // Set up the scene
     gui.primaryStage.title = "Chess Game - ScalaFX"
-    gui.primaryStage.scene = new Scene(1050, 850) {
+    gui.primaryStage.scene = new Scene(1050, 900) {
       root = new BorderPane {
         top = gui.createMenuBar()
-        center = gui.createBoardPane()
+        center = new VBox {
+          children = Seq(gui.createBoardPane(), gui.createCapturedPanel())
+        }
         right = gui.createControlPanel()
         style = "-fx-background-color: #f5f5f5;"
       }
     }
+    gui.primaryStage.scene.delegate.getValue.addEventFilter(
+      javafx.scene.input.KeyEvent.KEY_PRESSED,
+      (event: javafx.scene.input.KeyEvent) => {
+        event.getCode match {
+          case javafx.scene.input.KeyCode.LEFT  =>
+            gui.controller.backward(); gui.selectedSquare = None
+          case javafx.scene.input.KeyCode.RIGHT =>
+            gui.controller.forward();  gui.selectedSquare = None
+          case _ => ()
+        }
+      }
+    )
 
     // Mark GUI as initialized — observer update() calls are now safe
     gui.initialized = true
