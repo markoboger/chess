@@ -17,6 +17,16 @@ val javafxClassifier = {
   s"$os$arch"
 }
 
+lazy val Benchmarks = project
+  .in(file("benchmark"))
+  .enablePlugins(JmhPlugin)
+  .dependsOn(Chess)
+  .settings(
+    name := "Chess-Benchmarks",
+    scalaVersion := "3.5.0",
+    publish / skip := true
+  )
+
 lazy val Chess = project
   .in(file("."))
   .settings(
