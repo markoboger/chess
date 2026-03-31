@@ -50,6 +50,8 @@ lazy val Chess = project
       "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
       "org.apache.pekko" %% "pekko-stream" % "1.1.2",
       "org.apache.pekko" %% "pekko-http" % "1.1.0",
+      "org.apache.pekko" %% "pekko-testkit" % "1.1.2" % Test,
+      "org.apache.pekko" %% "pekko-stream-testkit" % "1.1.2" % Test,
       "org.apache.pekko" %% "pekko-http-testkit" % "1.1.0" % Test,
       "ch.qos.logback"    % "logback-classic"   % "1.5.6" % Runtime
     ),
