@@ -1,0 +1,36 @@
+# Dockerfile for API Gateway
+FROM sbtscala/scala-sbt:eclipse-temurin-jammy-21.0.5_11_1.10.6_3.5.2 AS builder
+
+WORKDIR /app
+
+# Copy build files
+COPY build.sbt .
+COPY project project/
+
+# Download dependencies
+RUN sbt update
+
+# Copy source code
+COPY src src/
+
+# Build the application
+RUN sbt compile stage
+
+# Runtime image
+FROM eclipse-temurin:21-jre-jammy
+
+WORKDIR /app
+
+# Copy built application from builder
+COPY --from=builder /app/target/universal/stage /app
+
+# Expose Gateway port
+EXPOSE 8080
+
+# Set environment
+ENV PORT=8080
+ENV GAME_SERVICE_URL=http://game-service:8081
+ENV UI_SERVICE_URL=http://ui-service:8082
+
+# Run the API Gateway
+CMD ["/app/bin/chess", "-main", "chess.microservices.gateway.GatewayServer"]
