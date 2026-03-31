@@ -48,6 +48,9 @@ lazy val Chess = project
       "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0",
       "com.lihaoyi" %% "fastparse" % "3.1.1",
       "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
+      "org.apache.pekko" %% "pekko-stream" % "1.1.2",
+      "org.apache.pekko" %% "pekko-http" % "1.1.0",
+      "org.apache.pekko" %% "pekko-http-testkit" % "1.1.0" % Test,
       "ch.qos.logback"    % "logback-classic"   % "1.5.6" % Runtime
     ),
     coverageExcludedFiles := ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*",

@@ -1,21 +1,22 @@
-# Lecture 5: REST API with fs2
+# Lecture 5: REST API with Pekko HTTP
 
 ## Learning Objectives
 
 Students will learn:
-- Alternative implementation of the same REST interface using fs2
-- Streaming abstractions with fs2-core
+- Alternative implementation of the same REST interface using Pekko HTTP
+- Different streaming models: Pekko Streams vs fs2
+- Different programming paradigms: Future-based vs Effect-based
 - Performance comparison methodology
 - Library evaluation criteria
 
 ## Architecture Overview
 
-This lecture implements the **same API specification** as Lecture 4, but using fs2 instead of http4s:
+This lecture implements the **same API specification** as Lecture 4, but using Pekko HTTP instead of http4s:
 
 ```
 ┌─────────────────────────┐
 │   HTTP REST API         │
-│   (fs2-based)           │
+│   (Pekko HTTP)          │
 ├─────────────────────────┤
 │   Game Controller       │
 │   (existing)            │
@@ -28,8 +29,8 @@ This lecture implements the **same API specification** as Lecture 4, but using f
 ## Goals
 
 1. **Same Interface**: Implement identical REST endpoints as Lecture 4
-2. **Different Library**: Use fs2 ecosystem instead of http4s
-3. **Comparison**: Document differences in implementation approach
+2. **Different Stack**: Use Pekko HTTP/Pekko Streams/Futures instead of http4s/fs2/Cats Effect
+3. **Comparison**: Document differences in implementation approach and programming models
 4. **Performance**: Set up benchmarks to compare both implementations
 
 ## REST Endpoints
@@ -47,44 +48,49 @@ All endpoints from Lecture 4:
 
 ### Dependencies (add to build.sbt)
 ```scala
-val fs2Version = "3.9.3"
+val pekkoVersion = "1.1.2"
+val pekkoHttpVersion = "1.1.0"
 
 libraryDependencies ++= Seq(
-  "co.fs2" %% "fs2-core" % fs2Version,
-  "co.fs2" %% "fs2-io" % fs2Version,
-  "io.circe" %% "circe-generic" % "0.14.6",
-  "io.circe" %% "circe-literal" % "0.14.6",
-  "io.circe" %% "circe-parser" % "0.14.6"
+  "org.apache.pekko" %% "pekko-actor-typed" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-stream" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-http" % pekkoHttpVersion,
+  "org.apache.pekko" %% "pekko-http-testkit" % pekkoHttpVersion % Test,
+  "io.circe" %% "circe-generic" % "0.14.10",
+  "io.circe" %% "circe-literal" % "0.14.10",
+  "io.circe" %% "circe-parser" % "0.14.10"
 )
 ```
 
 ### Package Structure
 ```
-chess.api.fs2/
+chess.api.pekko/
 ├── server/
-│   ├── ChessServerFs2.scala    # HTTP server with fs2
-│   ├── ChessRoutesFs2.scala    # Route definitions
-│   └── GameServiceFs2.scala    # Business logic
+│   ├── ChessServerPekko.scala    # HTTP server with Pekko HTTP
+│   ├── ChessRoutesPekko.scala    # Route definitions
+│   └── GameServicePekko.scala    # Business logic
 ├── model/
 │   └── (reuse from Lecture 4)
 └── client/
-    └── ChessClientFs2.scala    # Test client
+    └── ChessClientPekko.scala    # Test client
 ```
 
 ## Implementation Focus
 
 ### Streaming Patterns
-- Use `Stream[F, A]` for request/response handling
-- Demonstrate resource management with `Resource[F, A]`
-- Show backpressure handling
+- Use `Source[A, NotUsed]` for streaming responses
+- Demonstrate resource management with Pekko lifecycle
+- Show backpressure handling with Pekko Streams
 
 ### Comparison Points
 Document differences in:
-1. **Setup complexity** - How much boilerplate?
-2. **Route definition** - DSL ergonomics
-3. **Error handling** - How are failures managed?
-4. **Testing** - Test utilities and ease of testing
-5. **Performance** - Latency, throughput, memory usage
+1. **Programming Model** - Future-based (Pekko) vs Effect-based (http4s/Cats)
+2. **Setup complexity** - How much boilerplate?
+3. **Route definition** - DSL ergonomics (Pekko directives vs http4s DSL)
+4. **Error handling** - How are failures managed?
+5. **Testing** - Test utilities and ease of testing
+6. **Streaming model** - Pekko Streams vs fs2
+7. **Performance** - Latency, throughput, memory usage
 
 ## Performance Benchmarking
 
@@ -94,7 +100,7 @@ Set up JMH benchmarks comparing:
 - Memory allocation per request
 - Concurrent game handling
 
-Create `benchmarks/RestApiBenchmark.scala`:
+Create `benchmark/RestApiBenchmark.scala`:
 ```scala
 @State(Scope.Benchmark)
 class RestApiBenchmark {
@@ -102,7 +108,7 @@ class RestApiBenchmark {
   def http4sMove(): Unit = ???
 
   @Benchmark
-  def fs2Move(): Unit = ???
+  def pekkoMove(): Unit = ???
 }
 ```
 
@@ -117,13 +123,34 @@ class RestApiBenchmark {
 ## Comparison Document Structure
 
 Create `docs/REST-API-COMPARISON.md`:
-1. **Implementation Comparison** - Code patterns, complexity
-2. **Performance Results** - Benchmark data with charts
-3. **Developer Experience** - Subjective assessment
-4. **Recommendation** - Which to use when and why
+1. **Programming Model Comparison** - Future-based vs Effect-based approaches
+2. **Implementation Comparison** - Code patterns, complexity, DSL differences
+3. **Streaming Models** - Pekko Streams vs fs2
+4. **Performance Results** - Benchmark data with analysis
+5. **Developer Experience** - Subjective assessment, learning curve
+6. **Recommendation** - Which to use when and why
+
+## Key Differences to Explore
+
+**Programming Model:**
+- http4s: Pure functional with Cats Effect IO
+- Pekko HTTP: Imperative style with Futures
+
+**Streaming:**
+- http4s: fs2 streams with functional composition
+- Pekko HTTP: Pekko Streams with graph DSL
+
+**Error Handling:**
+- http4s: MonadError, ApplicativeError
+- Pekko HTTP: Try, Future failures, exception directives
+
+**Testing:**
+- http4s: http4s-dsl test utilities, pure IO testing
+- Pekko HTTP: RouteTest trait, ScalatestRouteTest
 
 ## References
 
-- [fs2 documentation](https://fs2.io/)
-- [fs2 guide](https://github.com/typelevel/fs2/blob/main/docs/guide.md)
+- [Pekko HTTP documentation](https://pekko.apache.org/docs/pekko-http/current/)
+- [Pekko Streams guide](https://pekko.apache.org/docs/pekko/current/stream/)
+- [Pekko routing DSL](https://pekko.apache.org/docs/pekko-http/current/routing-dsl/)
 - Lecture 4 implementation (http4s version)
