@@ -58,6 +58,11 @@ lazy val Chess = project
       "org.tpolecat" %% "doobie-postgres" % "1.0.0-RC5",
       "org.postgresql" % "postgresql" % "42.7.3",
       "com.zaxxer" % "HikariCP" % "5.1.0",
+      // HTTP4s dependencies for microservices
+      "org.http4s" %% "http4s-ember-server" % "0.23.27",
+      "org.http4s" %% "http4s-ember-client" % "0.23.27",
+      "org.http4s" %% "http4s-dsl" % "0.23.27",
+      "org.http4s" %% "http4s-circe" % "0.23.27",
       "org.testcontainers" % "testcontainers" % "1.19.8" % Test,
       "org.testcontainers" % "postgresql" % "1.19.8" % Test,
       "org.testcontainers" % "mongodb" % "1.19.8" % Test,
