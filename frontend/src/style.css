@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Chess board custom styles */
+@layer components {
+  .chess-board {
+    @apply grid grid-cols-8 grid-rows-8 aspect-square;
+    @apply border-4 border-gray-800 dark:border-gray-200;
+    @apply shadow-2xl rounded-lg overflow-hidden;
+  }
+
+  .chess-square {
+    @apply relative flex items-center justify-center;
+    @apply transition-colors duration-200;
+    @apply cursor-pointer;
+  }
+
+  .chess-square.light {
+    @apply bg-amber-100 dark:bg-amber-200;
+  }
+
+  .chess-square.dark {
+    @apply bg-amber-700 dark:bg-amber-800;
+  }
+
+  .chess-square.selected {
+    @apply ring-4 ring-blue-500 ring-inset;
+  }
+
+  .chess-square.legal-move {
+    @apply after:content-[''] after:absolute after:w-3 after:h-3;
+    @apply after:bg-green-500/50 after:rounded-full;
+  }
+
+  .chess-square.last-move {
+    @apply bg-yellow-300/30 dark:bg-yellow-500/30;
+  }
+
+  .chess-piece {
+    @apply text-5xl leading-none select-none;
+    @apply transition-transform duration-200;
+    @apply cursor-grab active:cursor-grabbing;
+  }
+
+  .chess-piece:hover {
+    @apply scale-110;
+  }
+}
+
+/* Responsive board sizing */
+@media (max-width: 767px) {
+  .chess-board {
+    @apply w-full max-w-[400px] mx-auto;
+  }
+  .chess-piece {
+    @apply text-4xl;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .chess-board {
+    @apply max-w-[500px];
+  }
+}
+
+@media (min-width: 1024px) {
+  .chess-board {
+    @apply max-w-[600px];
+  }
+}
