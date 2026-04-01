@@ -1,0 +1,505 @@
+eco,name,moves,variation
+A00,Uncommon Opening,1. g4,
+A00,Anderssen Opening,1. a3,
+A00,Ware Opening,1. a4,
+A00,Grob Opening,1. g4,
+A01,Nimzowitsch-Larsen Attack,1. b3,
+A02,Bird Opening,1. f4,
+A02,Bird Opening,1. f4 Nf6,From Gambit
+A03,Bird Opening,1. f4 d5,
+A04,Reti Opening,1. Nf3,
+A05,Reti Opening,1. Nf3 Nf6,
+A06,Reti Opening,1. Nf3 d5,
+A07,King's Indian Attack,1. Nf3 d5 2. g3,
+A08,King's Indian Attack,1. Nf3 d5 2. g3 c5 3. Bg2,
+A09,Reti Opening,1. Nf3 d5 2. c4,
+A10,English Opening,1. c4,
+A11,English Opening,1. c4 c6,Anglo-Slav
+A12,English Opening,1. c4 c6 2. Nf3 d5 3. b3,
+A13,English Opening,1. c4 e6,
+A14,English Opening,1. c4 e6 2. Nf3 d5 3. g3 Nf6 4. Bg2 Be7 5. O-O,
+A15,English Opening,1. c4 Nf6,Anglo-Indian
+A16,English Opening,1. c4 Nf6 2. Nc3,Anglo-Indian
+A17,English Opening,1. c4 Nf6 2. Nc3 e6,Hedgehog
+A18,English Opening,1. c4 Nf6 2. Nc3 e6 3. e4,Mikenas-Carls
+A19,English Opening,1. c4 Nf6 2. Nc3 e6 3. e4 c5,
+A20,English Opening,1. c4 e5,
+A21,English Opening,1. c4 e5 2. Nc3,
+A22,English Opening,1. c4 e5 2. Nc3 Nf6,
+A23,English Opening,1. c4 e5 2. Nc3 Nf6 3. g3,Bremen System
+A24,English Opening,1. c4 e5 2. Nc3 Nf6 3. g3 g6,
+A25,English Opening,1. c4 e5 2. Nc3 Nc6,Reversed Sicilian
+A26,English Opening,1. c4 e5 2. Nc3 Nc6 3. g3 g6 4. Bg2 Bg7 5. d3,Botvinnik System
+A27,English Opening,1. c4 e5 2. Nc3 Nc6 3. Nf3,Three Knights
+A28,English Opening,1. c4 e5 2. Nc3 Nc6 3. Nf3 Nf6,Four Knights
+A29,English Opening,1. c4 e5 2. Nc3 Nc6 3. Nf3 Nf6 4. g3,
+A30,English Opening,1. c4 c5,Symmetrical
+A31,English Opening,1. c4 c5 2. Nf3 Nf6 3. d4,
+A32,English Opening,1. c4 c5 2. Nf3 Nf6 3. d4 cxd4 4. Nxd4,
+A33,English Opening,1. c4 c5 2. Nf3 Nf6 3. d4 cxd4 4. Nxd4 e6 5. Nc3 Nc6,
+A34,English Opening,1. c4 c5 2. Nc3,Symmetrical
+A35,English Opening,1. c4 c5 2. Nc3 Nc6,
+A36,English Opening,1. c4 c5 2. Nc3 Nc6 3. g3,Symmetrical
+A37,English Opening,1. c4 c5 2. Nc3 Nc6 3. g3 g6 4. Bg2 Bg7 5. Nf3,
+A38,English Opening,1. c4 c5 2. Nc3 Nc6 3. g3 g6 4. Bg2 Bg7 5. Nf3 Nf6,
+A39,English Opening,1. c4 c5 2. Nc3 Nc6 3. g3 g6 4. Bg2 Bg7 5. Nf3 Nf6 6. O-O O-O 7. d4,
+A40,Queen's Pawn,1. d4,
+A41,Queen's Pawn,1. d4 d6,Modern Defense
+A42,Modern Defense,1. d4 d6 2. c4 g6 3. Nc3 Bg7,
+A43,Benoni Defense,1. d4 c5,Old Benoni
+A44,Benoni Defense,1. d4 c5 2. d5 e5,
+A45,Queen's Pawn,1. d4 Nf6,Indian Game
+A46,Queen's Pawn,1. d4 Nf6 2. Nf3,Indian Game
+A47,Queen's Indian,1. d4 Nf6 2. Nf3 b6,
+A48,King's Indian,1. d4 Nf6 2. Nf3 g6,
+A49,King's Indian,1. d4 Nf6 2. Nf3 g6 3. g3,
+A50,Queen's Pawn,1. d4 Nf6 2. c4,Indian Game
+A51,Budapest Gambit,1. d4 Nf6 2. c4 e5,
+A52,Budapest Gambit,1. d4 Nf6 2. c4 e5 3. dxe5 Ng4,
+A53,Old Indian,1. d4 Nf6 2. c4 d6,
+A54,Old Indian,1. d4 Nf6 2. c4 d6 3. Nc3,
+A55,Old Indian,1. d4 Nf6 2. c4 d6 3. Nc3 Nbd7 4. e4,
+A56,Benoni Defense,1. d4 Nf6 2. c4 c5,
+A57,Benko Gambit,1. d4 Nf6 2. c4 c5 3. d5 b5,
+A58,Benko Gambit,1. d4 Nf6 2. c4 c5 3. d5 b5 4. cxb5 a6,
+A59,Benko Gambit,1. d4 Nf6 2. c4 c5 3. d5 b5 4. cxb5 a6 5. bxa6,
+A60,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6,Modern Benoni
+A61,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. Nf3 g6,
+A62,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. Nf3 g6 7. g3,Fianchetto
+A63,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. Nf3 g6 7. g3 Bg7 8. Bg2 O-O 9. O-O,
+A64,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. Nf3 g6 7. g3 Bg7 8. Bg2 O-O 9. O-O Nbd7,
+A65,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4,Classical
+A66,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. f4,
+A67,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. f4 Bg7 8. Bb5+,Taimanov
+A68,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. f4 Bg7 8. Nf3 O-O,
+A69,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. f4 Bg7 8. Nf3 O-O 9. Be2,Four Pawns Attack
+A70,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. Nf3,Classical
+A71,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. Nf3 Bg7 8. Bg5,
+A72,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. Nf3 Bg7 8. Be2,
+A73,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. Nf3 Bg7 8. Be2 O-O,
+A74,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. Nf3 Bg7 8. Be2 O-O 9. O-O,
+A75,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. Nf3 Bg7 8. Be2 O-O 9. O-O a6,
+A76,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. Nf3 Bg7 8. Be2 O-O 9. O-O Re8,
+A77,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. Nf3 Bg7 8. Be2 O-O 9. O-O Re8 10. Nd2,
+A78,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. Nf3 Bg7 8. Be2 O-O 9. O-O Re8 10. Nd2 Na6,
+A79,Benoni Defense,1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4 g6 7. Nf3 Bg7 8. Be2 O-O 9. O-O Re8 10. Nd2 Na6 11. f3,Four Pawns Attack
+A80,Dutch Defense,1. d4 f5,
+A81,Dutch Defense,1. d4 f5 2. g3,
+A82,Dutch Defense,1. d4 f5 2. e4,Staunton Gambit
+A83,Dutch Defense,1. d4 f5 2. e4 fxe4 3. Nc3 Nf6 4. Bg5,
+A84,Dutch Defense,1. d4 f5 2. c4,
+A85,Dutch Defense,1. d4 f5 2. c4 Nf6 3. Nc3,
+A86,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3,Leningrad
+A87,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3 g6 4. Bg2 Bg7 5. Nf3,
+A88,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3 g6 4. Bg2 Bg7 5. Nf3 O-O 6. O-O d6 7. Nc3 c6,
+A89,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3 g6 4. Bg2 Bg7 5. Nf3 O-O 6. O-O d6 7. Nc3 Nc6,
+A90,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3 e6 4. Bg2,
+A91,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3 e6 4. Bg2 Be7,
+A92,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3 e6 4. Bg2 Be7 5. Nf3 O-O,
+A93,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3 e6 4. Bg2 Be7 5. Nf3 O-O 6. O-O d5 7. b3,Stonewall
+A94,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3 e6 4. Bg2 Be7 5. Nf3 O-O 6. O-O d5 7. b3 c6 8. Ba3,
+A95,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3 e6 4. Bg2 Be7 5. Nf3 O-O 6. O-O d5 7. Nc3 c6,
+A96,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3 e6 4. Bg2 Be7 5. Nf3 O-O 6. O-O d6,Classical
+A97,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3 e6 4. Bg2 Be7 5. Nf3 O-O 6. O-O d6 7. Nc3 Qe8,Ilyin-Zhenevsky
+A98,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3 e6 4. Bg2 Be7 5. Nf3 O-O 6. O-O d6 7. Nc3 Qe8 8. Qc2,
+A99,Dutch Defense,1. d4 f5 2. c4 Nf6 3. g3 e6 4. Bg2 Be7 5. Nf3 O-O 6. O-O d6 7. Nc3 Qe8 8. b3,
+B00,King's Pawn,1. e4,
+B01,Scandinavian Defense,1. e4 d5,
+B02,Alekhine Defense,1. e4 Nf6,
+B03,Alekhine Defense,1. e4 Nf6 2. e5 Nd5 3. d4,
+B04,Alekhine Defense,1. e4 Nf6 2. e5 Nd5 3. d4 d6 4. Nf3,Modern
+B05,Alekhine Defense,1. e4 Nf6 2. e5 Nd5 3. d4 d6 4. Nf3 Bg4,Modern
+B06,Modern Defense,1. e4 g6,
+B07,Pirc Defense,1. e4 d6,
+B08,Pirc Defense,1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. Nf3,Classical
+B09,Pirc Defense,1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. f4,Austrian Attack
+B10,Caro-Kann Defense,1. e4 c6,
+B11,Caro-Kann Defense,1. e4 c6 2. Nc3,Two Knights
+B12,Caro-Kann Defense,1. e4 c6 2. d4,
+B13,Caro-Kann Defense,1. e4 c6 2. d4 d5 3. exd5,Exchange
+B14,Caro-Kann Defense,1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4,Panov Attack
+B15,Caro-Kann Defense,1. e4 c6 2. d4 d5 3. Nc3,
+B16,Caro-Kann Defense,1. e4 c6 2. d4 d5 3. Nc3 dxe4 4. Nxe4,
+B17,Caro-Kann Defense,1. e4 c6 2. d4 d5 3. Nc3 dxe4 4. Nxe4 Nd7,
+B18,Caro-Kann Defense,1. e4 c6 2. d4 d5 3. Nc3 dxe4 4. Nxe4 Bf5,Classical
+B19,Caro-Kann Defense,1. e4 c6 2. d4 d5 3. Nc3 dxe4 4. Nxe4 Bf5 5. Ng3 Bg6 6. h4,
+B20,Sicilian Defense,1. e4 c5,
+B21,Sicilian Defense,1. e4 c5 2. f4,Grand Prix Attack
+B22,Sicilian Defense,1. e4 c5 2. c3,Alapin
+B23,Sicilian Defense,1. e4 c5 2. Nc3,Closed
+B24,Sicilian Defense,1. e4 c5 2. Nc3 Nc6 3. g3,Closed
+B25,Sicilian Defense,1. e4 c5 2. Nc3 Nc6 3. g3 g6 4. Bg2 Bg7 5. d3,
+B26,Sicilian Defense,1. e4 c5 2. Nc3 Nc6 3. g3 g6 4. Bg2 Bg7 5. d3 d6,
+B27,Sicilian Defense,1. e4 c5 2. Nf3,
+B28,Sicilian Defense,1. e4 c5 2. Nf3 a6,O'Kelly
+B29,Sicilian Defense,1. e4 c5 2. Nf3 Nf6,Nimzowitsch
+B30,Sicilian Defense,1. e4 c5 2. Nf3 Nc6,
+B31,Sicilian Defense,1. e4 c5 2. Nf3 Nc6 3. Bb5 g6,Rossolimo
+B32,Sicilian Defense,1. e4 c5 2. Nf3 Nc6 3. d4,Open
+B33,Sicilian Defense,1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4,Sveshnikov
+B34,Sicilian Defense,1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 g6,Accelerated Dragon
+B35,Sicilian Defense,1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 g6 5. Nc3 Bg7 6. Be3,
+B36,Sicilian Defense,1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 g6 5. c4,Maroczy Bind
+B37,Sicilian Defense,1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 g6 5. c4 Bg7,
+B38,Sicilian Defense,1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 g6 5. c4 Bg7 6. Be3 Nf6 7. Nc3,
+B39,Sicilian Defense,1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 g6 5. c4 Bg7 6. Be3 Nf6 7. Nc3 Ng4,
+B40,Sicilian Defense,1. e4 c5 2. Nf3 e6,
+B41,Sicilian Defense,1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 a6,Kan
+B42,Sicilian Defense,1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 a6 5. Bd3,
+B43,Sicilian Defense,1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 a6 5. Nc3,
+B44,Sicilian Defense,1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nc6,Taimanov
+B45,Sicilian Defense,1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nc6 5. Nc3,
+B46,Sicilian Defense,1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nc6 5. Nc3 a6,
+B47,Sicilian Defense,1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nc6 5. Nc3 Qc7,
+B48,Sicilian Defense,1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nc6 5. Nc3 Qc7 6. Be3,
+B49,Sicilian Defense,1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nc6 5. Nc3 Qc7 6. Be3 a6 7. Be2,
+B50,Sicilian Defense,1. e4 c5 2. Nf3 d6,
+B51,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. Bb5+,Moscow
+B52,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. Bb5+ Bd7,
+B53,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Qxd4,Chekhover
+B54,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4,
+B55,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. f3,Prins
+B56,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3,
+B57,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6,Sozin
+B58,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Be2,Boleslavsky
+B59,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Be2 e5 7. Nb3,
+B60,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Bg5,Richter-Rauzer
+B61,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Bg5 Bd7,
+B62,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Bg5 e6,
+B63,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Bg5 e6 7. Qd2,
+B64,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Bg5 e6 7. Qd2 Be7,
+B65,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Bg5 e6 7. Qd2 Be7 8. O-O-O,
+B66,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Bg5 e6 7. Qd2 a6,
+B67,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Bg5 e6 7. Qd2 a6 8. O-O-O Bd7,
+B68,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Bg5 e6 7. Qd2 a6 8. O-O-O Bd7 9. f4,
+B69,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Bg5 e6 7. Qd2 a6 8. O-O-O Bd7 9. f4 Be7,
+B70,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6,Dragon
+B71,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. f4,Dragon
+B72,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3,Dragon
+B73,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. Be2,Classical Dragon
+B74,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. Be2 Nc6,
+B75,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. f3,Yugoslav
+B76,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. f3 O-O,
+B77,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. f3 O-O 8. Qd2,
+B78,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. f3 O-O 8. Qd2 Nc6,
+B79,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. f3 O-O 8. Qd2 Nc6 9. Bc4,
+B80,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6,Scheveningen
+B81,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 6. g4,Keres Attack
+B82,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 6. f4,
+B83,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 6. Be2,
+B84,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 6. Be2 a6,
+B85,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 6. Be2 a6 7. O-O,
+B86,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 6. Bc4,Sozin Attack
+B87,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 6. Bc4 a6 7. Bb3,
+B88,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 6. Bc4 a6 7. Bb3 Be7,
+B89,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 6. Bc4 a6 7. Bb3 Be7 8. O-O,Velimirovic
+B90,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6,Najdorf
+B91,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. g3,
+B92,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Be2,
+B93,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. f4,
+B94,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Bg5,
+B95,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Bg5 e6,
+B96,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Bg5 e6 7. f4,
+B97,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Bg5 e6 7. f4 Qb6,Poisoned Pawn
+B98,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Bg5 e6 7. f4 Be7,
+B99,Sicilian Defense,1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Bg5 e6 7. f4 Be7 8. Qf3 Qc7 9. O-O-O,Main Line
+C00,French Defense,1. e4 e6,
+C01,French Defense,1. e4 e6 2. d4 d5 3. exd5,Exchange
+C02,French Defense,1. e4 e6 2. d4 d5 3. e5,Advance
+C03,French Defense,1. e4 e6 2. d4 d5 3. Nd2,Tarrasch
+C04,French Defense,1. e4 e6 2. d4 d5 3. Nd2 Nf6 4. e5 Nfd7,
+C05,French Defense,1. e4 e6 2. d4 d5 3. Nd2 Nf6 4. e5 Nfd7 5. f4,Tarrasch
+C06,French Defense,1. e4 e6 2. d4 d5 3. Nd2 Nf6 4. e5 Nfd7 5. Bd3,Tarrasch
+C07,French Defense,1. e4 e6 2. d4 d5 3. Nd2 c5,Tarrasch
+C08,French Defense,1. e4 e6 2. d4 d5 3. Nd2 c5 4. exd5 exd5,
+C09,French Defense,1. e4 e6 2. d4 d5 3. Nd2 c5 4. exd5 exd5 5. Ngf3 Nc6,
+C10,French Defense,1. e4 e6 2. d4 d5 3. Nc3,
+C11,French Defense,1. e4 e6 2. d4 d5 3. Nc3 Nf6,
+C12,French Defense,1. e4 e6 2. d4 d5 3. Nc3 Nf6 4. Bg5,MacCutcheon
+C13,French Defense,1. e4 e6 2. d4 d5 3. Nc3 Nf6 4. Bg5 Be7,Classical
+C14,French Defense,1. e4 e6 2. d4 d5 3. Nc3 Nf6 4. Bg5 Be7 5. e5 Nfd7 6. Bxe7,
+C15,French Defense,1. e4 e6 2. d4 d5 3. Nc3 Bb4,Winawer
+C16,French Defense,1. e4 e6 2. d4 d5 3. Nc3 Bb4 4. e5,
+C17,French Defense,1. e4 e6 2. d4 d5 3. Nc3 Bb4 4. e5 c5,
+C18,French Defense,1. e4 e6 2. d4 d5 3. Nc3 Bb4 4. e5 c5 5. a3 Bxc3+ 6. bxc3,
+C19,French Defense,1. e4 e6 2. d4 d5 3. Nc3 Bb4 4. e5 c5 5. a3 Bxc3+ 6. bxc3 Ne7,
+C20,King's Pawn Game,1. e4 e5,
+C21,Center Game,1. e4 e5 2. d4,
+C22,Center Game,1. e4 e5 2. d4 exd4 3. Qxd4,
+C23,Bishop's Opening,1. e4 e5 2. Bc4,
+C24,Bishop's Opening,1. e4 e5 2. Bc4 Nf6,
+C25,Vienna Game,1. e4 e5 2. Nc3,
+C26,Vienna Game,1. e4 e5 2. Nc3 Nf6,
+C27,Vienna Game,1. e4 e5 2. Nc3 Nf6 3. Bc4,
+C28,Vienna Game,1. e4 e5 2. Nc3 Nf6 3. Bc4 Nc6,
+C29,Vienna Gambit,1. e4 e5 2. Nc3 Nf6 3. f4,
+C30,King's Gambit,1. e4 e5 2. f4,
+C31,King's Gambit Declined,1. e4 e5 2. f4 d5,Falkbeer
+C32,King's Gambit Declined,1. e4 e5 2. f4 d5 3. exd5 e4 4. d3,
+C33,King's Gambit Accepted,1. e4 e5 2. f4 exf4,
+C34,King's Gambit Accepted,1. e4 e5 2. f4 exf4 3. Nf3,
+C35,King's Gambit Accepted,1. e4 e5 2. f4 exf4 3. Nf3 Be7,Cunningham
+C36,King's Gambit Accepted,1. e4 e5 2. f4 exf4 3. Nf3 d5,Modern
+C37,King's Gambit Accepted,1. e4 e5 2. f4 exf4 3. Nf3 g5 4. Bc4,Muzio Gambit
+C38,King's Gambit Accepted,1. e4 e5 2. f4 exf4 3. Nf3 g5 4. Bc4 Bg7,
+C39,King's Gambit Accepted,1. e4 e5 2. f4 exf4 3. Nf3 g5 4. h4,Kieseritzky
+C40,King's Pawn Game,1. e4 e5 2. Nf3,
+C41,Philidor Defense,1. e4 e5 2. Nf3 d6,
+C42,Petrov Defense,1. e4 e5 2. Nf3 Nf6,
+C43,Petrov Defense,1. e4 e5 2. Nf3 Nf6 3. d4,Modern
+C44,King's Pawn Game,1. e4 e5 2. Nf3 Nc6,
+C45,Scotch Game,1. e4 e5 2. Nf3 Nc6 3. d4,
+C46,Three Knights Game,1. e4 e5 2. Nf3 Nc6 3. Nc3,
+C47,Four Knights Game,1. e4 e5 2. Nf3 Nc6 3. Nc3 Nf6,
+C48,Four Knights Game,1. e4 e5 2. Nf3 Nc6 3. Nc3 Nf6 4. Bb5,Spanish
+C49,Four Knights Game,1. e4 e5 2. Nf3 Nc6 3. Nc3 Nf6 4. Bb5 Bb4,Symmetrical
+C50,Italian Game,1. e4 e5 2. Nf3 Nc6 3. Bc4,
+C51,Evans Gambit,1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. b4,
+C52,Evans Gambit,1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. b4 Bxb4 5. c3,
+C53,Giuoco Piano,1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3,
+C54,Giuoco Piano,1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Nf6 5. d4,
+C55,Two Knights Defense,1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6,
+C56,Two Knights Defense,1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4,
+C57,Two Knights Defense,1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5,Fried Liver
+C58,Two Knights Defense,1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Na5,
+C59,Two Knights Defense,1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Na5 6. Bb5+ c6 7. dxc6 bxc6 8. Be2,
+C60,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5,Spanish
+C61,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 Nd4,Bird Defense
+C62,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 d6,Steinitz
+C63,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 f5,Schliemann
+C64,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 Bc5,Classical
+C65,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6,Berlin
+C66,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O,
+C67,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4,Berlin
+C68,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Bxc6,Exchange
+C69,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Bxc6 dxc6 5. O-O,
+C70,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4,
+C71,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 d6,Modern Steinitz
+C72,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 d6 5. O-O,
+C73,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 d6 5. Bxc6+,
+C74,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 d6 5. c3,
+C75,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 d6 5. c3 Bd7,
+C76,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 d6 5. c3 Bd7 6. d4,
+C77,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6,Morphy
+C78,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O,
+C79,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O d6,Steinitz Deferred
+C80,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Nxe4,Open
+C81,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Nxe4 6. d4 b5 7. Bb3,
+C82,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Nxe4 6. d4 b5 7. Bb3 d5 8. dxe5 Be6,
+C83,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Nxe4 6. d4 b5 7. Bb3 d5 8. dxe5 Be6 9. c3,
+C84,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7,Closed
+C85,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Bxc6,Exchange Delayed
+C86,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Qe2,Worrall
+C87,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 d6,Averbakh
+C88,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3,Closed
+C89,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d5,Marshall Attack
+C90,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d6,Closed
+C91,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d6 9. d4,Yurtaev
+C92,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d6 9. h3,Closed
+C93,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d6 9. h3 h6,Smyslov
+C94,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d6 9. h3 Nb8,Breyer
+C95,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d6 9. h3 Nb8 10. d4,
+C96,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d6 9. h3 Na5 10. Bc2,Chigorin
+C97,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d6 9. h3 Na5 10. Bc2 c5 11. d4,Chigorin
+C98,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d6 9. h3 Na5 10. Bc2 c5 11. d4 Qc7,
+C99,Ruy Lopez,1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d6 9. h3 Na5 10. Bc2 c5 11. d4 Qc7 12. Nbd2,
+D00,Queen's Pawn,1. d4 d5,
+D01,Richter-Veresov Attack,1. d4 d5 2. Nc3 Nf6 3. Bg5,
+D02,Queen's Pawn,1. d4 d5 2. Nf3,
+D03,Torre Attack,1. d4 d5 2. Nf3 Nf6 3. Bg5,
+D04,Colle System,1. d4 d5 2. Nf3 Nf6 3. e3,
+D05,Colle System,1. d4 d5 2. Nf3 Nf6 3. e3 e6,
+D06,Queen's Gambit,1. d4 d5 2. c4,
+D07,Queen's Gambit Declined,1. d4 d5 2. c4 Nc6,Chigorin
+D08,Queen's Gambit Declined,1. d4 d5 2. c4 e5,Albin Countergambit
+D09,Queen's Gambit Declined,1. d4 d5 2. c4 e5 3. dxe5 d4,
+D10,Queen's Gambit Declined,1. d4 d5 2. c4 c6,Slav
+D11,Queen's Gambit Declined,1. d4 d5 2. c4 c6 3. Nf3,Slav
+D12,Queen's Gambit Declined,1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. e3,
+D13,Queen's Gambit Declined,1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. cxd5,Exchange Slav
+D14,Queen's Gambit Declined,1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. cxd5 cxd5 5. Nc3 Nc6 6. Bf4,
+D15,Queen's Gambit Declined,1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3,Slav
+D16,Queen's Gambit Declined,1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3 dxc4,Slav Accepted
+D17,Queen's Gambit Declined,1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3 dxc4 5. a4 Bf5,
+D18,Queen's Gambit Declined,1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3 dxc4 5. a4 Bf5 6. e3,
+D19,Queen's Gambit Declined,1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3 dxc4 5. a4 Bf5 6. e3 e6 7. Bxc4,
+D20,Queen's Gambit Accepted,1. d4 d5 2. c4 dxc4,
+D21,Queen's Gambit Accepted,1. d4 d5 2. c4 dxc4 3. Nf3,
+D22,Queen's Gambit Accepted,1. d4 d5 2. c4 dxc4 3. Nf3 a6,
+D23,Queen's Gambit Accepted,1. d4 d5 2. c4 dxc4 3. Nf3 Nf6,
+D24,Queen's Gambit Accepted,1. d4 d5 2. c4 dxc4 3. Nf3 Nf6 4. Nc3,
+D25,Queen's Gambit Accepted,1. d4 d5 2. c4 dxc4 3. Nf3 Nf6 4. e3,
+D26,Queen's Gambit Accepted,1. d4 d5 2. c4 dxc4 3. Nf3 Nf6 4. e3 e6,
+D27,Queen's Gambit Accepted,1. d4 d5 2. c4 dxc4 3. Nf3 Nf6 4. e3 e6 5. Bxc4,
+D28,Queen's Gambit Accepted,1. d4 d5 2. c4 dxc4 3. Nf3 Nf6 4. e3 e6 5. Bxc4 c5,
+D29,Queen's Gambit Accepted,1. d4 d5 2. c4 dxc4 3. Nf3 Nf6 4. e3 e6 5. Bxc4 c5 6. O-O,
+D30,Queen's Gambit Declined,1. d4 d5 2. c4 e6,
+D31,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3,
+D32,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 c5,Tarrasch
+D33,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 c5 4. cxd5 exd5 5. Nf3,
+D34,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 c5 4. cxd5 exd5 5. Nf3 Nc6 6. g3,
+D35,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6,
+D36,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. cxd5 exd5 5. Bg5,Exchange
+D37,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3,
+D38,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 Bb4,Ragozin
+D39,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 Bb4 5. Bg5 dxc4,
+D40,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 c5,Semi-Tarrasch
+D41,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 c5 5. cxd5,
+D42,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 c5 5. cxd5 Nxd5 6. e3,
+D43,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 c6,Semi-Slav
+D44,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 c6 5. Bg5 dxc4,
+D45,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 c6 5. e3,Semi-Slav
+D46,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 c6 5. e3 Nbd7 6. Bd3,
+D47,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 c6 5. e3 Nbd7 6. Bd3 dxc4 7. Bxc4,Meran
+D48,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 c6 5. e3 Nbd7 6. Bd3 dxc4 7. Bxc4 b5 8. Bd3,
+D49,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 c6 5. e3 Nbd7 6. Bd3 dxc4 7. Bxc4 b5 8. Bd3 Bb7,
+D50,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5,
+D51,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Nbd7,
+D52,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Nbd7 5. e3 c6 6. Nf3,
+D53,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7,
+D54,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Rc1,
+D55,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3,
+D56,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 h6 7. Bh4,
+D57,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 h6 7. Bh4 Ne4,Lasker
+D58,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 h6 7. Bh4 b6,Tartakower
+D59,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 h6 7. Bh4 b6 8. cxd5 Nxd5,
+D60,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 Nbd7,Orthodox
+D61,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 Nbd7 7. Qc2,
+D62,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 Nbd7 7. Qc2 c5,
+D63,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 Nbd7 7. Rc1,
+D64,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 Nbd7 7. Rc1 c6 8. Qc2,
+D65,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 Nbd7 7. Rc1 c6 8. Qc2 a6,
+D66,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 Nbd7 7. Rc1 c6 8. Bd3,
+D67,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 Nbd7 7. Rc1 c6 8. Bd3 dxc4 9. Bxc4,
+D68,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 Nbd7 7. Rc1 c6 8. Bd3 dxc4 9. Bxc4 Nd5,
+D69,Queen's Gambit Declined,1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 6. Nf3 Nbd7 7. Rc1 c6 8. Bd3 dxc4 9. Bxc4 Nd5 10. Bxe7,
+D70,Neo-Grünfeld,1. d4 Nf6 2. c4 g6 3. f3,
+D71,Neo-Grünfeld,1. d4 Nf6 2. c4 g6 3. g3 d5,
+D72,Neo-Grünfeld,1. d4 Nf6 2. c4 g6 3. g3 d5 4. Bg2 Bg7 5. cxd5 Nxd5,
+D73,Neo-Grünfeld,1. d4 Nf6 2. c4 g6 3. g3 d5 4. Bg2 Bg7 5. Nf3,
+D74,Neo-Grünfeld,1. d4 Nf6 2. c4 g6 3. g3 d5 4. Bg2 Bg7 5. Nf3 O-O 6. cxd5 Nxd5 7. O-O,
+D75,Neo-Grünfeld,1. d4 Nf6 2. c4 g6 3. g3 d5 4. Bg2 Bg7 5. Nf3 O-O 6. cxd5 Nxd5 7. O-O c5 8. dxc5,
+D76,Neo-Grünfeld,1. d4 Nf6 2. c4 g6 3. g3 d5 4. Bg2 Bg7 5. Nf3 O-O 6. cxd5 Nxd5 7. O-O Nb6,
+D77,Neo-Grünfeld,1. d4 Nf6 2. c4 g6 3. g3 d5 4. Bg2 Bg7 5. Nf3 O-O 6. O-O,
+D78,Neo-Grünfeld,1. d4 Nf6 2. c4 g6 3. g3 d5 4. Bg2 Bg7 5. Nf3 O-O 6. O-O c6,
+D79,Neo-Grünfeld,1. d4 Nf6 2. c4 g6 3. g3 d5 4. Bg2 Bg7 5. Nf3 O-O 6. O-O c6 7. cxd5 cxd5,
+D80,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5,
+D81,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Qb3,Russian
+D82,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Bf4,
+D83,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Bf4 Bg7 5. e3 O-O,
+D84,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Bf4 Bg7 5. e3 O-O 6. cxd5,
+D85,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. cxd5 Nxd5 5. e4,Exchange
+D86,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. cxd5 Nxd5 5. e4 Nxc3 6. bxc3 Bg7 7. Bc4,
+D87,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. cxd5 Nxd5 5. e4 Nxc3 6. bxc3 Bg7 7. Bc4 c5 8. Ne2,
+D88,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. cxd5 Nxd5 5. e4 Nxc3 6. bxc3 Bg7 7. Bc4 c5 8. Ne2 Nc6 9. Be3 O-O 10. O-O,
+D89,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. cxd5 Nxd5 5. e4 Nxc3 6. bxc3 Bg7 7. Bc4 c5 8. Ne2 Nc6 9. Be3 O-O 10. O-O Bg4,
+D90,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Nf3,
+D91,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Nf3 Bg7 5. Bg5,
+D92,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Nf3 Bg7 5. Bf4,
+D93,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Nf3 Bg7 5. Bf4 O-O 6. e3,
+D94,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Nf3 Bg7 5. e3,
+D95,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Nf3 Bg7 5. e3 O-O 6. Qb3,
+D96,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Nf3 Bg7 5. Qb3,Russian
+D97,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Nf3 Bg7 5. Qb3 dxc4 6. Qxc4 O-O 7. e4,
+D98,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Nf3 Bg7 5. Qb3 dxc4 6. Qxc4 O-O 7. e4 Bg4,
+D99,Grünfeld Defense,1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Nf3 Bg7 5. Qb3 dxc4 6. Qxc4 O-O 7. e4 Bg4 8. Be3 Nfd7 9. Qb3,Smyslov
+E00,Queen's Pawn,1. d4 Nf6 2. c4 e6,Catalan
+E01,Catalan,1. d4 Nf6 2. c4 e6 3. g3 d5 4. Bg2,Closed
+E02,Catalan,1. d4 Nf6 2. c4 e6 3. g3 d5 4. Bg2 dxc4 5. Nf3,Open
+E03,Catalan,1. d4 Nf6 2. c4 e6 3. g3 d5 4. Bg2 dxc4 5. Nf3 Nc6,
+E04,Catalan,1. d4 Nf6 2. c4 e6 3. g3 d5 4. Bg2 dxc4 5. Nf3 Be7,
+E05,Catalan,1. d4 Nf6 2. c4 e6 3. g3 d5 4. Bg2 dxc4 5. Nf3 Be7 6. O-O,
+E06,Catalan,1. d4 Nf6 2. c4 e6 3. g3 d5 4. Bg2 Be7,Closed
+E07,Catalan,1. d4 Nf6 2. c4 e6 3. g3 d5 4. Bg2 Be7 5. Nf3 O-O 6. O-O,
+E08,Catalan,1. d4 Nf6 2. c4 e6 3. g3 d5 4. Bg2 Be7 5. Nf3 O-O 6. O-O Nbd7,
+E09,Catalan,1. d4 Nf6 2. c4 e6 3. g3 d5 4. Bg2 Be7 5. Nf3 O-O 6. O-O Nbd7 7. Qc2 c6 8. Nbd2,
+E10,Queen's Pawn,1. d4 Nf6 2. c4 e6 3. Nf3,
+E11,Bogo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nf3 Bb4+,
+E12,Queen's Indian Defense,1. d4 Nf6 2. c4 e6 3. Nf3 b6,
+E13,Queen's Indian Defense,1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. Nc3 Bb7 5. Bg5,
+E14,Queen's Indian Defense,1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. e3,
+E15,Queen's Indian Defense,1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. g3,
+E16,Queen's Indian Defense,1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. g3 Bb7,
+E17,Queen's Indian Defense,1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. g3 Bb7 5. Bg2 Be7,
+E18,Queen's Indian Defense,1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. g3 Bb7 5. Bg2 Be7 6. O-O O-O 7. Nc3,
+E19,Queen's Indian Defense,1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. g3 Bb7 5. Bg2 Be7 6. O-O O-O 7. Nc3 Ne4 8. Qc2,
+E20,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4,
+E21,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Nf3,Three Knights
+E22,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qb3,Spielmann
+E23,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qb3 c5 5. dxc5 Nc6,
+E24,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. a3,Sämisch
+E25,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. a3 Bxc3+ 5. bxc3,
+E26,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. a3 Bxc3+ 5. bxc3 c5 6. e3,
+E27,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. a3 Bxc3+ 5. bxc3 O-O,
+E28,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3,
+E29,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 c5 5. Bd3 Nc6,
+E30,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Bg5,Leningrad
+E31,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Bg5 h6 5. Bh4,
+E32,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2,Classical
+E33,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 Nc6,
+E34,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 d5,
+E35,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 d5 5. cxd5 exd5,
+E36,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 d5 5. a3,
+E37,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 d5 5. a3 Bxc3+ 6. Qxc3 Ne4,
+E38,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5,
+E39,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5 5. dxc5 O-O,
+E40,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3,Rubinstein
+E41,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 c5,
+E42,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 c5 5. Ne2,
+E43,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 b6,
+E44,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 b6 5. Ne2,
+E45,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 b6 5. Ne2 Ba6,
+E46,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O,
+E47,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Bd3,
+E48,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Bd3 d5,
+E49,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Bd3 d5 6. a3 Bxc3+ 7. bxc3,
+E50,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Nf3,
+E51,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Nf3 d5 6. Bd3,
+E52,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Nf3 d5 6. Bd3 b6,
+E53,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Nf3 d5 6. Bd3 c5,
+E54,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Nf3 d5 6. Bd3 c5 7. O-O,
+E55,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Nf3 d5 6. Bd3 c5 7. O-O dxc4 8. Bxc4,
+E56,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Nf3 d5 6. Bd3 c5 7. O-O Nc6,
+E57,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Nf3 d5 6. Bd3 c5 7. O-O Nc6 8. a3 Bxc3 9. bxc3,
+E58,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Nf3 d5 6. Bd3 c5 7. O-O Nc6 8. a3 Bxc3 9. bxc3 dxc4 10. Bxc4,
+E59,Nimzo-Indian Defense,1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Nf3 d5 6. Bd3 c5 7. O-O Nc6 8. a3 Bxc3 9. bxc3 dxc4 10. Bxc4 Qc7,
+E60,King's Indian Defense,1. d4 Nf6 2. c4 g6,
+E61,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3,
+E62,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. Nf3 d6 5. g3,Fianchetto
+E63,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. Nf3 d6 5. g3 O-O 6. Bg2 Nc6 7. O-O,
+E64,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. Nf3 d6 5. g3 O-O 6. Bg2 c5,
+E65,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. Nf3 d6 5. g3 O-O 6. Bg2 c5 7. O-O,
+E66,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. Nf3 d6 5. g3 O-O 6. Bg2 c5 7. O-O Nc6 8. d5,
+E67,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. Nf3 d6 5. g3 O-O 6. Bg2 Nbd7,
+E68,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. Nf3 d6 5. g3 O-O 6. Bg2 Nbd7 7. O-O e5 8. e4,
+E69,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. Nf3 d6 5. g3 O-O 6. Bg2 Nbd7 7. O-O e5 8. e4 c6 9. h3,
+E70,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4,
+E71,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. h3,
+E72,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. g3,
+E73,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Be2,
+E74,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Be2 O-O 6. Bg5,Averbakh
+E75,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Be2 O-O 6. Bg5 c5,
+E76,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f4,Four Pawns
+E77,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f4 O-O 6. Be2,
+E78,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f4 O-O 6. Be2 c5 7. Nf3,
+E79,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f4 O-O 6. Be2 c5 7. Nf3 cxd4 8. Nxd4,
+E80,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f3,Sämisch
+E81,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f3 O-O,
+E82,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f3 O-O 6. Be3,
+E83,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f3 O-O 6. Be3 Nc6 7. Nge2,
+E84,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f3 O-O 6. Be3 Nc6 7. Nge2 a6,
+E85,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f3 O-O 6. Be3 e5,
+E86,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f3 O-O 6. Be3 e5 7. Nge2 c6,
+E87,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f3 O-O 6. Be3 e5 7. d5,
+E88,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f3 O-O 6. Be3 e5 7. d5 c6,
+E89,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f3 O-O 6. Be3 e5 7. d5 c6 8. Nge2,
+E90,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3,Classical
+E91,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2,
+E92,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5,
+E93,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. d5,Petrosian
+E94,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. O-O,
+E95,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. O-O Nbd7,
+E96,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. O-O Nbd7 8. Re1,
+E97,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. O-O Nc6,
+E98,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. O-O Nc6 8. d5 Ne7 9. Ne1,
+E99,King's Indian Defense,1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. O-O Nc6 8. d5 Ne7 9. Ne1 Nd7 10. f3,

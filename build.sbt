@@ -72,6 +72,15 @@ lazy val Chess = project
       // Pekko actors
       "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
 
+      // Database - MongoDB (using mongo4cats for functional API)
+      "io.github.kirill5k" %% "mongo4cats-core" % "0.7.9",
+      "io.github.kirill5k" %% "mongo4cats-circe" % "0.7.9",
+
+      // Database - PostgreSQL with Doobie (functional SQL)
+      "org.tpolecat" %% "doobie-core" % "1.0.0-RC5",
+      "org.tpolecat" %% "doobie-postgres" % "1.0.0-RC5",
+      "org.tpolecat" %% "doobie-hikari" % "1.0.0-RC5",
+
       // Logging
       "ch.qos.logback" % "logback-classic" % "1.5.6" % Runtime
     ),
