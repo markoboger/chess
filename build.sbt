@@ -48,7 +48,20 @@ lazy val Chess = project
       "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0",
       "com.lihaoyi" %% "fastparse" % "3.1.1",
       "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
-      "ch.qos.logback"    % "logback-classic"   % "1.5.6" % Runtime
+      "ch.qos.logback"    % "logback-classic"   % "1.5.6" % Runtime,
+      // Database dependencies
+      "org.typelevel" %% "cats-effect" % "3.5.4",
+      "io.github.kirill5k" %% "mongo4cats-core" % "0.7.8",
+      "io.github.kirill5k" %% "mongo4cats-circe" % "0.7.8",
+      "org.tpolecat" %% "doobie-core" % "1.0.0-RC5",
+      "org.tpolecat" %% "doobie-hikari" % "1.0.0-RC5",
+      "org.tpolecat" %% "doobie-postgres" % "1.0.0-RC5",
+      "org.postgresql" % "postgresql" % "42.7.3",
+      "com.zaxxer" % "HikariCP" % "5.1.0",
+      "org.testcontainers" % "testcontainers" % "1.19.8" % Test,
+      "org.testcontainers" % "postgresql" % "1.19.8" % Test,
+      "org.testcontainers" % "mongodb" % "1.19.8" % Test,
+      "de.flapdoodle.embed" % "de.flapdoodle.embed.mongo" % "4.13.1" % Test
     ),
     coverageExcludedFiles := ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*",
     coverageMinimumStmtTotal := 40,
