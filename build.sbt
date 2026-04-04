@@ -48,7 +48,15 @@ lazy val Chess = project
       "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0",
       "com.lihaoyi" %% "fastparse" % "3.1.1",
       "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
-      "ch.qos.logback"    % "logback-classic"   % "1.5.6" % Runtime
+      "ch.qos.logback"    % "logback-classic"   % "1.5.6" % Runtime,
+      // Kafka dependencies - using fs2-kafka for functional streaming
+      "com.github.fd4s" %% "fs2-kafka" % "3.5.1",
+      "org.typelevel" %% "cats-effect" % "3.5.4",
+      // http4s for REST API and SSE
+      "org.http4s" %% "http4s-ember-server" % "0.23.27",
+      "org.http4s" %% "http4s-ember-client" % "0.23.27",
+      "org.http4s" %% "http4s-dsl" % "0.23.27",
+      "org.http4s" %% "http4s-circe" % "0.23.27"
     ),
     coverageExcludedFiles := ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*",
     coverageMinimumStmtTotal := 40,
