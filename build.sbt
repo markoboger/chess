@@ -8,7 +8,7 @@ val javafxClassifier = {
     case n if n.contains("linux")   => "linux"
     case n if n.contains("mac")     => "mac"
     case n if n.contains("windows") => "win"
-    case other => throw new RuntimeException(s"Unknown OS: $other")
+    case other                      => throw new RuntimeException(s"Unknown OS: $other")
   }
   val arch = sys.props("os.arch") match {
     case "aarch64" | "arm64" => "-aarch64"
@@ -48,7 +48,12 @@ lazy val Chess = project
       "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0",
       "com.lihaoyi" %% "fastparse" % "3.1.1",
       "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
-      "ch.qos.logback"    % "logback-classic"   % "1.5.6" % Runtime,
+      "ch.qos.logback" % "logback-classic" % "1.5.6" % Runtime,
+      // http4s (for microservices)
+      "org.http4s" %% "http4s-dsl" % "0.23.30",
+      "org.http4s" %% "http4s-ember-server" % "0.23.30",
+      "org.http4s" %% "http4s-ember-client" % "0.23.30",
+      "org.http4s" %% "http4s-circe" % "0.23.30",
       // Database dependencies
       "org.typelevel" %% "cats-effect" % "3.5.4",
       "io.github.kirill5k" %% "mongo4cats-core" % "0.7.8",

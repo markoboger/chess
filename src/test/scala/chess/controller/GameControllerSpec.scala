@@ -299,7 +299,7 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       controller.pgnText shouldBe "1. e4 e5"
 
       controller.applyPgnMove("Nf3")
-      controller.pgnText shouldBe "1. e4 e5 2. Nf3"
+      controller.pgnText shouldBe "1. e4 e5\n2. Nf3"
     }
 
     "record PGN for coordinate moves" in {
