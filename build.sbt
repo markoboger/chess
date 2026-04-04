@@ -61,7 +61,13 @@ lazy val Chess = project
       "org.testcontainers" % "testcontainers" % "1.19.8" % Test,
       "org.testcontainers" % "postgresql" % "1.19.8" % Test,
       "org.testcontainers" % "mongodb" % "1.19.8" % Test,
-      "de.flapdoodle.embed" % "de.flapdoodle.embed.mongo" % "4.13.1" % Test
+      "de.flapdoodle.embed" % "de.flapdoodle.embed.mongo" % "4.13.1" % Test,
+      // Lichess Bot API dependencies
+      "org.http4s" %% "http4s-ember-client" % "0.23.27",
+      "org.http4s" %% "http4s-circe" % "0.23.27",
+      "org.http4s" %% "http4s-dsl" % "0.23.27",
+      "co.fs2" %% "fs2-core" % "3.10.2",
+      "com.github.pureconfig" %% "pureconfig-core" % "0.17.6"
     ),
     coverageExcludedFiles := ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*",
     coverageMinimumStmtTotal := 40,
