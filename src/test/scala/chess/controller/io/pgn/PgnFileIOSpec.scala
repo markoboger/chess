@@ -13,7 +13,7 @@ class PgnFileIOSpec extends AnyWordSpec with Matchers {
 
     "format moves with move numbers" in {
       val moves = Vector("e4", "e5", "Nf3", "Nc6")
-      pgnIO.save(moves) shouldBe "1. e4 e5 2. Nf3 Nc6"
+      pgnIO.save(moves) shouldBe "1. e4 e5\n2. Nf3 Nc6"
     }
 
     "handle a single move" in {
@@ -21,7 +21,7 @@ class PgnFileIOSpec extends AnyWordSpec with Matchers {
     }
 
     "handle an odd number of moves" in {
-      pgnIO.save(Vector("e4", "e5", "Nf3")) shouldBe "1. e4 e5 2. Nf3"
+      pgnIO.save(Vector("e4", "e5", "Nf3")) shouldBe "1. e4 e5\n2. Nf3"
     }
 
     "return empty string for no moves" in {

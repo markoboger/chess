@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: chess-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: chess
+      MONGO_INITDB_ROOT_PASSWORD: chess123
+      MONGO_INITDB_DATABASE: chess
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - chess-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/chess --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: chess-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: chess
+      POSTGRES_PASSWORD: chess123
+      POSTGRES_DB: chess
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - chess-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chess"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  game-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.game-service
+    container_name: chess-game-service
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - CHESS_DB=mongodb
+      - MONGO_URI=mongodb://chess:chess123@mongodb:27017
+      - MONGO_DATABASE=chess
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=chess
+      - POSTGRES_USER=chess
+      - POSTGRES_PASSWORD=chess123
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - chess-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.api-gateway
+    container_name: chess-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - GAME_SERVICE_URL=http://game-service:8081
+    depends_on:
+      game-service:
+        condition: service_healthy
+    networks:
+      - chess-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  vue-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.vue-ui
+    container_name: chess-vue-ui
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    depends_on:
+      - api-gateway
+    networks:
+      - chess-network
+
+networks:
+  chess-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
+  postgres_data:
+    driver: local

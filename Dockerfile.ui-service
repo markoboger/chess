@@ -1,0 +1,37 @@
+# Dockerfile for UI Service
+FROM sbtscala/scala-sbt:eclipse-temurin-jammy-21.0.5_11_1.10.6_3.5.2 AS builder
+
+WORKDIR /app
+
+# Copy build files
+COPY build.sbt .
+COPY project project/
+
+# Download dependencies
+RUN sbt update
+
+# Copy source code
+COPY src src/
+
+# Build the application
+RUN sbt compile stage
+
+# Runtime image
+FROM eclipse-temurin:21-jre-jammy
+
+WORKDIR /app
+
+# Copy built application from builder
+COPY --from=builder /app/target/universal/stage /app
+
+# Copy static files
+COPY services/ui/static /app/services/ui/static
+
+# Expose UI Service port
+EXPOSE 8082
+
+# Set environment
+ENV PORT=8082
+
+# Run the UI Service
+CMD ["/app/bin/chess", "-main", "chess.microservices.ui.UIServer"]

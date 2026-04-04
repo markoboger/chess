@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Microservices Demo</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Chess Microservices Architecture</h1>
+        <p class="subtitle">Lecture 6: Distributed Chess Application</p>
+
+        <div class="architecture-info">
+            <h3>Service Architecture</h3>
+            <div class="services">
+                <div class="service">
+                    <strong>API Gateway</strong> (this page)<br>
+                    <span class="endpoint">http://localhost:8080</span>
+                </div>
+                <div class="service">
+                    <strong>Game Service</strong><br>
+                    <span class="endpoint">http://localhost:8081</span>
+                </div>
+                <div class="service">
+                    <strong>UI Service</strong><br>
+                    <span class="endpoint">http://localhost:8082</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="game-section">
+            <h2>Chess Game</h2>
+
+            <div class="controls">
+                <button id="newGame" class="btn btn-primary">New Game</button>
+                <span id="gameId" class="game-id"></span>
+            </div>
+
+            <div class="game-container">
+                <div class="board-section">
+                    <div id="board" class="board"></div>
+                    <div class="fen-section">
+                        <label>Current FEN Position:</label>
+                        <input type="text" id="fenDisplay" readonly>
+                        <button id="copyFen" class="btn btn-small">Copy</button>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <div class="move-input">
+                        <h3>Make a Move</h3>
+                        <div class="input-group">
+                            <input type="text" id="moveInput" placeholder="e.g., e4, Nf3, O-O">
+                            <button id="makeMove" class="btn">Move</button>
+                        </div>
+                        <p class="help-text">Enter move in algebraic notation</p>
+                    </div>
+
+                    <div class="game-status">
+                        <h3>Game Status</h3>
+                        <div id="status" class="status-display">No game started</div>
+                        <div id="lastEvent" class="event-display"></div>
+                    </div>
+
+                    <div class="move-history">
+                        <h3>Move History</h3>
+                        <div id="moveHistory" class="move-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="load-fen-section">
+                <h3>Load Custom Position</h3>
+                <div class="input-group">
+                    <input type="text" id="fenInput" placeholder="Enter FEN string">
+                    <button id="loadFen" class="btn">Load FEN</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="api-log">
+            <h3>API Call Log</h3>
+            <div id="apiLog" class="log-content"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -60,11 +60,16 @@ object FastParsePgnParser extends PgnIO {
   // --- public API -----------------------------------------------------------
 
   override def save(moves: Vector[String]): String =
-    moves.zipWithIndex
-      .map { case (move, i) =>
-        if (i % 2 == 0) s"${i / 2 + 1}. $move" else move
+    moves
+      .grouped(2)
+      .zipWithIndex
+      .map { case (pair, i) =>
+        pair match
+          case Vector(w, b) => s"${i + 1}. $w $b"
+          case Vector(w)    => s"${i + 1}. $w"
+          case _            => ""
       }
-      .mkString(" ")
+      .mkString("\n")
 
   override def load(input: String): Try[Vector[String]] =
     Try {
