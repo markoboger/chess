@@ -57,8 +57,6 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
                     gameEventEnum = component "GameEvent" "enum Moved | Check | Checkmate | Stalemate | ThreefoldRepetition. Produced by Board.move; carried inside MoveResult.Moved." "enum · GameEvent.scala"
 
                     moveErrorEnum = component "MoveError" "enum NoPiece | InvalidMove | LeavesKingInCheck | WrongColor | ParseError(msg: String) | PromotionRequired. Carried inside MoveResult.Failed." "enum · MoveError.scala"
-
-                    puzzleClass = component "Puzzle" "case class (id: String, fen: String, moves: List[String], rating: Int, ratingDeviation: Int, popularity: Int, nbPlays: Int, themes: List[String], gameUrl: String, openingTags: List[String])." "case class · Puzzle.scala"
                 }
 
                 # ── chess.controller (Level 4: one component per class/trait) ─
@@ -192,15 +190,24 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
 
             # ================================================================
             # UI SERVICE — chess.microservices.ui.UIServer :8082
+            # NOTE: Has Dockerfile.ui-service but is NOT deployed in docker-compose.yml.
+            # The Vue UI container (chess-vue-ui) fulfils the same role in the compose stack.
             # ================================================================
-            uiService = container "UI Service" "Serves static web front-end assets to browser clients." "Scala 3 / http4s Ember · port 8082" "Microservice" {
+            uiService = container "UI Service" "Serves static web front-end assets to browser clients. Has Dockerfile.ui-service but is NOT included in docker-compose.yml — the Vue UI container replaces it in the compose stack." "Scala 3 / http4s Ember · port 8082" "Microservice" {
                 group "chess.microservices.ui" {
                     uiServerComp = component "UIServer" "object (IOApp). Serves classpath /static files. Returns 404 for unknown paths. GET /health." "object · UIServer.scala"
                 }
             }
 
             # ================================================================
+            # VUE UI — Vue.js 3 SPA served by nginx  (docker-compose: chess-vue-ui)
+            # Deployed as a Docker container; replaces the Scala UI Service in the compose stack.
+            # ================================================================
+            vueUI = container "Vue UI" "Vue.js 3 single-page application built with Vite and TypeScript. Manages game state with Pinia; renders the chess board using chess.js; calls the API Gateway for all game operations. Built with 'npm run build' and served by nginx with SPA fallback routing." "Vue 3 / TypeScript / Pinia / Tailwind CSS / chess.js / nginx:alpine · host port 3000" "WebApp" {}
+
+            # ================================================================
             # SEEDER — chess.seeder subproject (one-shot CLI tool)
+            # NOTE: Has no Docker container — run locally via sbt.
             # ================================================================
             seeder = container "Seeder" "One-shot CLI tool that seeds the Lichess opening library into PostgreSQL and MongoDB. Run via: sbt 'seeder/runMain chess.seeder.SeedOpeningsApp'." "Scala 3 / Cats Effect IO · sbt subproject" "Application" {
                 group "chess.seeder" {
@@ -210,7 +217,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
             }
 
             # ── Databases ────────────────────────────────────────────────────
-            postgres = container "PostgreSQL" "Tables: games, openings. Accessed via Doobie HikariCP Transactor." "PostgreSQL 15" "Database"
+            postgres = container "PostgreSQL" "Tables: games, openings. Accessed via Doobie HikariCP Transactor." "PostgreSQL 16" "Database"
             mongodb  = container "MongoDB"    "Collections: games, openings. Accessed via mongo4cats."            "MongoDB 7"    "Database"
         }
 
@@ -221,13 +228,15 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
 
         # ── People → Containers ────────────────────────────────────────────────
         player    -> chess    "Launches desktop app"
-        player    -> gateway  "HTTP requests (browser / REST client)"
+        player    -> gateway  "HTTP requests (REST client)"
+        player    -> vueUI    "Opens web chess app" "HTTP browser"
         developer -> seeder   "Runs one-shot seeding CLI"
 
         # ── Container → Container ─────────────────────────────────────────────
         gateway     -> gameService "Proxies /api/games/*" "HTTP/JSON"
-        gateway     -> uiService   "Proxies /*"           "HTTP"
+        gateway     -> uiService   "Proxies /* (when ui-service is deployed)" "HTTP"
         gateway     -> chess       "Uses GatewayConfig (in-process)"
+        vueUI       -> gateway     "REST API calls via VITE_API_URL" "HTTP/JSON"
         gameService -> chess       "Uses chess engine, model, persistence (in-process)"
         uiService   -> chess       "Shares compiled codebase (in-process)"
         chess       -> postgres    "Reads / writes games and openings" "JDBC / Doobie"
@@ -324,6 +333,36 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         gatewayRoutesComp -> serviceProxyComp  "Delegates proxy"
         gatewayRoutesComp -> gatewayConfigComp "Reads service URLs"
         serviceProxyComp  -> gatewayConfigComp "Reads target base URLs"
+
+        # ── Deployment environments ─────────────────────────────────────────
+        # docker-compose.yml spins up five named containers on a single bridge
+        # network.  Not containerised: chess (desktop app), seeder (sbt CLI),
+        # uiService (Dockerfile.ui-service exists but not listed in compose).
+        deploymentEnvironment "Docker Compose" "Local dev / integration stack defined in docker-compose.yml. All five containers share the 'chess-network' Docker bridge. Persistent volumes: mongodb_data, postgres_data." {
+
+            deploymentNode "chess-network" "Docker bridge network shared by all compose services" "Docker bridge" {
+
+                deploymentNode "chess-mongodb" "MongoDB database container" "Image: mongo:7.0 · port 27017 · volume: mongodb_data · healthcheck: mongosh ping" {
+                    containerInstance mongodb
+                }
+
+                deploymentNode "chess-postgres" "PostgreSQL database container" "Image: postgres:16-alpine · port 5432 · volume: postgres_data · healthcheck: pg_isready" {
+                    containerInstance postgres
+                }
+
+                deploymentNode "chess-game-service" "Game Service JVM container" "Image: eclipse-temurin:21-jre · port 8081 · Built from Dockerfile.game-service · depends_on: mongodb (healthy), postgres (healthy)" {
+                    containerInstance gameService
+                }
+
+                deploymentNode "chess-api-gateway" "API Gateway JVM container" "Image: eclipse-temurin:21-jre · port 8080 · Built from Dockerfile.gateway · depends_on: game-service (healthy)" {
+                    containerInstance gateway
+                }
+
+                deploymentNode "chess-vue-ui" "Vue.js frontend nginx container" "Image: nginx:alpine · host port 3000 → container port 80 · Built from Dockerfile.vue-ui · depends_on: api-gateway" {
+                    containerInstance vueUI
+                }
+            }
+        }
     }
 
     views {
@@ -416,6 +455,13 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
             title "Level 4 - chess.aview + chess root (views, wiring, entry points)"
         }
 
+        # ── Deployment — Docker Compose stack ────────────────────────────────────
+        deployment chessSystem "Docker Compose" "Deployment_DockerCompose" {
+            include *
+            autoLayout
+            title "Deployment - Docker Compose (docker-compose.yml): chess-mongodb, chess-postgres, chess-game-service, chess-api-gateway, chess-vue-ui"
+        }
+
         # ── Styles ────────────────────────────────────────────────────────────
         styles {
             element "Person" {
@@ -443,6 +489,11 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
             element "Database" {
                 shape Cylinder
                 background #6B3A9C
+                color #ffffff
+            }
+            element "WebApp" {
+                shape WebBrowser
+                background #E65100
                 color #ffffff
             }
             element "Component" {
