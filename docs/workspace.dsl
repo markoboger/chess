@@ -13,149 +13,16 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         chessSystem = softwareSystem "Chess Application" "Desktop chess app plus HTTP microservices, all sharing one compiled Scala codebase." {
 
             # ================================================================
-            # CHESS — the main application package (chess.*)
-            # Entry points: ChessApp (desktop), GameServer, GatewayServer, UIServer
-            # All runtime processes are compiled from this single sbt project.
+            # DESKTOP APP — chess.aview + chess root  (NOT a Docker container)
+            # Launched locally via: sbt run --gui  or  sbt run --console
             # ================================================================
-            chess = container "Chess" "All application layers compiled into one JVM artifact. Entry points select which subsystem to launch (desktop GUI, console, or microservice)." "Scala 3 / JVM" "Application" {
+            desktopApp = container "Chess Desktop App" "JavaFX/ScalaFX desktop chess application. Runs as a local JVM process; NOT deployed as a Docker container. Launches ChessGUI (graphical board, clock, opening recognition) or ConsoleView (ANSI terminal)." "Scala 3 / JavaFX 21 / ScalaFX · local JVM" "Application" {
 
-                # ── chess.util ────────────────────────────────────────────────
-                group "chess.util" {
-                    observerComp = component "Observer / Observable" "Observer[E]: trait with update(event: E): Unit. Observable[E]: trait with add/remove/notifyObservers(event) backed by Vector[Observer[E]]. Wires GameController (Observable) to ChessGUI and ConsoleView (both Observer)." "Observer.scala"
-                }
-
-                # ── chess.model (Level 4: one component per class/enum/trait) ─
-                group "chess.model" {
-                    openingClass       = component "Opening"       "case class (eco: String, name: String, moves: String, fen: String, moveCount: Int). Composite key (eco,name). Opening.unsafe(eco,name,moves,fen,moveCount) factory." "case class · Opening.scala"
-                    persistedGameClass = component "PersistedGame" "case class (id: UUID, fenHistory: List[String], pgnMoves: List[String], currentTurn: String, status: String, result: Option[String], openingEco: Option[String], openingName: Option[String], createdAt: Instant, updatedAt: Instant). PersistedGame.create(...) factory." "case class · PersistedGame.scala"
-                    puzzleClass         = component "Puzzle" "case class (id: String, fen: String, moves: List[String], rating: Int, ratingDeviation: Int, popularity: Int, nbPlays: Int, themes: List[String], gameUrl: String, openingTags: List[String])." "case class · Puzzle.scala"
-
-                    colorEnum = component "Color" "enum White | Black. fold[A](white: =>A, black: =>A): A. opposite: Color." "enum · Piece.scala"
-
-                    roleEnum = component "Role" "enum King | Queen | Rook | Bishop | Knight | Pawn. whiteSymbol: String (unicode). blackSymbol: String (unicode). isPromotable: Boolean. Role.all: Vector[Role]." "enum · Piece.scala"
-
-                    promotableRoleEnum = component "PromotableRole" "enum Queen | Rook | Bishop | Knight. toRole: Role. PromotableRole.fromRole(role: Role): Option[PromotableRole]. all: Vector[PromotableRole]." "enum · Piece.scala"
-
-                    pieceClass = component "Piece" "final case class (role: Role, color: Color). toString: Unicode chess symbol via color.fold(role.whiteSymbol, role.blackSymbol)." "case class · Piece.scala"
-
-                    fileEnum = component "File" "enum A|B|C|D|E|F|G|H (index: Int, letter: Char). offset(n: Int): Option[File]. -(other: File): Int. File.fromInt, fromChar, all: Vector[File]." "enum · Square.scala"
-
-                    rankEnum = component "Rank" "enum _1 through _8 (index: Int). offset(n: Int): Option[Rank]. -(other: Rank): Int. Rank.fromInt, all: Vector[Rank]." "enum · Square.scala"
-
-                    squareClass = component "Square" "final case class (file: File, rank: Rank). toString: algebraic e.g. e4. Square.apply(notation: String), fromString, fromCoords(file,rank). Square.all: Vector[Square] — all 64 squares." "case class · Square.scala"
-
-                    castlingRightsClass = component "CastlingRights" "case class (whiteKingside, whiteQueenside, blackKingside, blackQueenside: Boolean = true). can(color: Color, kingside: Boolean): Boolean. revokeKing(color: Color): CastlingRights. revokeRook(from: Square): CastlingRights." "case class · Board.scala"
-
-                    boardClass = component "Board" "final case class (squares: Vector[Vector[Option[Piece]]], lastMove: Option[(Square,Square)], castlingRights: CastlingRights). move(from,to): MoveResult. legalMoves(color): Vector[(Square,Square)]. isInCheck, isCheckmate, isStalemate(color). findKing, isAttackedBy, pieceAt. applyMoveUnchecked. Board.initial." "case class · Board.scala"
-
-                    moveResultTrait = component "MoveResult" "sealed trait. board: Board. flatMap(f: Board=>MoveResult), map(f: Board=>Board), foreach. movedOption: Option[(Board,GameEvent)]. toOption, get, getOrElse, isSuccess, isFailed, event: Option[GameEvent]." "sealed trait · MoveResult.scala"
-
-                    movedClass = component "MoveResult.Moved" "final case class (board: Board, gameEvent: GameEvent = GameEvent.Moved). Full MoveResult ops delegate to board/gameEvent. movedOption: Some((board,event))." "case class · MoveResult.scala"
-
-                    failedClass = component "MoveResult.Failed" "final case class (board: Board, error: MoveError). flatMap/map return this unchanged. get: throws NoSuchElementException. movedOption: None." "case class · MoveResult.scala"
-
-                    gameEventEnum = component "GameEvent" "enum Moved | Check | Checkmate | Stalemate | ThreefoldRepetition. Produced by Board.move; carried inside MoveResult.Moved." "enum · GameEvent.scala"
-
-                    moveErrorEnum = component "MoveError" "enum NoPiece | InvalidMove | LeavesKingInCheck | WrongColor | ParseError(msg: String) | PromotionRequired. Carried inside MoveResult.Failed." "enum · MoveError.scala"
-                }
-
-                # ── chess.controller (Level 4: one component per class/trait) ─
-                group "chess.controller" {
-
-                    gameCtrlComp = component "GameController" "class. boardStates: Vector[Board], pgnMoves: Vector[String], currentIndex: Int, activeColor: Color. applyMove(from,to), applyPgnMove(san). backward/forward navigation. announceInitial, loadFromFEN. isInCheck, isCheckmate, isStalemate, gameStatus. Extends Observable[MoveResult]." "class · GameController.scala"
-
-                    computerPlayerComp = component "ComputerPlayer" "class (var strategy: MoveStrategy). move(board, color, wouldRepeat: Board=>Boolean): Option[(Square,Square,Option[PromotableRole])]. If material advantage >= 150cp avoids repeating positions; falls back to best candidate if all moves repeat." "class · ComputerPlayer.scala"
-
-                    moveStrategyTrait = component "MoveStrategy" "trait. name: String. selectMove(board: Board, color: Color): Option[(Square, Square, Option[PromotableRole])]. MoveStrategy.promotionFor(from,to,board): Option[PromotableRole] — returns Some(Queen) when pawn reaches back rank." "trait · MoveStrategy.scala"
-                }
-
-                # ── chess.controller.strategy (Level 4: one component per class/object) ─
-                group "chess.controller.strategy" {
-
-                    evaluatorObj = component "Evaluator" "object. materialValue(role: Role): Int — Pawn=100, Knight=320, Bishop=330, Rook=500, Queen=900, King=20000. pstBonus(role,square,color): Int — piece-square tables. evaluate(board,color): Int — symmetric material+PST score." "object · Evaluator.scala"
-
-                    randomStratClass = component "RandomStrategy" "class. name=Random. selectMove: picks uniformly random move from board.legalMoves(color). Returns None when no legal moves exist." "class · RandomStrategy.scala"
-
-                    greedyStratClass = component "GreedyStrategy" "class. name=Greedy. pieceValue: Q=9,R=5,B=3,N=3,P=1,K=0. Prefers highest-value captures with random tiebreak. Falls back to random quiet move if no captures available." "class · GreedyStrategy.scala"
-
-                    materialStratClass = component "MaterialBalanceStrategy" "class. name=MaterialBalance. For each legal move: apply move, score with Evaluator.materialValue(). Pick max-score move with random tiebreak. Returns None if no legal moves." "class · MaterialBalanceStrategy.scala"
-
-                    pstStratClass = component "PieceSquareStrategy" "class. name=PieceSquare. Same as MaterialBalance but scores with Evaluator.evaluate() (material + piece-square table bonus). Stronger positional play." "class · PieceSquareStrategy.scala"
-
-                    minimaxStratClass = component "MinimaxStrategy" "class (depth: Int = 3). name=Minimax. alphaBeta(board, depth, alpha, beta, maximizing, seenInPath): Int. Terminal nodes: checkmate=+/-20000, stalemate=0. seenInPath: Set[NodeKey] prevents path-level repetition." "class · MinimaxStrategy.scala"
-
-                    quiescenceStratClass = component "QuiescenceStrategy" "class (depth: Int = 3, qDepth: Int = 6). name=Quiescence. After minimax bottoms out, quiescence(board,remaining,alpha,beta): Int searches captures only until a quiet position is reached." "class · QuiescenceStrategy.scala"
-
-                    idStratClass = component "IterativeDeepeningStrategy" "class (var timeLimitMs: Long = 2000). name=IterativeDeepening. searchAtDepth(board,color,depth): Option[Move]. Iterates depth 1 to infinity; stops when time budget expires; returns best result from last fully completed depth." "class · IterativeDeepeningStrategy.scala"
-
-                    openingBookStratClass = component "OpeningBookStrategy" "class (openings: List[Opening] = OpeningParser.parseLichessOpenings(), fallback: MoveStrategy = QuiescenceStrategy). Picks one opening at random on White's first move; plays both colors' book moves by ply index. Abandons book if a move is illegal (opponent deviated). Falls back to the engine once the opening is exhausted. reset() re-picks for the next game." "class · OpeningBookStrategy.scala"
-                }
-
-                # ── chess.controller.io ───────────────────────────────────────
-                group "chess.controller.io" {
-                    fenIOTrait     = component "FenIO"     "trait. load(s: String): Try[Board]. save(b: Board): String. Pluggable FEN serialisation; default bound via AppBindings given." "trait · FenIO.scala"
-                    pgnIOTrait     = component "PgnIO"     "trait. loadFile(path), parseMove(san,board,color), toAlgebraic(from,to,before,after,isWhite), pgnText(moves). Pluggable PGN serialisation." "trait · PgnIO.scala"
-                    fileIOTrait    = component "FileIO"    "trait. save(board): String. load(s: String): Try[Board]. Abstracts JSON board file persistence." "trait · FileIO.scala"
-                    openingIOTrait = component "OpeningIO" "trait. parseLichessOpenings(): List[Opening], parseTsvResource(path): Try[List[Opening]], parseCsvResource(path): Try[List[Opening]]. Bound via AppBindings given." "trait · OpeningIO.scala"
-                }
-
-                group "chess.controller.io.fen" {
-                    regexFenComp      = component "RegexFenParser"      "object (FenIO). Regex + split parser. Handles piece placement, active color, castling, en-passant. DEFAULT AppBindings binding." "object · RegexFenParser.scala"
-                    combinatorFenComp = component "CombinatorFenParser" "object (FenIO). scala-parser-combinators grammar. Alternative implementation." "object · CombinatorFenParser.scala"
-                    fastParseFenComp  = component "FastParseFenParser"  "object (FenIO). fastparse grammar. Alternative implementation." "object · FastParseFenParser.scala"
-                }
-
-                group "chess.controller.io.pgn" {
-                    pgnParserComp     = component "PGNParser"           "object. toAlgebraic + parseMove. Pawn/piece moves, disambiguation (file/rank/both), O-O/O-O-O castling, promotion, check +, checkmate #." "object · PGNParser.scala"
-                    pgnFileIOComp     = component "PgnFileIO"           "class (PgnIO, DEFAULT). Reads .pgn files from disk; delegates parse/format to PGNParser." "class · PgnFileIO.scala"
-                    combinatorPgnComp = component "CombinatorPgnParser" "object (PgnIO). scala-parser-combinators. Alternative." "object · CombinatorPgnParser.scala"
-                    fastParsePgnComp  = component "FastParsePgnParser"  "object (PgnIO). fastparse. Alternative." "object · FastParsePgnParser.scala"
-                }
-
-                group "chess.controller.io.json" {
-                    circeJsonComp   = component "CirceJsonFileIO + BoardCodecs (Circe)"   "object (FileIO) + given Encoder/Decoder for Board, Piece, Square. Board as 8x8 nullable array + lastMove. Cross-compatible JSON with uPickle." "object · circe/"
-                    upickleJsonComp = component "UPickleJsonFileIO + BoardCodecs (uPickle)" "object (FileIO) + given ReadWriter. Identical JSON structure to Circe variant." "object · upickle/"
-                }
-
-                group "chess.controller.io.opening" {
-                    openingParserComp = component "OpeningParser" "object (OpeningIO). Classpath-based parser for Lichess TSV and legacy CSV files. parseLichessOpenings, parseTsvLine, parseCsvOpenings, parseTsvResource/parseCsvResource, computeFenAndMoveCount, deduplicate, validateOpenings, printStatistics. DEFAULT OpeningIO binding in AppBindings." "object · OpeningParser.scala"
-                }
-
-                group "chess.controller.clock" {
-                    clockComp = component "ClockActor" "class. Apache Pekko typed actor. Configurable time controls per Color. Sends Tick; reports TimeUp event." "class · ClockActor.scala"
-                }
-
-                group "chess.controller.puzzle" {
-                    puzzleParserComp = component "PuzzleParser" "object. Parses Lichess puzzle CSV rows into Puzzle case class instances." "object · PuzzleParser.scala"
-                }
-
-                # ── chess.persistence ─────────────────────────────────────────
-                group "chess.persistence" {
-                    openingRepoTrait = component "OpeningRepository[F[_]]" "trait (higher-kinded). save, saveAll, findByEco, findByEcoAndName, findByName(query,limit), findAll(limit,offset), findByMoveCount(maxMoves), findByFen(fen): F[Option[Opening]], count, deleteAll. Bound via AppBindings given." "trait · OpeningRepository.scala"
-                    gameRepoTrait    = component "GameRepository[F[_]]"    "trait (higher-kinded). save(game), findById(id), findAll(limit,offset), findByStatus(status), delete(id): F[Boolean]." "trait · GameRepository.scala"
-                }
-
-                group "chess.persistence.memory" {
-                    inMemoryOpeningComp = component "InMemoryOpeningRepository" "class. Cats Effect IO + mutable Map[(eco,name), Opening] + Map[fen, Opening]. findByFen is O(1) via FEN index. fromLichess()(using OpeningIO): loads all 5 TSV files at startup. DEFAULT OpeningRepository[IO] binding in AppBindings." "class · InMemoryOpeningRepository.scala"
-                }
-
-                group "chess.persistence.postgres" {
-                    postgresGameComp    = component "PostgresGameRepository"    "class (GameRepository[IO]). Doobie HikariCP Transactor. Table: games(id UUID, fen, pgn, status, created_at, updated_at). ON CONFLICT upsert." "class · PostgresGameRepository.scala"
-                    postgresOpeningComp = component "PostgresOpeningRepository" "class (OpeningRepository[IO]). Doobie. Table: openings(eco,name,moves,fen,move_count). Composite PK (eco,name). Bulk INSERT ON CONFLICT DO NOTHING." "class · PostgresOpeningRepository.scala"
-                }
-
-                group "chess.persistence.mongodb" {
-                    mongoGameComp    = component "MongoGameRepository"    "class (GameRepository[IO]). mongo4cats. Collection: games. Filter/Sort/Skip/Limit fluent API. UUID stored as String." "class · MongoGameRepository.scala"
-                    mongoOpeningComp = component "MongoOpeningRepository" "class (OpeningRepository[IO]). mongo4cats. Collection: openings. Filter.regex for name search." "class · MongoOpeningRepository.scala"
-                }
-
-                # ── chess.aview ───────────────────────────────────────────────
                 group "chess.aview" {
                     chessGUIComp    = component "ChessGUI"    "class. JavaFX/ScalaFX board UI. Drag-and-drop + text-field input, back/forward history buttons, FEN display, PGN TextArea, opening name label (auto-updated after each move via FEN lookup in openingsByFen map), New Game. Extends Observer[MoveResult]; self-registers on GameController." "class · ChessGUI.scala"
                     consoleViewComp = component "ConsoleView" "class. ANSI terminal renderer. Prints Unicode board, active color, FEN, game events after each move. Reads PGN from stdin. Extends Observer[MoveResult]; self-registers on GameController." "class · ConsoleView.scala"
                 }
 
-                # ── chess (root package) ──────────────────────────────────────
                 group "chess (root)" {
                     appBindingsComp = component "AppBindings" "object. given FenIO = RegexFenParser. given PgnIO = PgnFileIO(). given OpeningIO = OpeningParser. given OpeningRepository[IO] = InMemoryOpeningRepository.fromLichess(). Swap any implementation by changing one line." "object · AppBindings.scala"
                     chessAppComp    = component "ChessApp"    "object (IOApp). Parses --gui/--console CLI arg. Creates GameController + ComputerPlayer + OpeningRepository, then launches ChessGUI or ConsoleView." "object · ChessApp.scala"
@@ -176,8 +43,108 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
 
             # ================================================================
             # GAME SERVICE — chess.microservices.game.GameServer :8081
+            # Docker container: chess-game-service
+            # Bundles the full chess engine (model, controller, persistence)
+            # plus the HTTP microservice entry point into one JVM process.
             # ================================================================
-            gameService = container "Game Service" "Stateful chess game microservice. Manages concurrent sessions; applies moves; detects game events." "Scala 3 / http4s Ember · Cats Effect IO · port 8081" "Microservice" {
+            gameService = container "Game Service" "Stateful chess game microservice. Manages concurrent sessions, applies moves, detects game events. Bundles the complete chess engine (model, controller, persistence) into a single JVM process." "Scala 3 / http4s Ember · Cats Effect IO · port 8081" "Microservice" {
+
+                # ── chess.util ────────────────────────────────────────────────
+                group "chess.util" {
+                    observerComp = component "Observer / Observable" "Observer[E]: trait with update(event: E): Unit. Observable[E]: trait with add/remove/notifyObservers(event) backed by Vector[Observer[E]]. Wires GameController (Observable) to ChessGUI and ConsoleView (both Observer)." "Observer.scala"
+                }
+
+                # ── chess.model ───────────────────────────────────────────────
+                group "chess.model" {
+                    openingClass       = component "Opening"       "case class (eco: String, name: String, moves: String, fen: String, moveCount: Int). Composite key (eco,name). Opening.unsafe(eco,name,moves,fen,moveCount) factory." "case class · Opening.scala"
+                    persistedGameClass = component "PersistedGame" "case class (id: UUID, fenHistory: List[String], pgnMoves: List[String], currentTurn: String, status: String, result: Option[String], openingEco: Option[String], openingName: Option[String], createdAt: Instant, updatedAt: Instant). PersistedGame.create(...) factory." "case class · PersistedGame.scala"
+                    puzzleClass        = component "Puzzle" "case class (id: String, fen: String, moves: List[String], rating: Int, ratingDeviation: Int, popularity: Int, nbPlays: Int, themes: List[String], gameUrl: String, openingTags: List[String])." "case class · Puzzle.scala"
+                    colorEnum          = component "Color" "enum White | Black. fold[A](white: =>A, black: =>A): A. opposite: Color." "enum · Piece.scala"
+                    roleEnum           = component "Role" "enum King | Queen | Rook | Bishop | Knight | Pawn. whiteSymbol/blackSymbol: String (unicode). isPromotable: Boolean. Role.all: Vector[Role]." "enum · Piece.scala"
+                    promotableRoleEnum = component "PromotableRole" "enum Queen | Rook | Bishop | Knight. toRole: Role. PromotableRole.fromRole(role: Role): Option[PromotableRole]. all: Vector[PromotableRole]." "enum · Piece.scala"
+                    pieceClass         = component "Piece" "final case class (role: Role, color: Color). toString: Unicode chess symbol via color.fold(role.whiteSymbol, role.blackSymbol)." "case class · Piece.scala"
+                    fileEnum           = component "File" "enum A|B|C|D|E|F|G|H (index: Int, letter: Char). offset(n: Int): Option[File]. -(other: File): Int. File.fromInt, fromChar, all: Vector[File]." "enum · Square.scala"
+                    rankEnum           = component "Rank" "enum _1 through _8 (index: Int). offset(n: Int): Option[Rank]. -(other: Rank): Int. Rank.fromInt, all: Vector[Rank]." "enum · Square.scala"
+                    squareClass        = component "Square" "final case class (file: File, rank: Rank). toString: algebraic e.g. e4. Square.apply(notation: String), fromString, fromCoords(file,rank). Square.all: Vector[Square] — all 64 squares." "case class · Square.scala"
+                    castlingRightsClass = component "CastlingRights" "case class (whiteKingside, whiteQueenside, blackKingside, blackQueenside: Boolean = true). can(color,kingside): Boolean. revokeKing(color): CastlingRights. revokeRook(from: Square): CastlingRights." "case class · Board.scala"
+                    boardClass         = component "Board" "final case class (squares: Vector[Vector[Option[Piece]]], lastMove: Option[(Square,Square)], castlingRights: CastlingRights). move(from,to): MoveResult. legalMoves(color): Vector[(Square,Square)]. isInCheck, isCheckmate, isStalemate(color). findKing, isAttackedBy, pieceAt. applyMoveUnchecked. Board.initial." "case class · Board.scala"
+                    moveResultTrait    = component "MoveResult" "sealed trait. board: Board. flatMap/map/foreach. movedOption: Option[(Board,GameEvent)]. toOption, get, getOrElse, isSuccess, isFailed, event: Option[GameEvent]." "sealed trait · MoveResult.scala"
+                    movedClass         = component "MoveResult.Moved" "final case class (board: Board, gameEvent: GameEvent = GameEvent.Moved). movedOption: Some((board,event))." "case class · MoveResult.scala"
+                    failedClass        = component "MoveResult.Failed" "final case class (board: Board, error: MoveError). flatMap/map return this unchanged. movedOption: None." "case class · MoveResult.scala"
+                    gameEventEnum      = component "GameEvent" "enum Moved | Check | Checkmate | Stalemate | ThreefoldRepetition. Produced by Board.move; carried inside MoveResult.Moved." "enum · GameEvent.scala"
+                    moveErrorEnum      = component "MoveError" "enum NoPiece | InvalidMove | LeavesKingInCheck | WrongColor | ParseError(msg) | PromotionRequired. Carried inside MoveResult.Failed." "enum · MoveError.scala"
+                }
+
+                # ── chess.controller ────────────────────────────────────────────
+                group "chess.controller" {
+                    gameCtrlComp       = component "GameController" "class. boardStates: Vector[Board], pgnMoves: Vector[String], currentIndex: Int, activeColor: Color. applyMove(from,to), applyPgnMove(san). backward/forward navigation. announceInitial, loadFromFEN. isInCheck, isCheckmate, isStalemate, gameStatus. Extends Observable[MoveResult]." "class · GameController.scala"
+                    computerPlayerComp = component "ComputerPlayer" "class (var strategy: MoveStrategy). move(board, color, wouldRepeat: Board=>Boolean): Option[(Square,Square,Option[PromotableRole])]. If material advantage >= 150cp avoids repeating positions; falls back to best candidate if all moves repeat." "class · ComputerPlayer.scala"
+                    moveStrategyTrait  = component "MoveStrategy" "trait. name: String. selectMove(board: Board, color: Color): Option[(Square, Square, Option[PromotableRole])]. MoveStrategy.promotionFor(from,to,board): Option[PromotableRole] — returns Some(Queen) when pawn reaches back rank." "trait · MoveStrategy.scala"
+                }
+
+                # ── chess.controller.strategy ────────────────────────────────────
+                group "chess.controller.strategy" {
+                    evaluatorObj          = component "Evaluator" "object. materialValue(role): Int. pstBonus(role,square,color): Int. evaluate(board,color): Int." "object · Evaluator.scala"
+                    randomStratClass      = component "RandomStrategy" "class. Picks uniformly random legal move." "class · RandomStrategy.scala"
+                    greedyStratClass      = component "GreedyStrategy" "class. Prefers highest-value captures; falls back to random quiet move." "class · GreedyStrategy.scala"
+                    materialStratClass    = component "MaterialBalanceStrategy" "class. Scores each legal move with Evaluator.materialValue(); picks max." "class · MaterialBalanceStrategy.scala"
+                    pstStratClass         = component "PieceSquareStrategy" "class. Scores with Evaluator.evaluate() (material + PST bonus)." "class · PieceSquareStrategy.scala"
+                    minimaxStratClass     = component "MinimaxStrategy" "class (depth: Int = 3). Alpha-beta minimax. Terminal: checkmate=+/-20000, stalemate=0. Path-level repetition guard." "class · MinimaxStrategy.scala"
+                    quiescenceStratClass  = component "QuiescenceStrategy" "class (depth=3, qDepth=6). Extends minimax with capture-only quiescence search." "class · QuiescenceStrategy.scala"
+                    idStratClass          = component "IterativeDeepeningStrategy" "class (timeLimitMs=2000). Iterates depth 1..∞; stops when time budget expires; returns best completed-depth result." "class · IterativeDeepeningStrategy.scala"
+                    openingBookStratClass = component "OpeningBookStrategy" "class (openings, fallback=QuiescenceStrategy). Picks one opening randomly on White's first move; follows book by ply index; abandons if opponent deviates; delegates to fallback thereafter. reset() re-picks for next game." "class · OpeningBookStrategy.scala"
+                }
+
+                # ── chess.controller.io ───────────────────────────────────────────
+                group "chess.controller.io" {
+                    fenIOTrait     = component "FenIO"     "trait. load(s: String): Try[Board]. save(b: Board): String. Pluggable FEN serialisation; default bound via AppBindings given." "trait · FenIO.scala"
+                    pgnIOTrait     = component "PgnIO"     "trait. loadFile(path), parseMove(san,board,color), toAlgebraic(from,to,before,after,isWhite), pgnText(moves). Pluggable PGN serialisation." "trait · PgnIO.scala"
+                    fileIOTrait    = component "FileIO"    "trait. save(board): String. load(s: String): Try[Board]. Abstracts JSON board file persistence." "trait · FileIO.scala"
+                    openingIOTrait = component "OpeningIO" "trait. parseLichessOpenings(): List[Opening], parseTsvResource(path): Try[List[Opening]], parseCsvResource(path): Try[List[Opening]]. Bound via AppBindings given." "trait · OpeningIO.scala"
+                }
+                group "chess.controller.io.fen" {
+                    regexFenComp      = component "RegexFenParser"      "object (FenIO). Regex + split parser. DEFAULT AppBindings binding." "object · RegexFenParser.scala"
+                    combinatorFenComp = component "CombinatorFenParser" "object (FenIO). scala-parser-combinators grammar. Alternative." "object · CombinatorFenParser.scala"
+                    fastParseFenComp  = component "FastParseFenParser"  "object (FenIO). fastparse grammar. Alternative." "object · FastParseFenParser.scala"
+                }
+                group "chess.controller.io.pgn" {
+                    pgnParserComp     = component "PGNParser"           "object. toAlgebraic + parseMove. Pawn/piece moves, disambiguation, O-O/O-O-O, promotion, check +, checkmate #." "object · PGNParser.scala"
+                    pgnFileIOComp     = component "PgnFileIO"           "class (PgnIO, DEFAULT). Reads .pgn files from disk; delegates parse/format to PGNParser." "class · PgnFileIO.scala"
+                    combinatorPgnComp = component "CombinatorPgnParser" "object (PgnIO). scala-parser-combinators. Alternative." "object · CombinatorPgnParser.scala"
+                    fastParsePgnComp  = component "FastParsePgnParser"  "object (PgnIO). fastparse. Alternative." "object · FastParsePgnParser.scala"
+                }
+                group "chess.controller.io.json" {
+                    circeJsonComp   = component "CirceJsonFileIO + BoardCodecs (Circe)"    "object (FileIO) + given Encoder/Decoder for Board, Piece, Square. Cross-compatible JSON with uPickle." "object · circe/"
+                    upickleJsonComp = component "UPickleJsonFileIO + BoardCodecs (uPickle)" "object (FileIO) + given ReadWriter. Identical JSON structure to Circe variant." "object · upickle/"
+                }
+                group "chess.controller.io.opening" {
+                    openingParserComp = component "OpeningParser" "object (OpeningIO). Classpath parser for Lichess TSV and legacy CSV files. parseLichessOpenings, parseTsvLine, parseCsvOpenings, computeFenAndMoveCount, deduplicate, validateOpenings, printStatistics. DEFAULT OpeningIO binding in AppBindings." "object · OpeningParser.scala"
+                }
+                group "chess.controller.clock" {
+                    clockComp = component "ClockActor" "class. Apache Pekko typed actor. Configurable time controls per Color. Sends Tick; reports TimeUp event." "class · ClockActor.scala"
+                }
+                group "chess.controller.puzzle" {
+                    puzzleParserComp = component "PuzzleParser" "object. Parses Lichess puzzle CSV rows into Puzzle case class instances." "object · PuzzleParser.scala"
+                }
+
+                # ── chess.persistence ────────────────────────────────────────────
+                group "chess.persistence" {
+                    openingRepoTrait = component "OpeningRepository[F[_]]" "trait (higher-kinded). save, saveAll, findByEco, findByEcoAndName, findByName(query,limit), findAll(limit,offset), findByMoveCount(maxMoves), findByFen(fen): F[Option[Opening]], count, deleteAll. Bound via AppBindings given." "trait · OpeningRepository.scala"
+                    gameRepoTrait    = component "GameRepository[F[_]]"    "trait (higher-kinded). save(game), findById(id), findAll(limit,offset), findByStatus(status), delete(id): F[Boolean]." "trait · GameRepository.scala"
+                }
+                group "chess.persistence.memory" {
+                    inMemoryOpeningComp = component "InMemoryOpeningRepository" "class. Cats Effect IO + mutable Map[(eco,name), Opening] + Map[fen, Opening]. findByFen is O(1) via FEN index. fromLichess()(using OpeningIO): loads all 5 TSV files at startup. DEFAULT OpeningRepository[IO] binding in AppBindings." "class · InMemoryOpeningRepository.scala"
+                }
+                group "chess.persistence.postgres" {
+                    postgresGameComp    = component "PostgresGameRepository"    "class (GameRepository[IO]). Doobie HikariCP Transactor. Table: games(id UUID, fen, pgn, status, created_at, updated_at). ON CONFLICT upsert." "class · PostgresGameRepository.scala"
+                    postgresOpeningComp = component "PostgresOpeningRepository" "class (OpeningRepository[IO]). Doobie. Table: openings(eco,name,moves,fen,move_count). Composite PK (eco,name). Bulk INSERT ON CONFLICT DO NOTHING." "class · PostgresOpeningRepository.scala"
+                }
+                group "chess.persistence.mongodb" {
+                    mongoGameComp    = component "MongoGameRepository"    "class (GameRepository[IO]). mongo4cats. Collection: games. Filter/Sort/Skip/Limit fluent API. UUID stored as String." "class · MongoGameRepository.scala"
+                    mongoOpeningComp = component "MongoOpeningRepository" "class (OpeningRepository[IO]). mongo4cats. Collection: openings. Filter.regex for name search." "class · MongoOpeningRepository.scala"
+                }
+
+                # ── chess.microservices.game (HTTP entry point) ──────────────────
                 group "chess.microservices.game" {
                     gameServerComp = component "GameServer"  "object (IOApp). Builds EmberServer; wires GameService with per-game GameController instances and a GameRepository (Postgres or MongoDB)." "object · GameServer.scala"
                     gameRoutesComp = component "GameRoutes"  "object. REST: POST /api/games, GET /api/games/:id, POST /api/games/:id/moves, DELETE /api/games/:id, GET /health. JSON via ApiModels." "object · GameRoutes.scala"
@@ -227,22 +194,22 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         chessSystem -> lichessOpenings "Reads TSV opening files at startup"
 
         # ── People → Containers ────────────────────────────────────────────────
-        player    -> chess    "Launches desktop app"
-        player    -> gateway  "HTTP requests (REST client)"
-        player    -> vueUI    "Opens web chess app" "HTTP browser"
-        developer -> seeder   "Runs one-shot seeding CLI"
+        player    -> desktopApp "Launches desktop app"
+        player    -> gateway    "HTTP requests (REST client)"
+        player    -> vueUI      "Opens web chess app" "HTTP browser"
+        developer -> seeder     "Runs one-shot seeding CLI"
 
-        # ── Container → Container ─────────────────────────────────────────────
+        # ── Container → Container ──────────────────────────────────────────────
         gateway     -> gameService "Proxies /api/games/*" "HTTP/JSON"
         gateway     -> uiService   "Proxies /* (when ui-service is deployed)" "HTTP"
-        gateway     -> chess       "Uses GatewayConfig (in-process)"
         vueUI       -> gateway     "REST API calls via VITE_API_URL" "HTTP/JSON"
-        gameService -> chess       "Uses chess engine, model, persistence (in-process)"
-        uiService   -> chess       "Shares compiled codebase (in-process)"
-        chess       -> postgres    "Reads / writes games and openings" "JDBC / Doobie"
-        chess       -> mongodb     "Reads / writes games and openings" "mongo4cats"
-        chess       -> lichessOpenings "Loads TSV files from classpath at startup"
-        seeder      -> chess       "Calls OpeningParser (in-process via sbt dependsOn)"
+        gameService -> postgres    "Reads / writes games and openings" "JDBC / Doobie"
+        gameService -> mongodb     "Reads / writes games and openings" "mongo4cats"
+        gameService -> lichessOpenings "Loads TSV opening files from classpath at startup"
+        desktopApp  -> postgres    "Reads / writes games and openings" "JDBC / Doobie"
+        desktopApp  -> mongodb     "Reads / writes games and openings" "mongo4cats"
+        desktopApp  -> lichessOpenings "Loads TSV opening files from classpath at startup"
+        seeder      -> gameService "Uses OpeningParser (in-process via sbt dependsOn)"
         seeder      -> postgres    "Bulk-inserts openings" "JDBC / Doobie"
         seeder      -> mongodb     "Bulk-inserts openings" "mongo4cats"
         seeder      -> lichessOpenings "Reads TSV files from classpath"
@@ -335,9 +302,8 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         serviceProxyComp  -> gatewayConfigComp "Reads target base URLs"
 
         # ── Deployment environments ─────────────────────────────────────────
-        # docker-compose.yml spins up five named containers on a single bridge
-        # network.  Not containerised: chess (desktop app), seeder (sbt CLI),
-        # uiService (Dockerfile.ui-service exists but not listed in compose).
+        # docker-compose.yml: five containers on the chess-network bridge
+        # Not containerised: desktopApp, seeder (CLI), uiService (Dockerfile.ui-service exists but not in compose).
         deploymentEnvironment "Docker Compose" {
 
             deploymentNode "chess-network" "Docker bridge network shared by all compose services" "Docker bridge" {
@@ -378,26 +344,26 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         container chessSystem "L2_Containers" {
             include *
             autoLayout
-            title "Level 2 - Containers (Chess, API Gateway, Game Service, UI Service, DBs)"
+            title "Level 2 - Containers (Desktop App, API Gateway, Game Service, Vue UI, UI Service, Seeder, PostgreSQL, MongoDB)"
         }
 
-        # ── Level 3 — full Chess package overview ─────────────────────────────
-        component chess "L3_Chess" {
+        # ── Level 3 — per-container component views ────────────────────────────────
+        component desktopApp "L3_DesktopApp" {
             include *
             autoLayout
-            title "Level 3 - Chess (all package layers and their components)"
+            title "Level 3 - Chess Desktop App (chess.aview + chess root)"
+        }
+
+        component gameService "L3_GameService" {
+            include *
+            autoLayout
+            title "Level 3 - Game Service (chess engine: model, controller, persistence + microservice HTTP layer)"
         }
 
         component gateway "L3_Gateway" {
             include *
             autoLayout
             title "Level 3 - API Gateway (chess.microservices.gateway)"
-        }
-
-        component gameService "L3_GameService" {
-            include *
-            autoLayout
-            title "Level 3 - Game Service (chess.microservices.game + shared)"
         }
 
         component uiService "L3_UIService" {
@@ -407,7 +373,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         }
 
         # ── Level 4 — chess.model: individual classes, enums, sealed traits ────
-        component chess "L4_Model" {
+        component gameService "L4_Model" {
             include colorEnum roleEnum promotableRoleEnum pieceClass
             include fileEnum rankEnum squareClass
             include castlingRightsClass boardClass
@@ -419,7 +385,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         }
 
         # ── Level 4 — chess.controller: engine and AI strategy classes ─────────
-        component chess "L4_Controller" {
+        component gameService "L4_Controller" {
             include gameCtrlComp computerPlayerComp moveStrategyTrait observerComp
             include evaluatorObj randomStratClass greedyStratClass materialStratClass
             include pstStratClass minimaxStratClass quiescenceStratClass idStratClass
@@ -429,7 +395,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         }
 
         # ── Level 4 — chess.controller.io: I/O traits and implementations ──────
-        component chess "L4_IO" {
+        component gameService "L4_IO" {
             include fenIOTrait regexFenComp combinatorFenComp fastParseFenComp
             include pgnIOTrait pgnParserComp pgnFileIOComp combinatorPgnComp fastParsePgnComp
             include fileIOTrait circeJsonComp upickleJsonComp
@@ -439,7 +405,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         }
 
         # ── Level 4 — chess.persistence: models, traits, adapters ──────────────
-        component chess "L4_Persistence" {
+        component gameService "L4_Persistence" {
             include openingRepoTrait gameRepoTrait
             include inMemoryOpeningComp
             include postgresGameComp postgresOpeningComp
@@ -449,8 +415,8 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         }
 
         # ── Level 4 — chess.aview: views and entry points ──────────────────────
-        component chess "L4_AView" {
-            include chessGUIComp consoleViewComp appBindingsComp chessAppComp observerComp
+        component desktopApp "L4_AView" {
+            include chessGUIComp consoleViewComp appBindingsComp chessAppComp
             autoLayout
             title "Level 4 - chess.aview + chess root (views, wiring, entry points)"
         }
