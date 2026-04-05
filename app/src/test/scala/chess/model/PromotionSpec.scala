@@ -1,12 +1,16 @@
 package chess.model
 
 import chess.controller.io.fen.RegexFenParser
-import chess.AppBindings.given
+import chess.controller.io.pgn.PgnFileIO
+import chess.controller.io.{FenIO, PgnIO}
 import chess.controller.GameController
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 class PromotionSpec extends AnyWordSpec with Matchers {
+
+  given FenIO = RegexFenParser
+  given PgnIO = PgnFileIO()
 
   // White pawn on e7, black king on h8, white king on a1
   private def nearPromotionBoard: Board =

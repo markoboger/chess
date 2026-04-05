@@ -15,4 +15,6 @@ final class HttpGameEventPublisher(client: Client[IO], baseUri: Uri) extends Gam
   override def publish(event: GameSessionEvent): IO[Unit] =
     val uri = baseUri / "events"
     val request = Request[IO](method = POST, uri = uri).withEntity(event)
-    client.successful(request).void
+    client.successful(request).void.handleErrorWith { _ =>
+      IO.unit // realtime service is optional — swallow connection errors silently
+    }

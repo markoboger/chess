@@ -1,7 +1,7 @@
 package chess.controller.io.fen
 
 import chess.controller.io.FenIO
-import chess.model.{Board, Piece, Role, Color}
+import chess.model.{Board, CastlingRights, Piece, Role, Color}
 import _root_.scala.util.Try
 
 object FastParseFenParser extends FenIO {
@@ -54,28 +54,52 @@ object FastParseFenParser extends FenIO {
     rank.rep(exactly = 8, sep = "/").map(_.toVector)
   )
 
-  /** Optional trailing FEN fields (active color, castling, en passant, …) */
+  /** Optional trailing FEN fields are skipped by the fastparse parser; castling, en passant, and clock fields are
+    * extracted from the raw string after the board is parsed.
+    */
   private def trailingFields[$: P]: P[Unit] = P(
     (" " ~ AnyChar.rep).?
   )
 
-  private def fen[$: P]: P[Board] = P(
+  private def boardOnly[$: P]: P[Vector[Vector[Option[Piece]]]] = P(
     board ~ trailingFields ~ End
-  ).map { squares => Board(squares) }
+  ).map(identity)
 
   // --- public API -----------------------------------------------------------
 
-  /** Parses a FEN string and returns a Board wrapped in a Try. */
+  /** Parses a FEN string and returns a Board wrapped in a Try. Handles all 6 FEN fields; trailing fields (castling, en
+    * passant) are optional and default gracefully when absent.
+    */
   def parseFEN(input: String): Try[Board] =
     Try {
-      fastparse.parse(input.trim, fen(using _)) match {
-        case Parsed.Success(board, _) => board
+      fastparse.parse(input.trim, boardOnly(using _)) match {
+        case Parsed.Success(squares, _) =>
+          val parts = input.trim.split("\\s+")
+          val activeColorWhite = parts.lift(1).forall(_.equalsIgnoreCase("w"))
+          val castlingRights = parts.lift(2).map(FullFen.parseCastling).getOrElse(CastlingRights())
+          val lastMove = parts.lift(3).flatMap(FullFen.parseEnPassantTarget(_, activeColorWhite))
+          Board(squares, castlingRights = castlingRights, lastMove = lastMove)
         case f: Parsed.Failure =>
-          throw new IllegalArgumentException(
-            s"FEN parse error: ${f.msg}"
-          )
+          throw new IllegalArgumentException(s"FEN parse error: ${f.msg}")
       }
     }
+
+  /** Parses a full 6-field FEN string and returns a [[FullFenState]]. Fields 5–6 (halfmove clock, fullmove number)
+    * default to 0 and 1 respectively when absent.
+    */
+  def parseFullFEN(input: String): Try[FullFenState] =
+    for
+      board <- parseFEN(input)
+      parts = input.trim.split("\\s+")
+      whiteToMove = parts.lift(1).forall(_.equalsIgnoreCase("w"))
+      halfmoveClock = parts.lift(4).flatMap(_.toIntOption).getOrElse(0)
+      fullmoveNumber = parts.lift(5).flatMap(_.toIntOption).getOrElse(1)
+    yield FullFenState(
+      board = board,
+      whiteToMove = whiteToMove,
+      halfmoveClock = halfmoveClock.max(0),
+      fullmoveNumber = fullmoveNumber.max(1)
+    )
 
   /** Converts a Board to FEN notation (board position only). Delegates to [[RegexFenParser.boardToFEN]] because
     * serialization does not benefit from parsing libraries.

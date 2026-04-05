@@ -1,9 +1,10 @@
 package chess.application.game
 
 import cats.effect.{IO, Ref}
-import chess.controller.GameController
+import chess.controller.{GameController, MoveStrategy}
 import chess.controller.io.{FenIO, PgnIO}
-import chess.model.{Board, MoveResult}
+import chess.controller.strategy.*
+import chess.model.{Board, Color, MoveResult}
 
 import java.time.Instant
 import java.util.UUID
@@ -117,6 +118,30 @@ class GameSessionService(
           case Right(_) =>
             publishSnapshot("fen_loaded", gameId, controller).as(Right(controller.getBoardAsFEN))
           case Left(error) => IO.pure(Left(error))
+    }
+
+  def computeAiMove(gameId: String, strategyId: String): IO[Either[String, Option[String]]] =
+    getGame(gameId).map {
+      case None => Left("Game not found")
+      case Some(controller) =>
+        val strategy: MoveStrategy = strategyId match
+          case "random"               => new RandomStrategy
+          case "material-balance"     => new MaterialBalanceStrategy
+          case "piece-square"         => new PieceSquareStrategy
+          case "minimax"              => new MinimaxStrategy
+          case "quiescence"           => new QuiescenceStrategy
+          case "iterative-deepening"  => new IterativeDeepeningStrategy
+          case _                      => new GreedyStrategy
+        val color = if controller.isWhiteToMove then Color.White else Color.Black
+        val moveOpt = strategy.selectMove(controller.board, color)
+        val san = moveOpt.flatMap { case (from, to, promo) =>
+          controller.board.move(from, to, promo).toOption.map { boardAfter =>
+            chess.controller.io.pgn.PGNParser.toAlgebraic(
+              from, to, controller.board, boardAfter, color == Color.White
+            )
+          }
+        }
+        Right(san)
     }
 
   private def publishSnapshot(

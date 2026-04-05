@@ -5,7 +5,9 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import scala.util.{Success, Failure}
 
-final class RegexFenParserSpec extends AnyWordSpec with Matchers:
+final class RegexFenParserSpec extends AnyWordSpec with Matchers with FullFenParserBehaviors:
+
+  behave like fullFenParser("RegexFenParser", RegexFenParser)
 
   "RegexFenParser" should {
     "parse the initial position" in {

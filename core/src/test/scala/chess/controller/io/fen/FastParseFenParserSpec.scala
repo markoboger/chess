@@ -6,7 +6,9 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import scala.util.{Success, Failure}
 
-final class FastParseFenParserSpec extends AnyWordSpec with Matchers:
+final class FastParseFenParserSpec extends AnyWordSpec with Matchers with FullFenParserBehaviors:
+
+  behave like fullFenParser("FastParseFenParser", FastParseFenParser)
 
   "FastParseFenParser" should {
     "parse the initial position" in {

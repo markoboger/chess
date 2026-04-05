@@ -20,7 +20,8 @@ object GatewayRoutes:
         Ok(HealthResponse("ok", "api-gateway"))
 
       case req @ (POST | GET | DELETE | PUT | PATCH) -> "api" /: "games" /: rest =>
-        val path = s"/games/$rest"
+        val restStr = rest.toString.stripPrefix("/")
+        val path = if restStr.isEmpty then "/games" else s"/games/$restStr"
         val targetUri = proxy.buildTargetUri(
           GatewayConfig.gameServiceUrl,
           path,
@@ -29,7 +30,8 @@ object GatewayRoutes:
         proxy.proxy(req, targetUri)
 
       case req @ GET -> "api" /: "openings" /: rest =>
-        val path = s"/openings/$rest"
+        val restStr = rest.toString.stripPrefix("/")
+        val path = if restStr.isEmpty then "/openings" else s"/openings/$restStr"
         val targetUri = proxy.buildTargetUri(
           GatewayConfig.gameServiceUrl,
           path,

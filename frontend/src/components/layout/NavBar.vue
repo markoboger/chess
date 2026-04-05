@@ -50,7 +50,7 @@
         <!-- Strategy menu -->
         <div class="nav-item" :class="{ open: openMenu === 'strategy' }">
           <button class="nav-btn" @click.stop="toggle('strategy')">
-            Strategy <span class="chevron">▾</span>
+            {{ strategyButtonLabel }} <span class="chevron">▾</span>
           </button>
           <div class="dropdown" v-if="openMenu === 'strategy'">
             <div class="dropdown-group">White</div>
@@ -224,7 +224,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import {
   useGameStore,
   CLOCK_PRESETS,
@@ -244,6 +244,20 @@ const uiStore = useUIStore()
 
 const openMenu = ref<string | null>(null)
 const mobileOpen = ref(false)
+
+function strategyLabel(id: ComputerStrategyId): string {
+  return COMPUTER_STRATEGIES.find(s => s.id === id)?.label ?? id
+}
+
+const strategyButtonLabel = computed(() => {
+  const mode = gameStore.gameMode
+  if (mode === 'hvh') return 'Strategy'
+  if (mode === 'hvc') return `Strategy: ${strategyLabel(gameStore.blackComputerStrategy)}`
+  // cvc: show both if different, else just the one
+  const w = strategyLabel(gameStore.whiteComputerStrategy)
+  const b = strategyLabel(gameStore.blackComputerStrategy)
+  return w === b ? `Strategy: ${w}` : `Strategy: ${w} / ${b}`
+})
 
 function toggle(menu: string) {
   openMenu.value = openMenu.value === menu ? null : menu

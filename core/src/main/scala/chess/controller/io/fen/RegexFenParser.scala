@@ -137,6 +137,23 @@ object RegexFenParser extends FenIO {
     if (piece.color == Color.White) char.toUpper else char
   }
 
+  /** Parses a full 6-field FEN string and returns a [[FullFenState]]. Fields 5–6 (halfmove clock, fullmove number)
+    * default to 0 and 1 respectively when absent.
+    */
+  def parseFullFEN(input: String): Try[FullFenState] =
+    for
+      board <- parseFEN(input)
+      parts = input.trim.split("\\s+")
+      whiteToMove = parts.lift(1).forall(_.equalsIgnoreCase("w"))
+      halfmoveClock = parts.lift(4).flatMap(_.toIntOption).getOrElse(0)
+      fullmoveNumber = parts.lift(5).flatMap(_.toIntOption).getOrElse(1)
+    yield FullFenState(
+      board = board,
+      whiteToMove = whiteToMove,
+      halfmoveClock = halfmoveClock.max(0),
+      fullmoveNumber = fullmoveNumber.max(1)
+    )
+
   // --- FenIO interface ------------------------------------------------------
 
   override def save(board: Board): String = boardToFEN(board)

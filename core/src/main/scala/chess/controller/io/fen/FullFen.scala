@@ -13,18 +13,7 @@ final case class FullFenState(
 object FullFen:
 
   def parse(fen: String): Try[FullFenState] =
-    for
-      board <- RegexFenParser.parseFEN(fen)
-      parts = fen.trim.split("\\s+")
-      whiteToMove = parts.lift(1).forall(_.equalsIgnoreCase("w"))
-      halfmoveClock = parts.lift(4).flatMap(_.toIntOption).getOrElse(0)
-      fullmoveNumber = parts.lift(5).flatMap(_.toIntOption).getOrElse(1)
-    yield FullFenState(
-      board = board,
-      whiteToMove = whiteToMove,
-      halfmoveClock = halfmoveClock.max(0),
-      fullmoveNumber = fullmoveNumber.max(1)
-    )
+    RegexFenParser.parseFullFEN(fen)
 
   def render(
       board: Board,

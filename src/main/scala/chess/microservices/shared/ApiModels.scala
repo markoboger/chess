@@ -133,6 +133,27 @@ object OpeningLookupResponse:
   given Decoder[OpeningLookupResponse] = deriveDecoder
   given Encoder[OpeningLookupResponse] = deriveEncoder
 
+/** Request to compute an AI move for the current position.
+  * @param strategy
+  *   Strategy identifier: "random", "greedy", "material-balance", "piece-square", "minimax",
+  *   "quiescence", or "iterative-deepening"
+  */
+case class AiMoveRequest(strategy: String)
+
+object AiMoveRequest:
+  given Decoder[AiMoveRequest] = deriveDecoder
+  given Encoder[AiMoveRequest] = deriveEncoder
+
+/** Response after the backend computes an AI move.
+  * @param move
+  *   The chosen move in SAN notation, or None if no legal moves exist (game over)
+  */
+case class AiMoveResponse(move: Option[String])
+
+object AiMoveResponse:
+  given Decoder[AiMoveResponse] = deriveDecoder
+  given Encoder[AiMoveResponse] = deriveEncoder
+
 /** Health check response
   * @param status
   *   Health status ("ok" or "error")

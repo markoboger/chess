@@ -22,14 +22,15 @@ class ServiceProxy(client: Client[IO]):
     val targetRequest = request.withUri(targetUri)
 
     client.run(targetRequest).use { response =>
-      // Copy the response from the backend service
-      IO.pure(
+      // Read the entire body into memory while the connection is still open,
+      // then re-emit as a pure stream so the response is valid after resource release.
+      response.body.compile.toVector.map { bodyBytes =>
         Response[IO](
           status = response.status,
           headers = response.headers,
-          body = response.body
+          body = fs2.Stream.emits(bodyBytes)
         )
-      )
+      }
     }
 
   /** Build target URI for proxying

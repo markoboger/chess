@@ -25,11 +25,25 @@ export const CLOCK_PRESETS: { label: string; mode: ClockMode }[] = [
 
 export type GameMode = 'hvh' | 'hvc' | 'cvc'
 export type ComputerSide = 'white' | 'black'
-export type ComputerStrategyId = 'greedy' | 'opening-continuation'
+export type ComputerStrategyId =
+  | 'random'
+  | 'greedy'
+  | 'material-balance'
+  | 'piece-square'
+  | 'minimax'
+  | 'quiescence'
+  | 'iterative-deepening'
+  | 'opening-continuation'
 
 export const COMPUTER_STRATEGIES: { id: ComputerStrategyId; label: string }[] = [
-  { id: 'greedy', label: 'Greedy Capture' },
   { id: 'opening-continuation', label: 'Opening Continuation' },
+  { id: 'random',               label: 'Random' },
+  { id: 'greedy',               label: 'Greedy' },
+  { id: 'material-balance',     label: 'Material Balance' },
+  { id: 'piece-square',         label: 'Piece-Square Tables' },
+  { id: 'minimax',              label: 'Minimax (d=3)' },
+  { id: 'quiescence',           label: 'Minimax+QSearch (d=3)' },
+  { id: 'iterative-deepening',  label: 'Iterative Deepening' },
 ]
 
 export const useGameStore = defineStore('game', () => {
@@ -299,6 +313,19 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  // Strategies handled entirely in the browser (no backend round-trip needed)
+  const CLIENT_SIDE_STRATEGIES = new Set<ComputerStrategyId>(['opening-continuation', 'random', 'greedy'])
+
+  async function chooseBackendMove(strategy: ComputerStrategyId): Promise<string | null> {
+    if (!gameId.value) return null
+    try {
+      const response = await gameApi.aiMove(gameId.value, strategy)
+      return response.move ?? null
+    } catch {
+      return null
+    }
+  }
+
   function makeComputerMove() {
     if (computerScheduled.value || paused.value || isGameOver.value) return
     if (!isComputerTurn()) return
@@ -311,12 +338,29 @@ export const useGameStore = defineStore('game', () => {
       computerScheduled.value = false
       if (paused.value || isGameOver.value || !isComputerTurn() || !isAtLatest.value) return
 
+      const strategy = currentComputerStrategy()
       const moves = chess.value.moves({ verbose: true })
       if (moves.length === 0) return
 
+      if (!CLIENT_SIDE_STRATEGIES.has(strategy)) {
+        // Delegate to the backend strategy engine
+        const san = await chooseBackendMove(strategy)
+        if (san) {
+          const parsed = new Chess(chess.value.fen()).move(san as any)
+          if (parsed) {
+            const ok = await applyMove(parsed.from, parsed.to, parsed.promotion)
+            if (ok) triggerComputerMoveIfNeeded()
+          }
+        }
+        return
+      }
+
       let chosen: any
-      if (currentComputerStrategy() === 'opening-continuation') {
+      if (strategy === 'opening-continuation') {
         chosen = await chooseOpeningContinuationMove()
+      }
+      if (!chosen && strategy === 'random') {
+        chosen = moves[Math.floor(Math.random() * moves.length)]
       }
       if (!chosen) chosen = chooseGreedyMove(moves)
 

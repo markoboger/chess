@@ -33,6 +33,14 @@ export interface LoadFenResponse {
   fen: string
 }
 
+export interface AiMoveRequest {
+  strategy: string
+}
+
+export interface AiMoveResponse {
+  move?: string
+}
+
 export interface Opening {
   code: string
   name: string

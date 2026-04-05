@@ -118,6 +118,7 @@ lazy val Data = project
 
 lazy val Chess = project
   .in(file("."))
+  .aggregate(Core, App, Realtime, Data)
   .dependsOn(Core, App, Realtime, Data)
   .settings(
     name := "Chess",

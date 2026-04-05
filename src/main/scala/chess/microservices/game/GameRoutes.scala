@@ -103,4 +103,13 @@ object GameRoutes:
               BadRequest(ErrorResponse(error))
           }
         }
+
+      // POST /games/:id/ai-move - Compute an AI move using the specified strategy
+      case req @ POST -> Root / "games" / gameId / "ai-move" =>
+        req.asJsonDecode[AiMoveRequest].flatMap { request =>
+          gameSessions.computeAiMove(gameId, request.strategy).flatMap {
+            case Right(move) => Ok(AiMoveResponse(move))
+            case Left(error) => BadRequest(ErrorResponse(error))
+          }
+        }
     }
