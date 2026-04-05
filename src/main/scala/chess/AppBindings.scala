@@ -1,8 +1,9 @@
 package chess
 
 import cats.effect.IO
-import chess.controller.io.{FenIO, PgnIO}
+import chess.controller.io.{FenIO, PgnIO, OpeningIO}
 import chess.controller.io.fen.{RegexFenParser, CombinatorFenParser, FastParseFenParser}
+import chess.controller.io.opening.OpeningParser
 import chess.controller.io.pgn.{PgnFileIO, CombinatorPgnParser, FastParsePgnParser}
 import chess.persistence.OpeningRepository
 import chess.persistence.memory.InMemoryOpeningRepository
@@ -23,6 +24,9 @@ object AppBindings:
   given PgnIO = PgnFileIO()
   // given PgnIO = CombinatorPgnParser
   // given PgnIO = FastParsePgnParser
+
+  // --- OpeningIO ------------------------------------------------------------
+  given OpeningIO = OpeningParser
 
   // --- OpeningRepository ----------------------------------------------------
   given OpeningRepository[IO] = InMemoryOpeningRepository.fromLichess()

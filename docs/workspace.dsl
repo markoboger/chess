@@ -90,9 +90,10 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
 
                 # ── chess.controller.io ───────────────────────────────────────
                 group "chess.controller.io" {
-                    fenIOTrait  = component "FenIO"   "trait. load(s: String): Try[Board]. save(b: Board): String. Pluggable FEN serialisation; default bound via AppBindings given." "trait · FenIO.scala"
-                    pgnIOTrait  = component "PgnIO"   "trait. loadFile(path), parseMove(san,board,color), toAlgebraic(from,to,before,after,isWhite), pgnText(moves). Pluggable PGN serialisation." "trait · PgnIO.scala"
-                    fileIOTrait = component "FileIO"  "trait. save(board): String. load(s: String): Try[Board]. Abstracts JSON board file persistence." "trait · FileIO.scala"
+                    fenIOTrait     = component "FenIO"     "trait. load(s: String): Try[Board]. save(b: Board): String. Pluggable FEN serialisation; default bound via AppBindings given." "trait · FenIO.scala"
+                    pgnIOTrait     = component "PgnIO"     "trait. loadFile(path), parseMove(san,board,color), toAlgebraic(from,to,before,after,isWhite), pgnText(moves). Pluggable PGN serialisation." "trait · PgnIO.scala"
+                    fileIOTrait    = component "FileIO"    "trait. save(board): String. load(s: String): Try[Board]. Abstracts JSON board file persistence." "trait · FileIO.scala"
+                    openingIOTrait = component "OpeningIO" "trait. parseLichessOpenings(): List[Opening], parseTsvResource(path): Try[List[Opening]], parseCsvResource(path): Try[List[Opening]]. Bound via AppBindings given." "trait · OpeningIO.scala"
                 }
 
                 group "chess.controller.io.fen" {
@@ -111,6 +112,10 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
                 group "chess.controller.io.json" {
                     circeJsonComp   = component "CirceJsonFileIO + BoardCodecs (Circe)"   "object (FileIO) + given Encoder/Decoder for Board, Piece, Square. Board as 8x8 nullable array + lastMove. Cross-compatible JSON with uPickle." "object · circe/"
                     upickleJsonComp = component "UPickleJsonFileIO + BoardCodecs (uPickle)" "object (FileIO) + given ReadWriter. Identical JSON structure to Circe variant." "object · upickle/"
+                }
+
+                group "chess.controller.io.opening" {
+                    openingParserComp = component "OpeningParser" "object (OpeningIO). Classpath-based parser for Lichess TSV and legacy CSV files. parseLichessOpenings, parseTsvLine, parseCsvOpenings, parseTsvResource/parseCsvResource, computeFenAndMoveCount, deduplicate, validateOpenings, printStatistics. DEFAULT OpeningIO binding in AppBindings." "object · OpeningParser.scala"
                 }
 
                 group "chess.controller.clock" {
@@ -133,7 +138,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
                 }
 
                 group "chess.persistence.memory" {
-                    inMemoryOpeningComp = component "InMemoryOpeningRepository" "class. Cats Effect IO + mutable Map[(eco,name), Opening]. fromLichess(): loads all 5 TSV files via OpeningSeeder at startup. DEFAULT OpeningRepository[IO] binding in AppBindings." "class · InMemoryOpeningRepository.scala"
+                    inMemoryOpeningComp = component "InMemoryOpeningRepository" "class. Cats Effect IO + mutable Map[(eco,name), Opening]. fromLichess()(using OpeningIO): loads all 5 TSV files at startup. DEFAULT OpeningRepository[IO] binding in AppBindings." "class · InMemoryOpeningRepository.scala"
                 }
 
                 group "chess.persistence.postgres" {
@@ -146,10 +151,6 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
                     mongoOpeningComp = component "MongoOpeningRepository" "class (OpeningRepository[IO]). mongo4cats. Collection: openings. Filter.regex for name search." "class · MongoOpeningRepository.scala"
                 }
 
-                group "chess.persistence.util" {
-                    openingParserComp = component "OpeningParser" "object. Pure parsing only — no IO effect type. parseLichessOpenings(): List[Opening], parseTsvLine, parseCsvOpenings, parseTsvResource/parseCsvResource: Try[List[Opening]], computeFenAndMoveCount, deduplicate, validateOpenings, printStatistics. No repository dependency." "object · OpeningParser.scala"
-                }
-
                 # ── chess.aview ───────────────────────────────────────────────
                 group "chess.aview" {
                     chessGUIComp    = component "ChessGUI"    "class. JavaFX/ScalaFX board UI. Drag-and-drop + text-field input, back/forward history buttons, FEN display, PGN TextArea, opening name label, New Game. Extends Observer[MoveResult]; self-registers on GameController." "class · ChessGUI.scala"
@@ -158,7 +159,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
 
                 # ── chess (root package) ──────────────────────────────────────
                 group "chess (root)" {
-                    appBindingsComp = component "AppBindings" "object. given FenIO = RegexFenParser. given PgnIO = PgnFileIO(). given OpeningRepository[IO] = InMemoryOpeningRepository.fromLichess(). Swap any implementation by changing one line." "object · AppBindings.scala"
+                    appBindingsComp = component "AppBindings" "object. given FenIO = RegexFenParser. given PgnIO = PgnFileIO(). given OpeningIO = OpeningParser. given OpeningRepository[IO] = InMemoryOpeningRepository.fromLichess(). Swap any implementation by changing one line." "object · AppBindings.scala"
                     chessAppComp    = component "ChessApp"    "object (IOApp). Parses --gui/--console CLI arg. Creates GameController + ComputerPlayer + OpeningRepository, then launches ChessGUI or ConsoleView." "object · ChessApp.scala"
                 }
             }
@@ -292,7 +293,8 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         postgresOpeningComp -> postgres          "JDBC / Doobie"
         mongoGameComp       -> mongodb           "mongo4cats"
         mongoOpeningComp    -> mongodb           "mongo4cats"
-        inMemoryOpeningComp -> openingParserComp  "Seeded at startup by (parseLichessOpenings)"
+        openingIOTrait      -> openingParserComp  "implemented by (DEFAULT)"
+        inMemoryOpeningComp -> openingIOTrait     "Seeded at startup via (using OpeningIO)"
         openingSeederComp   -> openingParserComp  "Delegates parsing to"
         openingSeederComp   -> openingRepoTrait   "Bulk-saves via"
         seedAppComp         -> openingSeederComp  "Calls seed methods"
@@ -388,19 +390,20 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
             include fenIOTrait regexFenComp combinatorFenComp fastParseFenComp
             include pgnIOTrait pgnParserComp pgnFileIOComp combinatorPgnComp fastParsePgnComp
             include fileIOTrait circeJsonComp upickleJsonComp
+            include openingIOTrait openingParserComp
             autoLayout
-            title "Level 4 - chess.controller.io (FEN, PGN, JSON I/O traits and implementations)"
+            title "Level 4 - chess.controller.io (FEN, PGN, JSON, Opening I/O traits and implementations)"
         }
 
         # ── Level 4 — chess.persistence: models, traits, adapters ──────────────
         component chess "L4_Persistence" {
             include openingClass persistedGameClass
             include openingRepoTrait gameRepoTrait
-            include inMemoryOpeningComp openingParserComp
+            include inMemoryOpeningComp
             include postgresGameComp postgresOpeningComp
             include mongoGameComp mongoOpeningComp
             autoLayout
-            title "Level 4 - chess.persistence (models, repository traits, adapters, parser)"
+            title "Level 4 - chess.persistence (models, repository traits, adapters)"
         }
 
         # ── Level 4 — chess.aview: views and entry points ──────────────────────

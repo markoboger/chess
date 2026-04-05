@@ -1,19 +1,20 @@
-package chess.persistence.util
+package chess.controller.io.opening
 
 import chess.controller.GameController
-import chess.controller.io.FenIO
+import chess.controller.io.{FenIO, OpeningIO}
 import chess.model.Board
 import chess.persistence.model.Opening
 
 import scala.io.Source
 import scala.util.{Try, Using}
 
-/** Pure parsing and validation utilities for chess openings loaded from TSV/CSV files.
+/** Classpath-based implementation of [[OpeningIO]].
   *
-  * This object has no dependency on any repository or effect type. It reads classpath resources and produces
-  * [[Opening]] values. For seeding parsed openings into a database, see the `seeder` subproject.
+  * Parses Lichess TSV files and legacy CSV files from classpath resources into [[Opening]] values. Also exposes
+  * lower-level parsing utilities used by the `seeder` subproject. For seeding parsed openings into a database, see
+  * `chess.seeder.OpeningSeeder`.
   */
-object OpeningParser:
+object OpeningParser extends OpeningIO:
 
   // ── In-memory parsing ──────────────────────────────────────────────────────
 

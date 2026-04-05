@@ -1,4 +1,4 @@
-package chess.persistence.util
+package chess.controller.io.opening
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec

@@ -1,6 +1,7 @@
 package chess.persistence.memory
 
 import cats.effect.unsafe.implicits.global
+import chess.controller.io.opening.OpeningParser
 import chess.persistence.model.Opening
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -179,6 +180,7 @@ class InMemoryOpeningRepositorySpec extends AnyWordSpec with Matchers {
 
   "fromLichess" should {
     "load all Lichess openings from TSV resources" in {
+      given chess.controller.io.OpeningIO = OpeningParser
       val repo = InMemoryOpeningRepository.fromLichess()
       repo.count().unsafeRunSync() should be > 2000L
     }
