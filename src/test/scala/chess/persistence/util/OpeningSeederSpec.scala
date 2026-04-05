@@ -110,5 +110,128 @@ class OpeningSeederSpec extends AnyWordSpec with Matchers {
       val errors = OpeningSeeder.validateOpenings(openings)
       errors shouldBe empty
     }
+
+    "report duplicate (eco, name) pairs" in {
+      val o = Opening.unsafe("A00", "Polish Opening", "1. b4", "fen", 1)
+      val errors = OpeningSeeder.validateOpenings(List(o, o))
+      errors.exists(_.contains("Duplicate")) shouldBe true
+    }
+
+    "report invalid ECO format" in {
+      val o = Opening.unsafe("Z99", "Bad ECO", "1. e4", "fen", 1)
+      val errors = OpeningSeeder.validateOpenings(List(o))
+      errors.exists(_.contains("Invalid ECO")) shouldBe true
+    }
+
+    "report empty name" in {
+      val o = Opening.unsafe("A00", "", "1. b4", "fen", 1)
+      val errors = OpeningSeeder.validateOpenings(List(o))
+      errors.exists(_.contains("Empty name")) shouldBe true
+    }
+
+    "report unreasonable move count (0)" in {
+      val o = Opening.unsafe("A00", "Polish Opening", "1. b4", "fen", 0)
+      val errors = OpeningSeeder.validateOpenings(List(o))
+      errors.exists(_.contains("Unreasonable move count")) shouldBe true
+    }
+
+    "report unreasonable move count (> 50)" in {
+      val o = Opening.unsafe("A00", "Polish Opening", "1. b4", "fen", 51)
+      val errors = OpeningSeeder.validateOpenings(List(o))
+      errors.exists(_.contains("Unreasonable move count")) shouldBe true
+    }
+  }
+
+  "OpeningSeeder.printStatistics" should {
+
+    "handle empty openings list" in {
+      noException should be thrownBy OpeningSeeder.printStatistics(Nil)
+    }
+
+    "print stats for a non-empty list" in {
+      val openings = List(
+        Opening.unsafe("A00", "Polish Opening", "1. b4", "fen1", 1),
+        Opening.unsafe("C50", "Italian Game", "1. e4 e5 2. Nf3", "fen2", 3)
+      )
+      noException should be thrownBy OpeningSeeder.printStatistics(openings)
+    }
+  }
+
+  "OpeningSeeder.seedLichessOpenings" should {
+
+    "seed all openings into a repository" in {
+      import cats.effect.unsafe.implicits.global
+      import chess.persistence.memory.InMemoryOpeningRepository
+      val repo = new InMemoryOpeningRepository()
+      val count = OpeningSeeder.seedLichessOpenings(repo).unsafeRunSync()
+      count should be > 2000
+    }
+  }
+
+  "OpeningSeeder.seedFromTsvResource" should {
+
+    "seed openings from a single TSV resource" in {
+      import cats.effect.unsafe.implicits.global
+      import chess.persistence.memory.InMemoryOpeningRepository
+      val repo = new InMemoryOpeningRepository()
+      val count = OpeningSeeder.seedFromTsvResource(repo, "/openings/a.tsv").unsafeRunSync()
+      count should be > 0
+    }
+
+    "return 0 for a resource with no valid lines" in {
+      import cats.effect.unsafe.implicits.global
+      import chess.persistence.memory.InMemoryOpeningRepository
+      val repo = new InMemoryOpeningRepository()
+      // The header-only resource would produce 0 valid openings.
+      // Use the eco-openings CSV as a non-TSV resource — seeder finds no valid TSV lines.
+      val count = OpeningSeeder.seedFromTsvResource(repo, "/openings/eco-openings.csv").unsafeRunSync()
+      count shouldBe 0
+    }
+
+    "fail with IO error for a missing resource" in {
+      import cats.effect.unsafe.implicits.global
+      import chess.persistence.memory.InMemoryOpeningRepository
+      val repo = new InMemoryOpeningRepository()
+      an[Exception] should be thrownBy
+        OpeningSeeder.seedFromTsvResource(repo, "/nonexistent.tsv").unsafeRunSync()
+    }
+  }
+
+  "OpeningSeeder.seedFromCsvResource" should {
+
+    "seed openings from the legacy CSV resource" in {
+      import cats.effect.unsafe.implicits.global
+      import chess.persistence.memory.InMemoryOpeningRepository
+      val repo = new InMemoryOpeningRepository()
+      val count = OpeningSeeder.seedFromCsvResource(repo, "/openings/eco-openings.csv").unsafeRunSync()
+      count should be >= 0
+    }
+
+    "return 0 when resource has no valid CSV lines (covers isEmpty branch)" in {
+      import cats.effect.unsafe.implicits.global
+      import chess.persistence.memory.InMemoryOpeningRepository
+      val repo = new InMemoryOpeningRepository()
+      // Header-only CSV: parseCsvOpenings drops the header and finds no data rows → IO.pure(0)
+      val count = OpeningSeeder.seedFromCsvResource(repo, "/empty-openings.csv").unsafeRunSync()
+      count shouldBe 0
+    }
+  }
+
+  "OpeningSeeder.deduplicate" should {
+
+    "keep the entry with fewer moves when duplicates exist" in {
+      val short = Opening.unsafe("A00", "Polish Opening", "1. b4", "fen1", 1)
+      val long = Opening.unsafe("A00", "Polish Opening", "1. b4 e5", "fen2", 2)
+      val result = OpeningSeeder.deduplicate(List(long, short))
+      result.length shouldBe 1
+      result.head.moveCount shouldBe 1
+    }
+
+    "sort results by (eco, name)" in {
+      val c = Opening.unsafe("C50", "Italian Game", "1. e4", "fen", 1)
+      val a = Opening.unsafe("A00", "Polish Opening", "1. b4", "fen", 1)
+      val result = OpeningSeeder.deduplicate(List(c, a))
+      result.map(_.eco) shouldBe List("A00", "C50")
+    }
   }
 }

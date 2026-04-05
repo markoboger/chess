@@ -211,6 +211,7 @@ final class StrategySpec extends AnyWordSpec with Matchers:
   private val rookOnD5 = fen("4k3/8/8/3r4/8/8/8/3QK3")
   private val bishopOnD5 = fen("4k3/8/8/3b4/8/8/8/3QK3")
   private val pawnOnD5 = fen("4k3/8/8/3p4/8/8/8/3QK3")
+  private val knightOnD5 = fen("4k3/8/8/3n4/8/8/8/3QK3")
 
   "GreedyStrategy" should {
     "have the correct name" in {
@@ -242,6 +243,13 @@ final class StrategySpec extends AnyWordSpec with Matchers:
     "prefer a pawn capture over quiet moves" in {
       val s = new GreedyStrategy
       val result = s.selectMove(pawnOnD5, Color.White)
+      result shouldBe defined
+      result.get._2 shouldBe Square("d5")
+    }
+
+    "prefer a knight capture over quiet moves" in {
+      val s = new GreedyStrategy
+      val result = s.selectMove(knightOnD5, Color.White)
       result shouldBe defined
       result.get._2 shouldBe Square("d5")
     }

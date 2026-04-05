@@ -16,7 +16,9 @@ import chess.controller.{GameController, ComputerPlayer, MoveStrategy}
 import chess.controller.puzzle.PuzzleParser
 import chess.model.Puzzle
 import chess.persistence.model.Opening
-import chess.persistence.util.OpeningSeeder
+import chess.persistence.repository.OpeningRepository
+import cats.effect.IO
+import cats.effect.unsafe.implicits.global
 import chess.controller.strategy.{
   RandomStrategy,
   GreedyStrategy,
@@ -74,7 +76,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     PuzzleParser.fromResource("/puzzle/lichess_small_puzzle.csv")
 
   private lazy val openings: List[Opening] =
-    OpeningSeeder.parseLichessOpenings()
+    summon[OpeningRepository[IO]].findAll(limit = 10000).unsafeRunSync()
 
   private var pauseButton: Button = uninitialized
   private var gameButtonBox: HBox = uninitialized

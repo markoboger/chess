@@ -88,6 +88,10 @@ class MoveResultSpec extends AnyWordSpec with Matchers {
       failed.event shouldBe None
     }
 
+    "return None via movedOption" in {
+      failed.movedOption shouldBe None
+    }
+
     "not apply f in foreach" in {
       var called = false
       failed.foreach(_ => called = true)

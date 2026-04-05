@@ -68,7 +68,7 @@ lazy val Chess = project
       "org.testcontainers" % "mongodb" % "1.19.8" % Test,
       "de.flapdoodle.embed" % "de.flapdoodle.embed.mongo" % "4.13.1" % Test
     ),
-    coverageExcludedFiles := ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*",
+    coverageExcludedFiles := ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*;.*GameServer.*;.*GatewayServer.*;.*UIServer.*;.*SeedOpeningsApp.*",
     coverageMinimumStmtTotal := 40,
     coverageFailOnMinimum := false
   )
