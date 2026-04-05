@@ -2,16 +2,19 @@ package chess.persistence.model
 
 /** Represents a chess opening stored in the database.
   *
+  * Multiple openings can share the same ECO code (e.g., A00 covers Polish Opening, Grob Opening, etc.). The combination
+  * of (eco, name) is unique.
+  *
   * @param eco
   *   ECO (Encyclopedia of Chess Openings) code (e.g., "A00", "B12", "C45")
   * @param name
-  *   Full name of the opening (e.g., "Sicilian Defense, Najdorf Variation")
+  *   Full name of the opening (e.g., "Sicilian Defense: Najdorf Variation, English Attack")
   * @param moves
   *   PGN moves representing the opening line
   * @param fen
   *   FEN position after the opening moves are played
   * @param moveCount
-  *   Number of moves in the opening line
+  *   Number of half-moves (plies) in the opening line
   */
 final case class Opening(
     eco: String,

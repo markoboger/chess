@@ -21,11 +21,12 @@ class PostgresOpeningRepository(xa: Transactor[IO]) extends OpeningRepository[IO
   def createTable(): IO[Unit] =
     sql"""
       CREATE TABLE IF NOT EXISTS openings (
-        eco VARCHAR(3) PRIMARY KEY,
+        eco VARCHAR(3) NOT NULL,
         name VARCHAR(255) NOT NULL,
         moves TEXT NOT NULL,
         fen TEXT NOT NULL,
-        move_count INTEGER NOT NULL
+        move_count INTEGER NOT NULL,
+        PRIMARY KEY (eco, name)
       )
     """.update.run.transact(xa).void
 
@@ -40,8 +41,7 @@ class PostgresOpeningRepository(xa: Transactor[IO]) extends OpeningRepository[IO
     sql"""
       INSERT INTO openings (eco, name, moves, fen, move_count)
       VALUES (${opening.eco}, ${opening.name}, ${opening.moves}, ${opening.fen}, ${opening.moveCount})
-      ON CONFLICT (eco) DO UPDATE SET
-        name = EXCLUDED.name,
+      ON CONFLICT (eco, name) DO UPDATE SET
         moves = EXCLUDED.moves,
         fen = EXCLUDED.fen,
         move_count = EXCLUDED.move_count
@@ -50,16 +50,26 @@ class PostgresOpeningRepository(xa: Transactor[IO]) extends OpeningRepository[IO
   override def saveAll(openings: List[Opening]): IO[Int] =
     if openings.isEmpty then IO.pure(0)
     else
-      val sql = "INSERT INTO openings (eco, name, moves, fen, move_count) VALUES (?, ?, ?, ?, ?)"
-      Update[Opening](sql)
+      val stmt =
+        """INSERT INTO openings (eco, name, moves, fen, move_count) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT (eco, name) DO UPDATE SET moves = EXCLUDED.moves, fen = EXCLUDED.fen, move_count = EXCLUDED.move_count"""
+      Update[Opening](stmt)
         .updateMany(openings)
         .transact(xa)
 
-  override def findByEco(eco: String): IO[Option[Opening]] =
+  override def findByEco(eco: String): IO[List[Opening]] =
     sql"""
       SELECT eco, name, moves, fen, move_count
       FROM openings
       WHERE eco = $eco
+      ORDER BY name
+    """.query[Opening].to[List].transact(xa)
+
+  override def findByEcoAndName(eco: String, name: String): IO[Option[Opening]] =
+    sql"""
+      SELECT eco, name, moves, fen, move_count
+      FROM openings
+      WHERE eco = $eco AND name = $name
     """.query[Opening].option.transact(xa)
 
   override def findByName(nameQuery: String, limit: Int = 50): IO[List[Opening]] =
@@ -107,9 +117,7 @@ class PostgresOpeningRepository(xa: Transactor[IO]) extends OpeningRepository[IO
       .transact(xa)
 
   override def deleteAll(): IO[Long] =
-    sql"DELETE FROM openings"
-      .update
-      .run
+    sql"DELETE FROM openings".update.run
       .transact(xa)
       .map(_.toLong)
 

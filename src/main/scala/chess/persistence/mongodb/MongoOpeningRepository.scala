@@ -23,7 +23,7 @@ class MongoOpeningRepository(collection: MongoCollection[IO, Opening]) extends O
     import mongo4cats.models.collection.FindOneAndReplaceOptions
     collection
       .findOneAndReplace(
-        Filter.eq("eco", opening.eco),
+        Filter.eq("eco", opening.eco) && Filter.eq("name", opening.name),
         opening,
         FindOneAndReplaceOptions().upsert(true)
       )
@@ -31,11 +31,17 @@ class MongoOpeningRepository(collection: MongoCollection[IO, Opening]) extends O
 
   override def saveAll(openings: List[Opening]): IO[Int] =
     if openings.isEmpty then IO.pure(0)
-    else
-      collection.insertMany(openings).map(_.getInsertedIds.size())
+    else collection.insertMany(openings).map(_.getInsertedIds.size())
 
-  override def findByEco(eco: String): IO[Option[Opening]] =
-    collection.find(Filter.eq("eco", eco)).first
+  override def findByEco(eco: String): IO[List[Opening]] =
+    collection
+      .find(Filter.eq("eco", eco))
+      .sort(Sort.asc("name"))
+      .all
+      .map(_.toList)
+
+  override def findByEcoAndName(eco: String, name: String): IO[Option[Opening]] =
+    collection.find(Filter.eq("eco", eco) && Filter.eq("name", name)).first
 
   override def findByName(nameQuery: String, limit: Int = 50): IO[List[Opening]] =
     collection

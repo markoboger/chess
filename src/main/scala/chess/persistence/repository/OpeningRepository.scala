@@ -30,14 +30,25 @@ trait OpeningRepository[F[_]]:
     */
   def saveAll(openings: List[Opening]): F[Int]
 
-  /** Retrieves an opening by its ECO code.
+  /** Retrieves all openings for an ECO code (e.g., all A00 variations).
     *
     * @param eco
     *   The ECO code (e.g., "B12", "C45")
     * @return
+    *   List of openings for this ECO code, wrapped in effect F
+    */
+  def findByEco(eco: String): F[List[Opening]]
+
+  /** Retrieves a specific opening by its ECO code and name.
+    *
+    * @param eco
+    *   The ECO code
+    * @param name
+    *   The full opening name
+    * @return
     *   Some(opening) if found, None if not found, wrapped in effect F
     */
-  def findByEco(eco: String): F[Option[Opening]]
+  def findByEcoAndName(eco: String, name: String): F[Option[Opening]]
 
   /** Searches for openings by name (case-insensitive substring match).
     *

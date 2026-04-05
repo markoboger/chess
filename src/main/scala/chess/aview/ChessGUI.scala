@@ -15,6 +15,8 @@ import scalafx.stage.FileChooser.ExtensionFilter
 import chess.controller.{GameController, ComputerPlayer, MoveStrategy}
 import chess.controller.puzzle.PuzzleParser
 import chess.model.Puzzle
+import chess.persistence.model.Opening
+import chess.persistence.util.OpeningSeeder
 import chess.controller.strategy.{
   RandomStrategy,
   GreedyStrategy,
@@ -71,6 +73,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private lazy val puzzles: Vector[Puzzle] =
     PuzzleParser.fromResource("/puzzle/lichess_small_puzzle.csv")
 
+  private lazy val openings: List[Opening] =
+    OpeningSeeder.parseLichessOpenings()
+
   private var pauseButton: Button = uninitialized
   private var gameButtonBox: HBox = uninitialized
   private[aview] var primaryStage: Stage = uninitialized
@@ -89,6 +94,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var whiteStrategyLabel: Label = uninitialized
   private var puzzleInfoLabel: Label = uninitialized
   private var puzzleLink: scalafx.scene.control.Hyperlink = uninitialized
+  private var openingInfoLabel: Label = uninitialized
   private var blackStrategyLabel: Label = uninitialized
 
   // ── Chess clock ────────────────────────────────────────────────────────────
@@ -438,6 +444,10 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         controller.announceInitial(Board.initial)
         selectedSquare = None
         pgnDisplay.children.clear()
+        if (openingInfoLabel != null) {
+          openingInfoLabel.visible = false
+          openingInfoLabel.managed = false
+        }
         if (puzzleInfoLabel != null) {
           puzzleInfoLabel.visible = false
           puzzleInfoLabel.managed = false
@@ -511,6 +521,14 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       }
     }
 
+    openingInfoLabel = new Label("") {
+      wrapText = true
+      maxWidth = 260
+      style = "-fx-font-size: 11px; -fx-text-fill: #555555;"
+      visible = false
+      managed = false
+    }
+
     val panelNormalStyle =
       "-fx-border-color: #cccccc; -fx-border-width: 0 0 0 1;"
     val panelDropStyle =
@@ -531,6 +549,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         fenScrollPane,
         new Separator(),
         gameButtonBox,
+        openingInfoLabel,
         puzzleInfoLabel,
         puzzleLink
       )
@@ -1364,8 +1383,59 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       items = puzzleThemeMenus
     }
 
+    // ── Openings menu — grouped by ECO family → ECO code → variation ────────
+    val openingsByFamily: Seq[(Char, List[Opening])] =
+      openings
+        .groupBy(_.eco.charAt(0))
+        .toSeq
+        .sortBy(_._1)
+
+    val openingFamilyMenus = openingsByFamily.map { case (family, familyOpenings) =>
+      val familyDesc = family match {
+        case 'A' => "A — Flank Openings"
+        case 'B' => "B — Semi-Open Games"
+        case 'C' => "C — Open Games"
+        case 'D' => "D — Closed & Semi-Closed"
+        case 'E' => "E — Indian Defenses"
+        case c   => s"$c"
+      }
+      val byEco = familyOpenings.groupBy(_.eco).toSeq.sortBy(_._1)
+      val familyMenu = new Menu(s"$familyDesc  (${familyOpenings.length})")
+      familyMenu.items = byEco.map { case (eco, ecoOpenings) =>
+        val ecoMenu = new Menu(s"$eco  (${ecoOpenings.length})")
+        ecoMenu.items = ecoOpenings.sortBy(_.name).map { opening =>
+          new MenuItem(s"${opening.name}  [${opening.moveCount} plies]") {
+            onAction = _ => {
+              gameMode = GameMode.HumanVsHuman
+              updatePauseButtonVisibility()
+              selectedSquare = None
+              controller.loadPgnMoves(opening.moves)
+              if (openingInfoLabel != null) {
+                openingInfoLabel.text = s"${opening.eco}  ${opening.name}\n${opening.moves}"
+                openingInfoLabel.visible = true
+                openingInfoLabel.managed = true
+              }
+              // Hide puzzle info when showing an opening
+              if (puzzleInfoLabel != null) {
+                puzzleInfoLabel.visible = false; puzzleInfoLabel.managed = false
+              }
+              if (puzzleLink != null) {
+                puzzleLink.visible = false; puzzleLink.managed = false
+              }
+            }
+          }
+        }
+        ecoMenu
+      }
+      familyMenu
+    }
+
+    val openingsMenu = new Menu("Openings") {
+      items = openingFamilyMenus
+    }
+
     new MenuBar {
-      menus = Seq(fileMenu, gameMenu, strategyMenu, clockMenu, viewMenu, puzzlesMenu)
+      menus = Seq(fileMenu, gameMenu, strategyMenu, clockMenu, viewMenu, openingsMenu, puzzlesMenu)
     }
   }
 

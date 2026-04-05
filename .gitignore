@@ -47,3 +47,4 @@ scoverage-report/
 .bloop/
 metals.sbt
 project/metals.sbt
+frontend/.vite/
