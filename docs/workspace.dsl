@@ -338,7 +338,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         # docker-compose.yml spins up five named containers on a single bridge
         # network.  Not containerised: chess (desktop app), seeder (sbt CLI),
         # uiService (Dockerfile.ui-service exists but not listed in compose).
-        deploymentEnvironment "Docker Compose" "Local dev / integration stack defined in docker-compose.yml. All five containers share the 'chess-network' Docker bridge. Persistent volumes: mongodb_data, postgres_data." {
+        deploymentEnvironment "Docker Compose" {
 
             deploymentNode "chess-network" "Docker bridge network shared by all compose services" "Docker bridge" {
 
