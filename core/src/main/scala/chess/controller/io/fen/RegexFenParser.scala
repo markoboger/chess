@@ -1,7 +1,7 @@
 package chess.controller.io.fen
 
 import chess.controller.io.FenIO
-import chess.model.{Board, Piece, Role, Color}
+import chess.model.{Board, CastlingRights, Piece, Role, Color}
 import scala.util.{Try, Success, Failure}
 
 object RegexFenParser extends FenIO {
@@ -21,7 +21,10 @@ object RegexFenParser extends FenIO {
       if (boardPart.isEmpty) {
         throw new IllegalArgumentException("FEN string is empty")
       }
-      parseBoardFromFEN(boardPart)
+      val activeColorWhite = parts.lift(1).forall(_.equalsIgnoreCase("w"))
+      val castlingRights = parts.lift(2).map(FullFen.parseCastling).getOrElse(CastlingRights())
+      val lastMove = parts.lift(3).flatMap(FullFen.parseEnPassantTarget(_, activeColorWhite))
+      parseBoardFromFEN(boardPart).copy(castlingRights = castlingRights, lastMove = lastMove)
     }
   }
 

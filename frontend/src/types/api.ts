@@ -5,8 +5,6 @@ export interface CreateGameRequest {
 export interface CreateGameResponse {
   gameId: string
   fen: string
-  pgn: string
-  status: string
 }
 
 export interface GameStateResponse {
@@ -14,11 +12,6 @@ export interface GameStateResponse {
   fen: string
   pgn: string
   status: string
-  moveHistory: string[]
-  turn: string
-  isCheck: boolean
-  isCheckmate: boolean
-  isStalemate: boolean
 }
 
 export interface MakeMoveRequest {
@@ -28,13 +21,15 @@ export interface MakeMoveRequest {
 export interface MakeMoveResponse {
   success: boolean
   fen: string
-  pgn: string
-  status: string
-  moveHistory: string[]
-  error?: string
+  event?: string
 }
 
 export interface LoadFenRequest {
+  fen: string
+}
+
+export interface LoadFenResponse {
+  success: boolean
   fen: string
 }
 

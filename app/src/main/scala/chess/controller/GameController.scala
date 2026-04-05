@@ -2,6 +2,7 @@ package chess.controller
 
 import chess.model.{Board, Color, Piece, Role, PromotableRole, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.controller.io.{FenIO, PgnIO}
+import chess.controller.io.fen.FullFen
 import chess.controller.io.pgn.PGNParser
 import chess.util.Observable
 import scala.util.{Try, Success, Failure}
@@ -10,11 +11,22 @@ final class GameController(initialBoard: Board)(using
     val fenIO: FenIO,
     val pgnIO: PgnIO
 ) extends Observable[MoveResult]:
+  private case class HistoryState(
+      board: Board,
+      whiteToMove: Boolean,
+      halfmoveClock: Int,
+      fullmoveNumber: Int
+  )
+
   private var currentBoard: Board = initialBoard
   private var _isWhiteToMove: Boolean = true
+  private var _halfmoveClock: Int = 0
+  private var _fullmoveNumber: Int = 1
 
   // Move history for forward/backward navigation
-  private var _boardStates: Vector[Board] = Vector(initialBoard)
+  private var _history: Vector[HistoryState] = Vector(
+    HistoryState(initialBoard, whiteToMove = true, halfmoveClock = 0, fullmoveNumber = 1)
+  )
   private var _pgnMoves: Vector[String] = Vector.empty
   private var _currentIndex: Int = 0
 
@@ -45,7 +57,7 @@ final class GameController(initialBoard: Board)(using
   def isWhiteToMove: Boolean = _isWhiteToMove
 
   /** All board states from initial to latest. */
-  def boardStates: Vector[Board] = _boardStates
+  def boardStates: Vector[Board] = _history.map(_.board)
 
   /** PGN move strings in order. `pgnMoves(i)` transitions from `boardStates(i)` to `boardStates(i+1)`.
     */
@@ -55,7 +67,7 @@ final class GameController(initialBoard: Board)(using
   def currentIndex: Int = _currentIndex
 
   /** Whether we are viewing the latest position (moves are allowed). */
-  def isAtLatest: Boolean = _currentIndex == _boardStates.length - 1
+  def isAtLatest: Boolean = _currentIndex == _history.length - 1
 
   /** Format the move history as a PGN move text. */
   def pgnText: String = pgnIO.save(_pgnMoves)
@@ -64,18 +76,24 @@ final class GameController(initialBoard: Board)(using
   def backward(): Unit = {
     if (_currentIndex > 0) {
       _currentIndex -= 1
-      currentBoard = _boardStates(_currentIndex)
-      _isWhiteToMove = _currentIndex % 2 == 0
+      val state = _history(_currentIndex)
+      currentBoard = state.board
+      _isWhiteToMove = state.whiteToMove
+      _halfmoveClock = state.halfmoveClock
+      _fullmoveNumber = state.fullmoveNumber
       notifyObservers(MoveResult.Moved(currentBoard, gameEventAt(_currentIndex)))
     }
   }
 
   /** Navigate one move forward. */
   def forward(): Unit = {
-    if (_currentIndex < _boardStates.length - 1) {
+    if (_currentIndex < _history.length - 1) {
       _currentIndex += 1
-      currentBoard = _boardStates(_currentIndex)
-      _isWhiteToMove = _currentIndex % 2 == 0
+      val state = _history(_currentIndex)
+      currentBoard = state.board
+      _isWhiteToMove = state.whiteToMove
+      _halfmoveClock = state.halfmoveClock
+      _fullmoveNumber = state.fullmoveNumber
       notifyObservers(MoveResult.Moved(currentBoard, gameEventAt(_currentIndex)))
     }
   }
@@ -85,25 +103,35 @@ final class GameController(initialBoard: Board)(using
     *   0 = initial position, N = position after move N
     */
   def goToMove(index: Int): Unit =
-    if index >= 0 && index < _boardStates.length then
+    if index >= 0 && index < _history.length then
       _currentIndex = index
-      currentBoard = _boardStates(_currentIndex)
-      _isWhiteToMove = _currentIndex % 2 == 0
+      val state = _history(_currentIndex)
+      currentBoard = state.board
+      _isWhiteToMove = state.whiteToMove
+      _halfmoveClock = state.halfmoveClock
+      _fullmoveNumber = state.fullmoveNumber
       notifyObservers(MoveResult.Moved(currentBoard, gameEventAt(_currentIndex)))
 
   /** Compute the GameEvent for a board state at the given history index. The active color at that index is the player
     * whose turn it is to move.
     */
   private def gameEventAt(index: Int): GameEvent =
-    val activeColorAtIndex = if index % 2 == 0 then Color.White else Color.Black
-    _boardStates(index).detectGameEvent(activeColorAtIndex)
+    val activeColorAtIndex = if _history(index).whiteToMove then Color.White else Color.Black
+    _history(index).board.detectGameEvent(activeColorAtIndex)
 
-  private def resetHistory(board: Board): Unit = {
-    _boardStates = Vector(board)
+  private def resetHistory(
+      board: Board,
+      whiteToMove: Boolean = true,
+      halfmoveClock: Int = 0,
+      fullmoveNumber: Int = 1
+  ): Unit = {
+    _history = Vector(HistoryState(board, whiteToMove, halfmoveClock, fullmoveNumber))
     _pgnMoves = Vector.empty
     _currentIndex = 0
-    _isWhiteToMove = true
-    positionCounts = Map(positionKey(board, true) -> 1)
+    _isWhiteToMove = whiteToMove
+    _halfmoveClock = halfmoveClock
+    _fullmoveNumber = fullmoveNumber
+    positionCounts = Map(positionKey(board, whiteToMove) -> 1)
   }
 
   /** Notify observers about a board reset (new game, FEN load, etc.). */
@@ -120,12 +148,17 @@ final class GameController(initialBoard: Board)(using
     *   Either the new board or an error message
     */
   def loadFromFEN(fen: String): Either[String, Board] = {
-    fenIO.load(fen) match {
-      case Success(newBoard) =>
-        currentBoard = newBoard
-        resetHistory(newBoard)
-        notifyObservers(MoveResult.Moved(newBoard))
-        Right(newBoard)
+    FullFen.parse(fen) match {
+      case Success(state) =>
+        currentBoard = state.board
+        resetHistory(
+          board = state.board,
+          whiteToMove = state.whiteToMove,
+          halfmoveClock = state.halfmoveClock,
+          fullmoveNumber = state.fullmoveNumber
+        )
+        notifyObservers(MoveResult.Moved(state.board))
+        Right(state.board)
       case Failure(e) =>
         Left(s"Failed to parse FEN: ${e.getMessage}")
     }
@@ -136,7 +169,7 @@ final class GameController(initialBoard: Board)(using
     *   The FEN string representing the current board
     */
   def getBoardAsFEN: String = {
-    fenIO.save(board)
+    FullFen.render(board, _isWhiteToMove, _halfmoveClock, _fullmoveNumber)
   }
 
   /** Apply a move using PGN notation (e.g., "e4", "Nf3", "O-O", "e8=Q").
@@ -168,6 +201,11 @@ final class GameController(initialBoard: Board)(using
     if !isAtLatest then return MoveResult.Failed(board, MoveError.InvalidMove)
     val boardBefore = board
     val wasWhite = _isWhiteToMove
+    val movingPiece = board.pieceAt(from)
+    val isPawnMove = movingPiece.exists(_.role == Role.Pawn)
+    val isEnPassantCapture =
+      movingPiece.exists(_.role == Role.Pawn) && from.file != to.file && board.pieceAt(to).isEmpty
+    val isCapture = board.pieceAt(to).isDefined || isEnPassantCapture
     val result = board.pieceAt(from) match
       case Some(piece) if piece.color == activeColor =>
         board.move(from, to, promotion) match
@@ -181,9 +219,16 @@ final class GameController(initialBoard: Board)(using
             )
             currentBoard = moved.board
             _isWhiteToMove = !_isWhiteToMove
-            _boardStates = _boardStates :+ moved.board
+            _halfmoveClock = if isPawnMove || isCapture then 0 else _halfmoveClock + 1
+            _fullmoveNumber = if wasWhite then _fullmoveNumber else _fullmoveNumber + 1
+            _history = _history :+ HistoryState(
+              board = moved.board,
+              whiteToMove = _isWhiteToMove,
+              halfmoveClock = _halfmoveClock,
+              fullmoveNumber = _fullmoveNumber
+            )
             _pgnMoves = _pgnMoves :+ pgn
-            _currentIndex = _boardStates.length - 1
+            _currentIndex = _history.length - 1
             val key = positionKey(moved.board, _isWhiteToMove)
             val count = positionCounts.getOrElse(key, 0) + 1
             positionCounts = positionCounts.updated(key, count)

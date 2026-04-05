@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { Chess } from 'chess.js'
 import type { GameStatus, Turn } from '../types/game'
 import { useOpeningStore } from './opening'
+import { gameApi } from '../api/game-api'
 
 // ── Clock mode types ─────────────────────────────────────────────────
 export interface ClockModeTimed { kind: 'timed'; initialMs: number; incrementMs: number; label: string }
@@ -320,7 +321,7 @@ export const useGameStore = defineStore('game', () => {
       if (!chosen) chosen = chooseGreedyMove(moves)
 
       const promo = chosen.promotion || undefined
-      const ok = applyMove(chosen.from, chosen.to, promo)
+      const ok = await applyMove(chosen.from, chosen.to, promo)
       if (ok) triggerComputerMoveIfNeeded()
     }, delay)
   }
@@ -336,17 +337,19 @@ export const useGameStore = defineStore('game', () => {
     loading.value = true
     error.value = null
     try {
-      chess.value = startFen ? new Chess(startFen) : new Chess()
+      const response = await gameApi.createGame(startFen ? { startFen } : undefined)
+      chess.value = new Chess(response.fen)
+      gameId.value = response.gameId
+      gameOverByTimeout.value = false
+      resetHistory()
+      resetClock()
+      syncStatusFromChess()
+      triggerComputerMoveIfNeeded()
     } catch {
-      chess.value = new Chess()
+      error.value = 'Could not create game via backend.'
+    } finally {
+      loading.value = false
     }
-    gameId.value = 'local'
-    gameOverByTimeout.value = false
-    resetHistory()
-    resetClock()
-    status.value = 'in_progress'
-    loading.value = false
-    triggerComputerMoveIfNeeded()
   }
 
   function resetHistory() {
@@ -360,36 +363,43 @@ export const useGameStore = defineStore('game', () => {
     pendingPromotion.value = null
   }
 
-  function applyMove(from: string, to: string, promotion?: string): boolean {
+  async function applyMove(from: string, to: string, promotion?: string): Promise<boolean> {
     if (!isAtLatest.value) {
       error.value = 'Navigate to latest position before making a move.'
       return false
     }
     error.value = null
+    if (!gameId.value) {
+      error.value = 'No active backend game.'
+      return false
+    }
 
+    const probe = new Chess(chess.value.fen())
     const moveObj: any = { from, to }
     if (promotion) moveObj.promotion = promotion
 
-    const result = chess.value.move(moveObj)
+    const result = probe.move(moveObj)
     if (!result) {
       error.value = 'Invalid move'
       return false
     }
 
-    pgnMoves.value = [...pgnMoves.value, result.san]
-    boardStates.value = [...boardStates.value, chess.value.fen()]
-    currentIndex.value = boardStates.value.length - 1
-    lastMove.value = { from: result.from, to: result.to }
-    selectedSquare.value = null
-    legalMoves.value = []
-
-    if (chess.value.isCheckmate()) status.value = 'checkmate'
-    else if (chess.value.isStalemate()) status.value = 'stalemate'
-    else if (chess.value.isDraw()) status.value = 'draw'
-    else status.value = 'in_progress'
-
-    switchClock()
-    return true
+    try {
+      const response = await gameApi.makeMove(gameId.value, result.san)
+      chess.value = new Chess(response.fen)
+      pgnMoves.value = [...pgnMoves.value, result.san]
+      boardStates.value = [...boardStates.value, response.fen]
+      currentIndex.value = boardStates.value.length - 1
+      lastMove.value = { from: result.from, to: result.to }
+      selectedSquare.value = null
+      legalMoves.value = []
+      syncStatusFromChess()
+      switchClock()
+      return true
+    } catch (err: any) {
+      error.value = err?.response?.data?.error || 'Move rejected by backend.'
+      return false
+    }
   }
 
   function selectSquare(square: string) {
@@ -418,8 +428,9 @@ export const useGameStore = defineStore('game', () => {
           return
         }
       }
-      const ok = applyMove(selectedSquare.value, square)
-      if (ok) triggerComputerMoveIfNeeded()
+      void applyMove(selectedSquare.value, square).then(ok => {
+        if (ok) triggerComputerMoveIfNeeded()
+      })
     } else if (piece && piece.color === currentTurn) {
       selectedSquare.value = square
       if (showLegalMoves.value) {
@@ -438,8 +449,9 @@ export const useGameStore = defineStore('game', () => {
     if (!pendingPromotion.value) return
     const { from, to } = pendingPromotion.value
     pendingPromotion.value = null
-    const ok = applyMove(from, to, role)
-    if (ok) triggerComputerMoveIfNeeded()
+    void applyMove(from, to, role).then(ok => {
+      if (ok) triggerComputerMoveIfNeeded()
+    })
   }
 
   function cancelPromotion() {
@@ -523,14 +535,18 @@ export const useGameStore = defineStore('game', () => {
   })
 
   // ── Import / Export ──────────────────────────────────────────────────
-  function loadFenString(fenStr: string): boolean {
+  async function loadFenString(fenStr: string): Promise<boolean> {
     try {
-      const c = new Chess(fenStr.trim())
-      chess.value = c
+      if (!gameId.value) {
+        await createGame(fenStr.trim())
+        return !error.value
+      }
+      const response = await gameApi.loadFen(gameId.value, fenStr.trim())
+      chess.value = new Chess(response.fen)
       gameOverByTimeout.value = false
       resetHistory()
       resetClock()
-      status.value = 'in_progress'
+      syncStatusFromChess()
       return true
     } catch {
       error.value = 'Invalid FEN string'
@@ -538,23 +554,23 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  function loadPgnString(pgnStr: string): boolean {
+  async function loadPgnString(pgnStr: string): Promise<boolean> {
     try {
       const c = new Chess()
       c.loadPgn(pgnStr.trim())
-      // Rebuild history by replaying
-      const newChess = new Chess()
-      const history = c.history({ verbose: true })
-      const states: string[] = [newChess.fen()]
+      const history = c.history()
+      await createGame()
+      if (!gameId.value) return false
+      const states: string[] = [chess.value.fen()]
       const moves: string[] = []
-      for (const m of history) {
-        const result = newChess.move({ from: m.from, to: m.to, promotion: m.promotion })
-        if (result) {
-          states.push(newChess.fen())
-          moves.push(result.san)
-        }
+      let latestFen = chess.value.fen()
+      for (const san of history) {
+        const response = await gameApi.makeMove(gameId.value, san)
+        latestFen = response.fen
+        states.push(latestFen)
+        moves.push(san)
       }
-      chess.value = newChess
+      chess.value = new Chess(latestFen)
       boardStates.value = states
       pgnMoves.value = moves
       currentIndex.value = states.length - 1
@@ -565,10 +581,7 @@ export const useGameStore = defineStore('game', () => {
       lastMove.value = null
       error.value = null
       pendingPromotion.value = null
-      if (newChess.isCheckmate()) status.value = 'checkmate'
-      else if (newChess.isStalemate()) status.value = 'stalemate'
-      else if (newChess.isDraw()) status.value = 'draw'
-      else status.value = 'in_progress'
+      syncStatusFromChess()
       updateLastMoveFromIndex()
       return true
     } catch {
@@ -577,7 +590,7 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  function loadPgnOrFen(input: string): boolean {
+  async function loadPgnOrFen(input: string): Promise<boolean> {
     const trimmed = input.trim()
     // FEN heuristic: contains '/' rank separators and no newlines
     const isFen = (trimmed.match(/\//g) || []).length >= 7 && !trimmed.includes('\n')
@@ -586,14 +599,16 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function resetGame() {
-    chess.value = new Chess()
-    gameId.value = 'local'
     gameMode.value = 'hvh'
     paused.value = false
-    gameOverByTimeout.value = false
-    resetHistory()
-    resetClock()
-    status.value = 'in_progress'
+    void createGame()
+  }
+
+  function syncStatusFromChess() {
+    if (chess.value.isCheckmate()) status.value = 'checkmate'
+    else if (chess.value.isStalemate()) status.value = 'stalemate'
+    else if (chess.value.isDraw()) status.value = 'draw'
+    else status.value = 'in_progress'
   }
 
   return {

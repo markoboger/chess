@@ -117,11 +117,11 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
 
     "load a position from FEN notation" in {
       val controller = new GameController(Board.initial)
-      val fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR"
+      val fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
 
       val result = controller.loadFromFEN(fen)
       result.isRight shouldBe true
-      controller.isWhiteToMove shouldBe true
+      controller.isWhiteToMove shouldBe false
     }
 
     "return error for invalid FEN" in {
@@ -136,7 +136,7 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       val controller = new GameController(Board.initial)
       val fen = controller.getBoardAsFEN
 
-      fen should be("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
+      fen should be("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
 
     "get FEN after making moves" in {
@@ -145,7 +145,7 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       controller.applyMove(Square("e2"), Square("e4")) // e4
       val fen = controller.getBoardAsFEN
 
-      fen should be("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR")
+      fen should be("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1")
     }
 
     "return Failed when piece exists but move is invalid" in {

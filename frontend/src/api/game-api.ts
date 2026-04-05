@@ -6,6 +6,7 @@ import type {
   MakeMoveRequest,
   MakeMoveResponse,
   LoadFenRequest,
+  LoadFenResponse,
 } from '../types/api'
 
 export const gameApi = {
@@ -25,7 +26,7 @@ export const gameApi = {
     return response.data
   },
 
-  async loadFen(gameId: string, fen: string): Promise<GameStateResponse> {
+  async loadFen(gameId: string, fen: string): Promise<LoadFenResponse> {
     const request: LoadFenRequest = { fen }
     const response = await apiClient.post(`/games/${gameId}/fen`, request)
     return response.data

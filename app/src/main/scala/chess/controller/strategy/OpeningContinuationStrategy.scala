@@ -2,7 +2,7 @@ package chess.controller.strategy
 
 import chess.controller.MoveStrategy
 import chess.application.opening.OpeningParser
-import chess.controller.io.fen.RegexFenParser
+import chess.controller.io.fen.FullFen
 import chess.controller.io.pgn.PGNParser
 import chess.model.{Board, Color, Opening, PromotableRole, Square}
 
@@ -76,8 +76,4 @@ object OpeningContinuationStrategy:
       pgn.split("\\s+").toVector.filterNot(token => token.isEmpty || token.matches("\\d+\\.+"))
 
     private def positionKey(board: Board, color: Color): PositionKey =
-      val castling =
-        s"${if board.castlingRights.whiteKingside then "K" else ""}${if board.castlingRights.whiteQueenside then "Q" else ""}${if board.castlingRights.blackKingside then "k" else ""}${if board.castlingRights.blackQueenside then "q" else ""}"
-      val castlingPart = if castling.isEmpty then "-" else castling
-      val lastMovePart = board.lastMove.fold("-") { case (from, to) => s"${from}${to}" }
-      s"${RegexFenParser.save(board)} ${if color == Color.White then "w" else "b"} $castlingPart $lastMovePart"
+      FullFen.openingKey(board, color == Color.White)
