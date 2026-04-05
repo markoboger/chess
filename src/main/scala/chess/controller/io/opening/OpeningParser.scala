@@ -3,7 +3,7 @@ package chess.controller.io.opening
 import chess.controller.GameController
 import chess.controller.io.{FenIO, OpeningIO}
 import chess.model.Board
-import chess.persistence.model.Opening
+import chess.model.Opening
 
 import scala.io.Source
 import scala.util.{Try, Using}

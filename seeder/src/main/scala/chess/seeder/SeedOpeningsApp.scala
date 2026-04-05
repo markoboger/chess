@@ -1,7 +1,7 @@
 package chess.seeder
 
 import cats.effect.{IO, IOApp, ExitCode}
-import chess.persistence.model.Opening
+import chess.model.Opening
 import chess.persistence.mongodb.MongoOpeningRepository
 import chess.persistence.postgres.PostgresOpeningRepository
 import chess.controller.io.opening.OpeningParser

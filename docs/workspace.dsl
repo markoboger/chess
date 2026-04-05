@@ -26,6 +26,9 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
 
                 # ── chess.model (Level 4: one component per class/enum/trait) ─
                 group "chess.model" {
+                    openingClass       = component "Opening"       "case class (eco: String, name: String, moves: String, fen: String, moveCount: Int). Composite key (eco,name). Opening.unsafe(eco,name,moves,fen,moveCount) factory." "case class · Opening.scala"
+                    persistedGameClass = component "PersistedGame" "case class (id: UUID, fenHistory: List[String], pgnMoves: List[String], currentTurn: String, status: String, result: Option[String], openingEco: Option[String], openingName: Option[String], createdAt: Instant, updatedAt: Instant). PersistedGame.create(...) factory." "case class · PersistedGame.scala"
+                    puzzleClass         = component "Puzzle" "case class (id: String, fen: String, moves: List[String], rating: Int, ratingDeviation: Int, popularity: Int, nbPlays: Int, themes: List[String], gameUrl: String, openingTags: List[String])." "case class · Puzzle.scala"
 
                     colorEnum = component "Color" "enum White | Black. fold[A](white: =>A, black: =>A): A. opposite: Color." "enum · Piece.scala"
 
@@ -130,11 +133,6 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
                 group "chess.persistence" {
                     openingRepoTrait = component "OpeningRepository[F[_]]" "trait (higher-kinded). save, saveAll, findByEcoAndName, findByName(query,limit), findAll(limit,offset), findByMoveCount(maxMoves), count: F[Int]. Bound via AppBindings given." "trait · OpeningRepository.scala"
                     gameRepoTrait    = component "GameRepository[F[_]]"    "trait (higher-kinded). save(game), findById(id), findAll(limit,offset), findByStatus(status), delete(id): F[Boolean]." "trait · GameRepository.scala"
-                }
-
-                group "chess.persistence.model" {
-                    openingClass       = component "Opening"       "case class (eco: String, name: String, moves: String, fen: String, moveCount: Int). Composite key (eco,name). Opening.unsafe(eco,name,moves,fen,moveCount) factory." "case class · Opening.scala"
-                    persistedGameClass = component "PersistedGame" "case class (id: UUID, fen: String, pgn: String, status: String, createdAt: Instant, updatedAt: Instant). PersistedGame.create(fen?,pgn?,status?) factory." "case class · PersistedGame.scala"
                 }
 
                 group "chess.persistence.memory" {
@@ -372,6 +370,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
             include castlingRightsClass boardClass
             include moveResultTrait movedClass failedClass
             include gameEventEnum moveErrorEnum puzzleClass
+            include openingClass persistedGameClass
             autoLayout
             title "Level 4 - chess.model (all classes, enums, sealed traits)"
         }
@@ -397,13 +396,12 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
 
         # ── Level 4 — chess.persistence: models, traits, adapters ──────────────
         component chess "L4_Persistence" {
-            include openingClass persistedGameClass
             include openingRepoTrait gameRepoTrait
             include inMemoryOpeningComp
             include postgresGameComp postgresOpeningComp
             include mongoGameComp mongoOpeningComp
             autoLayout
-            title "Level 4 - chess.persistence (models, repository traits, adapters)"
+            title "Level 4 - chess.persistence (repository traits and adapters)"
         }
 
         # ── Level 4 — chess.aview: views and entry points ──────────────────────

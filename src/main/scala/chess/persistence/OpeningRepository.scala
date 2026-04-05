@@ -1,6 +1,6 @@
 package chess.persistence
 
-import chess.persistence.model.Opening
+import chess.model.Opening
 
 /** Repository abstraction for chess opening library.
   *

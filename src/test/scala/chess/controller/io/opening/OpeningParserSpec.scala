@@ -2,7 +2,7 @@ package chess.controller.io.opening
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import chess.persistence.model.Opening
+import chess.model.Opening
 
 class OpeningParserSpec extends AnyWordSpec with Matchers {
 

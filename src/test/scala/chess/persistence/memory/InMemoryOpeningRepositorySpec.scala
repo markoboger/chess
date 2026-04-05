@@ -2,7 +2,7 @@ package chess.persistence.memory
 
 import cats.effect.unsafe.implicits.global
 import chess.controller.io.opening.OpeningParser
-import chess.persistence.model.Opening
+import chess.model.Opening
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 

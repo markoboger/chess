@@ -15,7 +15,7 @@ import scalafx.stage.FileChooser.ExtensionFilter
 import chess.controller.{GameController, ComputerPlayer, MoveStrategy}
 import chess.controller.puzzle.PuzzleParser
 import chess.model.Puzzle
-import chess.persistence.model.Opening
+import chess.model.Opening
 import chess.persistence.OpeningRepository
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global

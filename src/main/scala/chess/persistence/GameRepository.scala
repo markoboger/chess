@@ -1,6 +1,6 @@
 package chess.persistence
 
-import chess.persistence.model.PersistedGame
+import chess.model.PersistedGame
 import java.util.UUID
 
 /** Repository abstraction for persisting and retrieving chess games.

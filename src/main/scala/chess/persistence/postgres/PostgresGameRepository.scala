@@ -2,7 +2,7 @@ package chess.persistence.postgres
 
 import cats.effect.IO
 import cats.implicits.*
-import chess.persistence.model.PersistedGame
+import chess.model.PersistedGame
 import chess.persistence.GameRepository
 import doobie.*
 import doobie.implicits.*

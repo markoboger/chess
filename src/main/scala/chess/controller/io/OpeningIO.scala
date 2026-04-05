@@ -1,6 +1,6 @@
 package chess.controller.io
 
-import chess.persistence.model.Opening
+import chess.model.Opening
 
 import scala.util.Try
 

@@ -1,7 +1,7 @@
 package chess.persistence.memory
 
 import cats.effect.IO
-import chess.persistence.model.Opening
+import chess.model.Opening
 import chess.persistence.OpeningRepository
 import chess.controller.io.OpeningIO
 
