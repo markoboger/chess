@@ -8,14 +8,22 @@ export interface OpeningInfo {
   moves: string
 }
 
+export interface OpeningContinuation {
+  san: string
+  remainingPlies: number
+  eco: string
+  name: string
+}
+
 // Module-level singleton so the map is built only once across store resets
 let fenMap: Map<string, OpeningInfo> | null = null
+let continuationMap: Map<string, OpeningContinuation[]> | null = null
 let mapPromise: Promise<Map<string, OpeningInfo>> | null = null
 
 async function buildFenMap(): Promise<Map<string, OpeningInfo>> {
   const map = new Map<string, OpeningInfo>()
+  const prefixes = new Map<string, OpeningContinuation[]>()
   const files = ['a', 'b', 'c', 'd', 'e']
-  const board = new Chess()
 
   for (const f of files) {
     try {
@@ -33,6 +41,21 @@ async function buildFenMap(): Promise<Map<string, OpeningInfo>> {
         const pgn = line.slice(tab2 + 1).trim()
         if (!eco || !name) continue
         try {
+          const board = new Chess()
+          const tokens = pgn.split(/\s+/).filter(token => token && !/^\d+\.+$/.test(token))
+          for (let i = 0; i < tokens.length; i++) {
+            const key = continuationKey(board.fen())
+            const next = tokens[i]
+            const entry: OpeningContinuation = {
+              san: next,
+              remainingPlies: tokens.length - i,
+              eco,
+              name,
+            }
+            prefixes.set(key, [...(prefixes.get(key) ?? []), entry])
+            if (!board.move(next as any)) break
+          }
+
           board.reset()
           if (pgn) board.loadPgn(pgn)
           const placement = board.fen().split(' ')[0]
@@ -47,7 +70,19 @@ async function buildFenMap(): Promise<Map<string, OpeningInfo>> {
       // ignore fetch errors for individual files
     }
   }
+  continuationMap = new Map(
+    Array.from(prefixes.entries(), ([key, entries]) => [
+      key,
+      entries
+        .sort((a, b) => b.remainingPlies - a.remainingPlies || a.san.localeCompare(b.san))
+        .filter((entry, index, arr) => arr.findIndex(other => other.san === entry.san) === index),
+    ]),
+  )
   return map
+}
+
+function continuationKey(fen: string): string {
+  return fen.split(' ').slice(0, 4).join(' ')
 }
 
 function getMap(): Promise<Map<string, OpeningInfo>> {
@@ -74,9 +109,16 @@ export const useOpeningStore = defineStore('opening', () => {
     current.value = map.get(piecePlacement) ?? null
   }
 
+  async function bestContinuationForFen(fen: string): Promise<OpeningContinuation | null> {
+    await getMap()
+    ready.value = true
+    const candidates = continuationMap?.get(continuationKey(fen)) ?? []
+    return candidates[0] ?? null
+  }
+
   function clear() {
     current.value = null
   }
 
-  return { current, ready, init, lookupByFen, clear }
+  return { current, ready, init, lookupByFen, bestContinuationForFen, clear }
 })

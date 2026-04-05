@@ -28,7 +28,7 @@ import scala.util.{Failure, Random, Success}
   */
 class OpeningBookStrategy(
     openings: List[Opening] = OpeningParser.parseLichessOpenings(),
-    val fallback: MoveStrategy = new QuiescenceStrategy()
+    val fallback: MoveStrategy = new IterativeDeepeningStrategy()
 ) extends MoveStrategy:
 
   private val rng = new Random()

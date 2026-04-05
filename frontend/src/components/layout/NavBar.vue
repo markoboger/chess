@@ -47,6 +47,36 @@
           </div>
         </div>
 
+        <!-- Strategy menu -->
+        <div class="nav-item" :class="{ open: openMenu === 'strategy' }">
+          <button class="nav-btn" @click.stop="toggle('strategy')">
+            Strategy <span class="chevron">▾</span>
+          </button>
+          <div class="dropdown" v-if="openMenu === 'strategy'">
+            <div class="dropdown-group">White</div>
+            <button
+              v-for="strategy in COMPUTER_STRATEGIES"
+              :key="'w-' + strategy.id"
+              class="dd-item"
+              :class="{ active: gameStore.whiteComputerStrategy === strategy.id }"
+              @click="setStrategy('white', strategy.id)"
+            >
+              <span class="dd-check">{{ gameStore.whiteComputerStrategy === strategy.id ? '●' : '' }}</span> {{ strategy.label }}
+            </button>
+            <div class="dd-sep"></div>
+            <div class="dropdown-group">Black</div>
+            <button
+              v-for="strategy in COMPUTER_STRATEGIES"
+              :key="'b-' + strategy.id"
+              class="dd-item"
+              :class="{ active: gameStore.blackComputerStrategy === strategy.id }"
+              @click="setStrategy('black', strategy.id)"
+            >
+              <span class="dd-check">{{ gameStore.blackComputerStrategy === strategy.id ? '●' : '' }}</span> {{ strategy.label }}
+            </button>
+          </div>
+        </div>
+
         <!-- View menu -->
         <div class="nav-item" :class="{ open: openMenu === 'view' }">
           <button class="nav-btn" @click.stop="toggle('view')">
@@ -123,6 +153,32 @@
         </div>
 
         <div class="drawer-section">
+          <div class="drawer-label">White Strategy</div>
+          <button
+            v-for="strategy in COMPUTER_STRATEGIES"
+            :key="'mw-' + strategy.id"
+            class="drawer-item"
+            :class="{ active: gameStore.whiteComputerStrategy === strategy.id }"
+            @click="setStrategy('white', strategy.id); mobileOpen=false"
+          >
+            <span class="dd-check">{{ gameStore.whiteComputerStrategy === strategy.id ? '●' : '' }}</span> {{ strategy.label }}
+          </button>
+        </div>
+
+        <div class="drawer-section">
+          <div class="drawer-label">Black Strategy</div>
+          <button
+            v-for="strategy in COMPUTER_STRATEGIES"
+            :key="'mb-' + strategy.id"
+            class="drawer-item"
+            :class="{ active: gameStore.blackComputerStrategy === strategy.id }"
+            @click="setStrategy('black', strategy.id); mobileOpen=false"
+          >
+            <span class="dd-check">{{ gameStore.blackComputerStrategy === strategy.id ? '●' : '' }}</span> {{ strategy.label }}
+          </button>
+        </div>
+
+        <div class="drawer-section">
           <div class="drawer-label">View</div>
           <button class="drawer-item" @click="toggleLegal; mobileOpen=false">
             <span class="dd-check">{{ gameStore.showLegalMoves ? '✓' : '' }}</span> Show Legal Moves
@@ -169,7 +225,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useGameStore, CLOCK_PRESETS, type ClockMode, type GameMode } from '../../stores/game'
+import {
+  useGameStore,
+  CLOCK_PRESETS,
+  COMPUTER_STRATEGIES,
+  type ClockMode,
+  type GameMode,
+  type ComputerSide,
+  type ComputerStrategyId,
+} from '../../stores/game'
 import { useUIStore } from '../../stores/ui'
 
 const props = defineProps<{ activeView?: 'game' | 'puzzles' }>()
@@ -214,6 +278,11 @@ function isActivePreset(mode: ClockMode): boolean {
 
 function setClock(mode: ClockMode) {
   gameStore.setClockMode(mode)
+  closeAll()
+}
+
+function setStrategy(side: ComputerSide, strategy: ComputerStrategyId) {
+  gameStore.setComputerStrategy(side, strategy)
   closeAll()
 }
 

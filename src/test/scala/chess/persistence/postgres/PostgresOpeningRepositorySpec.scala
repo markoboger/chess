@@ -2,7 +2,9 @@ package chess.persistence.postgres
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
+import chess.controller.strategy.OpeningContinuationStrategy
 import chess.model.Opening
+import chess.model.{Color, Square}
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
 import org.scalatest.BeforeAndAfterAll
@@ -210,6 +212,19 @@ class PostgresOpeningRepositorySpec extends AnyWordSpec with Matchers with Befor
     "return None for an unknown FEN" in {
       cleanUp()
       repo.findByFen("missing-fen").unsafeRunSync() shouldBe None
+    }
+  }
+
+  "stored openings" should {
+    "be usable by the opening continuation strategy for black moves" in {
+      cleanUp()
+      repo
+        .save(opening("B20", "Sicilian Defense", "1. e4 c5 2. Nf3 d6", 4))
+        .unsafeRunSync()
+      val strategy = new OpeningContinuationStrategy(repo.findAll(limit = 100).unsafeRunSync())
+      val boardAfterE4 = chess.model.Board.initial.move(Square("e2"), Square("e4"), None).toOption.get
+
+      strategy.selectMove(boardAfterE4, Color.Black) shouldBe Some((Square("c7"), Square("c5"), None))
     }
   }
 

@@ -26,7 +26,8 @@ import chess.controller.strategy.{
   PieceSquareStrategy,
   MinimaxStrategy,
   QuiescenceStrategy,
-  IterativeDeepeningStrategy
+  IterativeDeepeningStrategy,
+  OpeningContinuationStrategy
 }
 import chess.model.{Board, Piece, PromotableRole, Role, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.model.{Color => ChessColor}
@@ -1314,7 +1315,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       "Minimax (d=4)" -> (() => new MinimaxStrategy(4)),
       "Minimax+QSearch (d=3)" -> (() => new QuiescenceStrategy(3)),
       "Minimax+QSearch (d=4)" -> (() => new QuiescenceStrategy(4)),
-      "Iterative Deepening" -> (() => new IterativeDeepeningStrategy())
+      "Iterative Deepening" -> (() => new IterativeDeepeningStrategy()),
+      "Opening Continuation" -> (() => new OpeningContinuationStrategy(openings))
     )
 
     def makeStrategySubmenu(label: String, player: ComputerPlayer): Menu = {

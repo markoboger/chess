@@ -2,6 +2,9 @@ package chess.persistence.memory
 
 import cats.effect.unsafe.implicits.global
 import chess.controller.io.opening.OpeningParser
+import chess.controller.io.pgn.PGNParser
+import chess.controller.strategy.OpeningContinuationStrategy
+import chess.model.{Color, Square}
 import chess.model.Opening
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -200,6 +203,23 @@ class InMemoryOpeningRepositorySpec extends AnyWordSpec with Matchers {
       given chess.controller.io.OpeningIO = OpeningParser
       val repo = InMemoryOpeningRepository.fromLichess()
       repo.count().unsafeRunSync() should be > 2000L
+    }
+
+    "provide documented black opening moves through the strategy" in {
+      given chess.controller.io.OpeningIO = OpeningParser
+      val repo = InMemoryOpeningRepository.fromLichess()
+      val openings = repo.findAll(limit = 3000).unsafeRunSync()
+      val strategy = new OpeningContinuationStrategy(openings)
+      val boardAfterE4 = chess.model.Board.initial.move(Square("e2"), Square("e4"), None).toOption.get
+      val documentedBlackReplies = openings
+        .flatMap(_.moves.split("\\s+").toList.filterNot(token => token.isEmpty || token.matches("\\d+\\.+")).lift(1))
+        .flatMap(san => PGNParser.parseMove(san, boardAfterE4, false).toOption.map { case (from, to) => (from, to, None) })
+        .toSet
+      val selectedMove = strategy.selectMove(boardAfterE4, Color.Black)
+
+      documentedBlackReplies should not be empty
+      selectedMove shouldBe defined
+      documentedBlackReplies should contain(selectedMove.get)
     }
   }
 }

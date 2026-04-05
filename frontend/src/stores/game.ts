@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { Chess } from 'chess.js'
 import type { GameStatus, Turn } from '../types/game'
+import { useOpeningStore } from './opening'
 
 // ── Clock mode types ─────────────────────────────────────────────────
 export interface ClockModeTimed { kind: 'timed'; initialMs: number; incrementMs: number; label: string }
@@ -22,6 +23,13 @@ export const CLOCK_PRESETS: { label: string; mode: ClockMode }[] = [
 ]
 
 export type GameMode = 'hvh' | 'hvc' | 'cvc'
+export type ComputerSide = 'white' | 'black'
+export type ComputerStrategyId = 'greedy' | 'opening-continuation'
+
+export const COMPUTER_STRATEGIES: { id: ComputerStrategyId; label: string }[] = [
+  { id: 'greedy', label: 'Greedy Capture' },
+  { id: 'opening-continuation', label: 'Opening Continuation' },
+]
 
 export const useGameStore = defineStore('game', () => {
   // ── Core chess engine (always the "latest" position) ─────────────────
@@ -47,6 +55,8 @@ export const useGameStore = defineStore('game', () => {
   const gameMode = ref<GameMode>('hvh')
   const paused = ref(false)
   const computerScheduled = ref(false)
+  const whiteComputerStrategy = ref<ComputerStrategyId>('greedy')
+  const blackComputerStrategy = ref<ComputerStrategyId>('opening-continuation')
 
   // ── Puzzle mode ──────────────────────────────────────────────────────
   const puzzleMode = ref(false)
@@ -254,6 +264,40 @@ export const useGameStore = defineStore('game', () => {
     return false
   }
 
+  function currentComputerStrategy(): ComputerStrategyId {
+    return latestTurn.value === 'w' ? whiteComputerStrategy.value : blackComputerStrategy.value
+  }
+
+  function setComputerStrategy(side: ComputerSide, strategy: ComputerStrategyId) {
+    if (side === 'white') whiteComputerStrategy.value = strategy
+    else blackComputerStrategy.value = strategy
+    triggerComputerMoveIfNeeded()
+  }
+
+  function chooseGreedyMove(moves: any[]): any {
+    const captures = moves.filter((m: any) => m.captured)
+    if (captures.length > 0) {
+      const vals: Record<string, number> = { q: 9, r: 5, b: 3, n: 3, p: 1 }
+      captures.sort((a: any, b: any) => (vals[b.captured] || 0) - (vals[a.captured] || 0))
+      return captures[0]
+    }
+    return moves[Math.floor(Math.random() * moves.length)]
+  }
+
+  async function chooseOpeningContinuationMove(): Promise<any | null> {
+    const openingStore = useOpeningStore()
+    const candidate = await openingStore.bestContinuationForFen(chess.value.fen())
+    if (!candidate) return null
+
+    try {
+      const clone = new Chess(chess.value.fen())
+      const result = clone.move(candidate.san as any)
+      return result || null
+    } catch {
+      return null
+    }
+  }
+
   function makeComputerMove() {
     if (computerScheduled.value || paused.value || isGameOver.value) return
     if (!isComputerTurn()) return
@@ -262,24 +306,18 @@ export const useGameStore = defineStore('game', () => {
     computerScheduled.value = true
     const delay = gameMode.value === 'cvc' ? 400 : 250
 
-    setTimeout(() => {
+    setTimeout(async () => {
       computerScheduled.value = false
       if (paused.value || isGameOver.value || !isComputerTurn() || !isAtLatest.value) return
 
       const moves = chess.value.moves({ verbose: true })
       if (moves.length === 0) return
 
-      // Simple heuristic: prefer captures > checks > random
-      const captures = moves.filter((m: any) => m.captured)
       let chosen: any
-      if (captures.length > 0) {
-        // Pick highest-value capture
-        const vals: Record<string, number> = { q: 9, r: 5, b: 3, n: 3, p: 1 }
-        captures.sort((a: any, b: any) => (vals[b.captured] || 0) - (vals[a.captured] || 0))
-        chosen = captures[0]
-      } else {
-        chosen = moves[Math.floor(Math.random() * moves.length)]
+      if (currentComputerStrategy() === 'opening-continuation') {
+        chosen = await chooseOpeningContinuationMove()
       }
+      if (!chosen) chosen = chooseGreedyMove(moves)
 
       const promo = chosen.promotion || undefined
       const ok = applyMove(chosen.from, chosen.to, promo)
@@ -579,6 +617,10 @@ export const useGameStore = defineStore('game', () => {
     gameMode,
     paused,
     computerScheduled,
+    whiteComputerStrategy,
+    blackComputerStrategy,
+    currentComputerStrategy,
+    setComputerStrategy,
     setGameMode,
     togglePause,
     // Clock
