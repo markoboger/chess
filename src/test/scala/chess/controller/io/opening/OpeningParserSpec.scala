@@ -6,6 +6,11 @@ import chess.model.Opening
 
 class OpeningParserSpec extends AnyWordSpec with Matchers {
 
+  private def withOutput(block: => Unit): String =
+    val buffer = new java.io.ByteArrayOutputStream()
+    Console.withOut(new java.io.PrintStream(buffer))(block)
+    buffer.toString
+
   "OpeningParser.parseTsvLine" should {
 
     "parse a valid Lichess TSV line" in {
@@ -103,6 +108,65 @@ class OpeningParserSpec extends AnyWordSpec with Matchers {
     }
   }
 
+  "OpeningParser.parseTsvResource" should {
+    "parse a bundled TSV file" in {
+      val result = OpeningParser.parseTsvResource("/openings/a.tsv")
+
+      result.isSuccess shouldBe true
+      result.get should not be empty
+    }
+
+    "fail when the resource does not exist" in {
+      val result = OpeningParser.parseTsvResource("/openings/does-not-exist.tsv")
+
+      result.isFailure shouldBe true
+      result.failed.get.getMessage should include("Resource not found")
+    }
+  }
+
+  "OpeningParser.parseCsvResource" should {
+    "parse the legacy CSV resource" in {
+      val result = OpeningParser.parseCsvResource("/openings/eco-openings.csv")
+
+      result.isSuccess shouldBe true
+      result.get should not be empty
+    }
+
+    "parse an empty CSV resource into an empty list" in {
+      val result = OpeningParser.parseCsvResource("/empty-openings.csv")
+
+      result shouldBe scala.util.Success(Nil)
+    }
+  }
+
+  "OpeningParser.parseCsvOpenings" should {
+    "skip the header and parse valid rows" in {
+      val rows = List(
+        "eco,name,moves",
+        "A00,Polish Opening,1. b4",
+        "C50,Italian Game,1. e4 e5 2. Nf3 Nc6 3. Bc4"
+      )
+
+      val result = OpeningParser.parseCsvOpenings(rows)
+
+      result.map(_.eco) shouldBe List("A00", "C50")
+      result.map(_.moveCount) shouldBe List(1, 5)
+    }
+
+    "discard malformed and invalid rows" in {
+      val rows = List(
+        "eco,name,moves",
+        "A00,Missing moves",
+        "B00,Blank moves,",
+        "C00,Bad pgn,1. Zz9"
+      )
+
+      val result = OpeningParser.parseCsvOpenings(rows)
+
+      result.map(_.eco) shouldBe List("C00")
+    }
+  }
+
   "OpeningParser.validateOpenings" should {
 
     "return no errors for the parsed Lichess dataset" in {
@@ -145,7 +209,11 @@ class OpeningParserSpec extends AnyWordSpec with Matchers {
   "OpeningParser.printStatistics" should {
 
     "handle empty openings list" in {
-      noException should be thrownBy OpeningParser.printStatistics(Nil)
+      val out = withOutput {
+        OpeningParser.printStatistics(Nil)
+      }
+
+      out should include("No openings to report.")
     }
 
     "print stats for a non-empty list" in {
@@ -153,7 +221,15 @@ class OpeningParserSpec extends AnyWordSpec with Matchers {
         Opening.unsafe("A00", "Polish Opening", "1. b4", "fen1", 1),
         Opening.unsafe("C50", "Italian Game", "1. e4 e5 2. Nf3", "fen2", 3)
       )
-      noException should be thrownBy OpeningParser.printStatistics(openings)
+      val out = withOutput {
+        OpeningParser.printStatistics(openings)
+      }
+
+      out should include("Total openings: 2")
+      out should include("Unique ECO codes: 2")
+      out should include("By ECO category:")
+      out should include("A: 1 openings")
+      out should include("C: 1 openings")
     }
   }
 

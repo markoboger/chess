@@ -124,6 +124,12 @@ class PostgresOpeningRepositorySpec extends AnyWordSpec with Matchers with Befor
       repo.saveAll(List(opening("A00", "Polish Opening"), opening("A01", "Polish Opening Var"))).unsafeRunSync()
       repo.findByName("polish", limit = 1).unsafeRunSync().length shouldBe 1
     }
+
+    "use the default limit when omitted" in {
+      cleanUp()
+      repo.save(opening("C50", "Italian Game")).unsafeRunSync()
+      repo.findByName("italian").unsafeRunSync().map(_.name) shouldBe List("Italian Game")
+    }
   }
 
   "findAll" should {
@@ -141,6 +147,12 @@ class PostgresOpeningRepositorySpec extends AnyWordSpec with Matchers with Befor
       val page = repo.findAll(limit = 2, offset = 1).unsafeRunSync()
       page.length shouldBe 2
     }
+
+    "use default parameters when omitted" in {
+      cleanUp()
+      repo.saveAll(List(opening("A00", "Polish Opening"), opening("B12", "Caro-Kann Defense"))).unsafeRunSync()
+      repo.findAll().unsafeRunSync().length shouldBe 2
+    }
   }
 
   "findByMoveCount" should {
@@ -157,6 +169,12 @@ class PostgresOpeningRepositorySpec extends AnyWordSpec with Matchers with Befor
       val result = repo.findByMoveCount(maxMoves = 3).unsafeRunSync()
       result.map(_.name) should contain("Polish Opening")
       result.map(_.name) should not contain "Italian Game"
+    }
+
+    "use the default limit when omitted" in {
+      cleanUp()
+      repo.save(opening("A00", "Polish Opening", moveCount = 1)).unsafeRunSync()
+      repo.findByMoveCount(3).unsafeRunSync().map(_.name) shouldBe List("Polish Opening")
     }
   }
 
@@ -178,6 +196,20 @@ class PostgresOpeningRepositorySpec extends AnyWordSpec with Matchers with Befor
       cleanUp()
       repo.saveAll(List(opening("A00", "Polish Opening"), opening("C50", "Italian Game"))).unsafeRunSync()
       repo.count().unsafeRunSync() shouldBe 2L
+    }
+  }
+
+  "findByFen" should {
+    "return the matching opening when present" in {
+      cleanUp()
+      val o = opening("C50", "Italian Game")
+      repo.save(o).unsafeRunSync()
+      repo.findByFen(o.fen).unsafeRunSync() shouldBe Some(o)
+    }
+
+    "return None for an unknown FEN" in {
+      cleanUp()
+      repo.findByFen("missing-fen").unsafeRunSync() shouldBe None
     }
   }
 

@@ -121,6 +121,12 @@ class MongoOpeningRepositorySpec extends AnyWordSpec with Matchers with BeforeAn
         .unsafeRunSync()
       repo.findByName("Polish", limit = 1).unsafeRunSync().length shouldBe 1
     }
+
+    "use the default limit when omitted" in {
+      cleanUp()
+      repo.save(opening("C50", "Italian Game")).unsafeRunSync()
+      repo.findByName("Italian").unsafeRunSync().map(_.name) shouldBe List("Italian Game")
+    }
   }
 
   "findAll" should {
@@ -161,6 +167,12 @@ class MongoOpeningRepositorySpec extends AnyWordSpec with Matchers with BeforeAn
       result.map(_.name) should contain("Polish Opening")
       result.map(_.name) should not contain "Italian Game"
     }
+
+    "use the default limit when omitted" in {
+      cleanUp()
+      repo.save(opening("A00", "Polish Opening", moveCount = 1)).unsafeRunSync()
+      repo.findByMoveCount(3).unsafeRunSync().map(_.name) shouldBe List("Polish Opening")
+    }
   }
 
   "findRandom" should {
@@ -181,6 +193,20 @@ class MongoOpeningRepositorySpec extends AnyWordSpec with Matchers with BeforeAn
       cleanUp()
       repo.saveAll(List(opening("A00", "Polish Opening"), opening("C50", "Italian Game"))).unsafeRunSync()
       repo.count().unsafeRunSync() shouldBe 2L
+    }
+  }
+
+  "findByFen" should {
+    "return the matching opening when present" in {
+      cleanUp()
+      val o = opening("C50", "Italian Game")
+      repo.save(o).unsafeRunSync()
+      repo.findByFen(o.fen).unsafeRunSync() shouldBe Some(o)
+    }
+
+    "return None for an unknown FEN" in {
+      cleanUp()
+      repo.findByFen("missing-fen").unsafeRunSync() shouldBe None
     }
   }
 

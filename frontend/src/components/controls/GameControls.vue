@@ -249,7 +249,7 @@ watch(() => gameStore.currentIndex, async () => {
   font-family: monospace;
   font-size: 13px;
   line-height: 1.6;
-  max-height: 330px;
+  height: 330px;
   overflow-y: auto;
   padding: 8px;
   background: white;

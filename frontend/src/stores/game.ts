@@ -48,6 +48,10 @@ export const useGameStore = defineStore('game', () => {
   const paused = ref(false)
   const computerScheduled = ref(false)
 
+  // ── Puzzle mode ──────────────────────────────────────────────────────
+  const puzzleMode = ref(false)
+  const puzzlePendingMove = ref<{ from: string; to: string; promotion?: string } | null>(null)
+
   // ── Chess clock ──────────────────────────────────────────────────────
   const clockMode = ref<ClockMode>({ kind: 'none' })
   const whiteTimeMs = ref(0)   // elapsed (no-limit) or remaining (timed)
@@ -354,13 +358,20 @@ export const useGameStore = defineStore('game', () => {
     if (pendingPromotion.value) return
     if (!isAtLatest.value) return
     if (isGameOver.value) return
-    // Block human clicks when it's computer's turn
-    if (isComputerTurn()) return
+    // Block human clicks when it's computer's turn (not applicable in puzzle mode)
+    if (!puzzleMode.value && isComputerTurn()) return
 
     const piece = viewChess.value.get(square as any)
     const currentTurn = viewChess.value.turn()
 
     if (selectedSquare.value && legalMoves.value.includes(square)) {
+      // In puzzle mode, don't apply the move — let the puzzle panel handle it
+      if (puzzleMode.value) {
+        puzzlePendingMove.value = { from: selectedSquare.value, to: square }
+        selectedSquare.value = null
+        legalMoves.value = []
+        return
+      }
       const fromPiece = viewChess.value.get(selectedSquare.value as any)
       if (fromPiece && fromPiece.type === 'p') {
         const toRank = square[1]
@@ -561,6 +572,9 @@ export const useGameStore = defineStore('game', () => {
     error,
     pendingPromotion,
     showLegalMoves,
+    // Puzzle mode
+    puzzleMode,
+    puzzlePendingMove,
     // Game mode
     gameMode,
     paused,

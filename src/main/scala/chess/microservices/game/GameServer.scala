@@ -7,8 +7,8 @@ import chess.AppBindings.given
 
 /** Game Service microservice
   *
-  * Runs on port 8081 and provides endpoints for chess game management. Part of the microservices
-  * architecture, this service handles all chess-related business logic and state.
+  * Runs on port 8081 and provides endpoints for chess game management. Part of the microservices architecture, this
+  * service handles all chess-related business logic and state.
   *
   * Endpoints:
   *   - POST /games - Create new game
@@ -45,6 +45,7 @@ object GameServer extends IOApp.Simple:
           IO.println("  GET    /games/:id/moves    - Get move history") *>
           IO.println("  GET    /games/:id/fen      - Get current FEN") *>
           IO.println("  POST   /games/:id/fen      - Load FEN position") *>
+          IO.println("  GET    /openings/lookup    - Look up opening by FEN (?fen=<piece-placement>)") *>
           IO.println("") *>
           IO.println("Press Ctrl+C to stop the server") *>
           IO.never

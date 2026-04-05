@@ -1,14 +1,39 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
-import MenuBar from './components/controls/MenuBar.vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import NavBar from './components/layout/NavBar.vue'
 import ChessBoard from './components/board/ChessBoard.vue'
 import GameControls from './components/controls/GameControls.vue'
+import OpeningBadge from './components/game/OpeningBadge.vue'
+import PuzzlePanel from './components/game/PuzzlePanel.vue'
 import { useGameStore } from './stores/game'
+import { usePuzzleStore } from './stores/puzzle'
+import { useOpeningStore } from './stores/opening'
 
 const gameStore = useGameStore()
+const puzzleStore = usePuzzleStore()
+const openingStore = useOpeningStore()
+
+const activeView = ref<'game' | 'puzzles'>('game')
+
+function togglePuzzles() {
+  activeView.value = activeView.value === 'puzzles' ? 'game' : 'puzzles'
+  if (activeView.value === 'game') {
+    puzzleStore.reset()
+    gameStore.puzzleMode = false
+    gameStore.resetGame()
+  }
+}
+
+function handleNewGame() {
+  activeView.value = 'game'
+  puzzleStore.reset()
+  gameStore.puzzleMode = false
+  gameStore.resetGame()
+}
 
 onMounted(async () => {
   await gameStore.createGame()
+  openingStore.init()   // pre-load opening map in background
   window.addEventListener('keydown', handleKeydown)
 })
 
@@ -17,9 +42,9 @@ onUnmounted(() => {
 })
 
 function handleKeydown(e: KeyboardEvent) {
-  // Don't capture keys when typing in a textarea/input
   const tag = (e.target as HTMLElement)?.tagName
   if (tag === 'TEXTAREA' || tag === 'INPUT') return
+  if (gameStore.puzzleMode) return  // disable nav keys during puzzle
 
   if (e.key === 'ArrowLeft') {
     e.preventDefault()
@@ -34,87 +59,157 @@ function handleKeydown(e: KeyboardEvent) {
     e.preventDefault()
     gameStore.goToMove(gameStore.boardStates.length - 1)
   } else if (e.key === 'v' && (e.metaKey || e.ctrlKey)) {
-    // Cmd+V / Ctrl+V to paste FEN or PGN
     navigator.clipboard.readText().then((text: string) => {
       const trimmed = text.trim()
       if (trimmed) gameStore.loadPgnOrFen(trimmed)
-    }).catch(() => { /* clipboard read denied */ })
+    }).catch(() => {})
   }
 }
 </script>
 
 <template>
   <div class="app-shell">
-    <MenuBar />
+    <NavBar
+      :active-view="activeView"
+      @new-game="handleNewGame"
+      @toggle-puzzles="togglePuzzles"
+    />
 
     <main class="app-main">
-      <div class="board-area">
-        <ChessBoard />
+      <!-- Board column -->
+      <div class="board-column">
+        <div class="board-card">
+          <ChessBoard />
+        </div>
+        <div class="opening-row">
+          <OpeningBadge v-if="!puzzleStore.active" />
+          <span v-else-if="puzzleStore.puzzle" class="puzzle-mode-badge">
+            🧩 Puzzle mode · Find the best move
+          </span>
+        </div>
       </div>
-      <div class="sidebar">
-        <GameControls />
+
+      <!-- Sidebar -->
+      <div class="sidebar-column">
+        <div class="sidebar-card">
+          <Transition name="panel" mode="out-in">
+            <PuzzlePanel v-if="activeView === 'puzzles'" key="puzzles" @puzzle-loaded="() => {}" />
+            <GameControls v-else key="game" />
+          </Transition>
+        </div>
       </div>
     </main>
   </div>
 </template>
 
 <style>
-/* Global app styles — not scoped so they apply everywhere */
+/* ── Global reset ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
 
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #eeece8;
+  color: #222;
+  min-height: 100vh;
+}
+
+/* ── App shell ─────────────────────────────────────────────────────── */
 .app-shell {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-.app-header {
-  background: white;
-  border-bottom: 1px solid #ddd;
-  padding: 12px 24px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-}
-
-.app-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #333;
-}
-
+/* ── Main content ──────────────────────────────────────────────────── */
 .app-main {
   flex: 1;
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 24px;
+  padding: 24px 20px;
   gap: 0;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
 }
 
-.board-area {
+/* ── Board column ──────────────────────────────────────────────────── */
+.board-column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.board-card {
   background: white;
   border-radius: 12px 0 0 12px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.10);
   padding: 16px;
 }
 
-.sidebar {
+.opening-row {
+  padding-left: 4px;
+  min-height: 28px;
+}
+
+.puzzle-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(181, 136, 99, 0.15);
+  border: 1px solid rgba(181, 136, 99, 0.4);
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #7a4e2d;
+}
+
+/* ── Sidebar column ────────────────────────────────────────────────── */
+.sidebar-column {
+  flex-shrink: 0;
+}
+
+.sidebar-card {
   background: white;
   border-radius: 0 12px 12px 0;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-  border-left: 1px solid #e0e0e0;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+  border-left: 1px solid #e0ddd8;
   width: 320px;
-  min-height: 600px;
+  min-height: 580px;
   overflow-y: auto;
 }
 
+/* ── Panel transition ──────────────────────────────────────────────── */
+.panel-enter-active, .panel-leave-active { transition: opacity 0.18s ease; }
+.panel-enter-from, .panel-leave-to { opacity: 0; }
+
+/* ── Responsive ────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .app-main {
     flex-direction: column;
     align-items: center;
+    padding: 16px 12px;
     gap: 16px;
   }
-  .board-area { border-radius: 12px; }
-  .sidebar { border-radius: 12px; border-left: none; width: 100%; max-width: 600px; min-height: auto; }
+
+  .board-column { align-items: center; }
+
+  .board-card {
+    border-radius: 12px;
+  }
+
+  .sidebar-card {
+    border-radius: 12px;
+    border-left: none;
+    width: 100%;
+    max-width: 620px;
+    min-height: auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-main { padding: 12px 8px; }
 }
 </style>

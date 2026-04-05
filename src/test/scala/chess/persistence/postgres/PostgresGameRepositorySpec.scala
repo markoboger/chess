@@ -111,6 +111,12 @@ class PostgresGameRepositorySpec extends AnyWordSpec with Matchers with BeforeAn
       repo.findAll(limit = 2, offset = 0).unsafeRunSync().length shouldBe 2
       repo.findAll(limit = 10, offset = 2).unsafeRunSync().length shouldBe 1
     }
+
+    "use default parameters when omitted" in {
+      cleanUp()
+      repo.save(PersistedGame.create()).unsafeRunSync()
+      repo.findAll().unsafeRunSync().length shouldBe 1
+    }
   }
 
   "findByStatus" should {
@@ -121,6 +127,12 @@ class PostgresGameRepositorySpec extends AnyWordSpec with Matchers with BeforeAn
       val result = repo.findByStatus("InProgress").unsafeRunSync()
       result.length shouldBe 1
       result.head.status shouldBe "InProgress"
+    }
+
+    "use the default limit when omitted" in {
+      cleanUp()
+      repo.save(PersistedGame.create(status = "InProgress")).unsafeRunSync()
+      repo.findByStatus("InProgress").unsafeRunSync().length shouldBe 1
     }
   }
 
@@ -135,6 +147,12 @@ class PostgresGameRepositorySpec extends AnyWordSpec with Matchers with BeforeAn
 
     "return empty for unknown ECO" in {
       repo.findByOpening("Z99").unsafeRunSync() shouldBe empty
+    }
+
+    "use the default limit when omitted" in {
+      cleanUp()
+      repo.save(PersistedGame.create().copy(openingEco = Some("C50"))).unsafeRunSync()
+      repo.findByOpening("C50").unsafeRunSync().length shouldBe 1
     }
   }
 

@@ -8,6 +8,10 @@ import org.scalatest.wordspec.AnyWordSpec
 class ApiModelsSpec extends AnyWordSpec with Matchers {
 
   "CreateGameRequest" should {
+    "use None as the default start FEN" in {
+      CreateGameRequest().startFen shouldBe None
+    }
+
     "round-trip through JSON with None" in {
       val req = CreateGameRequest(None)
       decode[CreateGameRequest](req.asJson.noSpaces) shouldBe Right(req)
@@ -91,6 +95,10 @@ class ApiModelsSpec extends AnyWordSpec with Matchers {
   }
 
   "ErrorResponse" should {
+    "use None as the default details value" in {
+      ErrorResponse("something went wrong").details shouldBe None
+    }
+
     "round-trip through JSON with no details" in {
       val resp = ErrorResponse("something went wrong")
       decode[ErrorResponse](resp.asJson.noSpaces) shouldBe Right(resp)
@@ -98,6 +106,13 @@ class ApiModelsSpec extends AnyWordSpec with Matchers {
     "round-trip through JSON with details" in {
       val resp = ErrorResponse("bad input", Some("field 'fen' is invalid"))
       decode[ErrorResponse](resp.asJson.noSpaces) shouldBe Right(resp)
+    }
+  }
+
+  "OpeningLookupResponse" should {
+    "round-trip through JSON" in {
+      val resp = OpeningLookupResponse("B20", "Sicilian Defence", "1. e4 c5")
+      decode[OpeningLookupResponse](resp.asJson.noSpaces) shouldBe Right(resp)
     }
   }
 

@@ -59,9 +59,11 @@ object OpeningParser extends OpeningIO:
       val parts = line.split(",", 3)
       if parts.length == 3 then
         val (eco, name, moves) = (parts(0).trim, parts(1).trim, parts(2).trim)
-        computeFenAndMoveCount(moves).flatMap { case (fen, moveCount) =>
-          Try(Opening.unsafe(eco, name, moves, fen, moveCount)).toOption
-        }
+        if eco.isEmpty || name.isEmpty || moves.isEmpty then None
+        else
+          computeFenAndMoveCount(moves).flatMap { case (fen, moveCount) =>
+            Try(Opening.unsafe(eco, name, moves, fen, moveCount)).toOption
+          }
       else None
     }
 

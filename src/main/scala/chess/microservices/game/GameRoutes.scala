@@ -7,12 +7,15 @@ import org.http4s.circe.*
 import org.http4s.circe.CirceEntityCodec.given
 import chess.microservices.shared.*
 import chess.controller.io.{FenIO, PgnIO}
+import chess.persistence.OpeningRepository
 
 /** HTTP routes for the Game Service microservice
   */
 object GameRoutes:
 
-  def routes(using fenIO: FenIO, pgnIO: PgnIO): HttpRoutes[IO] =
+  object FenQueryParam extends QueryParamDecoderMatcher[String]("fen")
+
+  def routes(using fenIO: FenIO, pgnIO: PgnIO, openingRepo: OpeningRepository[IO]): HttpRoutes[IO] =
     val gameService = GameService()
 
     HttpRoutes.of[IO] {
@@ -75,6 +78,15 @@ object GameRoutes:
             Ok(FenResponse(fen))
           case None =>
             NotFound(ErrorResponse("Game not found"))
+        }
+
+      // GET /openings/lookup?fen=<piece-placement> - Look up opening by board position
+      case GET -> Root / "openings" / "lookup" :? FenQueryParam(fen) =>
+        openingRepo.findByFen(fen).flatMap {
+          case Some(opening) =>
+            Ok(OpeningLookupResponse(opening.eco, opening.name, opening.moves))
+          case None =>
+            NotFound(ErrorResponse("Opening not found"))
         }
 
       // POST /games/:id/fen - Load position from FEN

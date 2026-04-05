@@ -119,6 +119,20 @@ object ErrorResponse:
   given Decoder[ErrorResponse] = deriveDecoder
   given Encoder[ErrorResponse] = deriveEncoder
 
+/** Opening lookup response
+  * @param eco
+  *   ECO code (e.g. "B20")
+  * @param name
+  *   Opening name (e.g. "Sicilian Defence")
+  * @param moves
+  *   PGN move sequence (e.g. "1. e4 c5")
+  */
+case class OpeningLookupResponse(eco: String, name: String, moves: String)
+
+object OpeningLookupResponse:
+  given Decoder[OpeningLookupResponse] = deriveDecoder
+  given Encoder[OpeningLookupResponse] = deriveEncoder
+
 /** Health check response
   * @param status
   *   Health status ("ok" or "error")

@@ -13,6 +13,12 @@ class InMemoryOpeningRepositorySpec extends AnyWordSpec with Matchers {
 
   private def freshRepo(openings: Opening*) = new InMemoryOpeningRepository(openings.toList)
 
+  "constructor defaults" should {
+    "start empty when no initial openings are provided" in {
+      new InMemoryOpeningRepository().count().unsafeRunSync() shouldBe 0L
+    }
+  }
+
   "save" should {
     "insert a new opening" in {
       val repo = freshRepo()
@@ -153,6 +159,17 @@ class InMemoryOpeningRepositorySpec extends AnyWordSpec with Matchers {
 
     "return Some when non-empty" in {
       freshRepo(opening("A00", "Polish Opening")).findRandom().unsafeRunSync() shouldBe defined
+    }
+  }
+
+  "findByFen" should {
+    "return the matching opening for an indexed FEN" in {
+      val o = opening("C50", "Italian Game")
+      freshRepo(o).findByFen(o.fen).unsafeRunSync() shouldBe Some(o)
+    }
+
+    "return None when the FEN is unknown" in {
+      freshRepo().findByFen("missing-fen").unsafeRunSync() shouldBe None
     }
   }
 
