@@ -1,9 +1,9 @@
 package chess
 
 import cats.effect.IO
-import chess.controller.io.{FenIO, PgnIO, OpeningIO}
+import chess.application.opening.{OpeningIO, OpeningParser}
+import chess.controller.io.{FenIO, PgnIO}
 import chess.controller.io.fen.{RegexFenParser, CombinatorFenParser, FastParseFenParser}
-import chess.controller.io.opening.OpeningParser
 import chess.controller.io.pgn.{PgnFileIO, CombinatorPgnParser, FastParsePgnParser}
 import chess.persistence.OpeningRepository
 import chess.persistence.memory.InMemoryOpeningRepository

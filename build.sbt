@@ -40,8 +40,85 @@ lazy val Benchmarks = project
     publish / skip := true
   )
 
+lazy val Core = project
+  .in(file("core"))
+  .settings(
+    name := "Chess-Core",
+    scalaVersion := "3.5.0",
+    libraryDependencies ++= Seq(
+      "org.scalatest" %% "scalatest" % "3.2.19" % Test,
+      "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0",
+      "com.lihaoyi" %% "fastparse" % "3.1.1"
+    ),
+    publish / skip := true
+  )
+
+lazy val App = project
+  .in(file("app"))
+  .dependsOn(Core)
+  .settings(
+    name := "Chess-App",
+    scalaVersion := "3.5.0",
+    libraryDependencies ++= Seq(
+      "org.scalatest" %% "scalatest" % "3.2.19" % Test,
+      "org.typelevel" %% "cats-effect" % "3.5.4",
+      "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2"
+    ),
+    Compile / unmanagedResourceDirectories += baseDirectory.value.getParentFile / "src" / "main" / "resources",
+    Test / unmanagedResourceDirectories += baseDirectory.value.getParentFile / "src" / "test" / "resources",
+    publish / skip := true
+  )
+
+lazy val Realtime = project
+  .in(file("realtime"))
+  .dependsOn(App)
+  .settings(
+    name := "Chess-Realtime",
+    scalaVersion := "3.5.0",
+    libraryDependencies ++= Seq(
+      "org.scalatest" %% "scalatest" % "3.2.19" % Test,
+      "org.typelevel" %% "cats-effect" % "3.5.4",
+      "io.circe" %% "circe-core" % "0.14.10",
+      "io.circe" %% "circe-generic" % "0.14.10",
+      "org.http4s" %% "http4s-dsl" % "0.23.30",
+      "org.http4s" %% "http4s-ember-client" % "0.23.30",
+      "org.http4s" %% "http4s-ember-server" % "0.23.30",
+      "org.http4s" %% "http4s-circe" % "0.23.30"
+    ),
+    publish / skip := true
+  )
+
+lazy val Data = project
+  .in(file("data"))
+  .dependsOn(Core, App)
+  .settings(
+    name := "Chess-Data",
+    scalaVersion := "3.5.0",
+    libraryDependencies ++= Seq(
+      "org.scalatest" %% "scalatest" % "3.2.19" % Test,
+      "org.typelevel" %% "cats-effect" % "3.5.4",
+      "io.circe" %% "circe-core" % "0.14.10",
+      "io.circe" %% "circe-generic" % "0.14.10",
+      "io.circe" %% "circe-parser" % "0.14.10",
+      "io.github.kirill5k" %% "mongo4cats-core" % "0.7.8",
+      "io.github.kirill5k" %% "mongo4cats-circe" % "0.7.8",
+      "org.tpolecat" %% "doobie-core" % "1.0.0-RC5",
+      "org.tpolecat" %% "doobie-hikari" % "1.0.0-RC5",
+      "org.tpolecat" %% "doobie-postgres" % "1.0.0-RC5",
+      "org.postgresql" % "postgresql" % "42.7.3",
+      "com.zaxxer" % "HikariCP" % "5.1.0",
+      "org.testcontainers" % "testcontainers" % "1.19.8" % Test,
+      "org.testcontainers" % "postgresql" % "1.19.8" % Test,
+      "org.testcontainers" % "mongodb" % "1.19.8" % Test,
+      "de.flapdoodle.embed" % "de.flapdoodle.embed.mongo" % "4.13.1" % Test
+    ),
+    Test / unmanagedResourceDirectories += baseDirectory.value.getParentFile / "src" / "test" / "resources",
+    publish / skip := true
+  )
+
 lazy val Chess = project
   .in(file("."))
+  .dependsOn(Core, App, Realtime, Data)
   .settings(
     name := "Chess",
     Compile / mainClass := Some("chess.ChessApp"),
@@ -58,8 +135,6 @@ lazy val Chess = project
       "io.circe" %% "circe-generic" % "0.14.10",
       "io.circe" %% "circe-parser" % "0.14.10",
       "com.lihaoyi" %% "upickle" % "4.0.2",
-      "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0",
-      "com.lihaoyi" %% "fastparse" % "3.1.1",
       "org.apache.pekko" %% "pekko-actor-typed" % "1.1.2",
       "ch.qos.logback" % "logback-classic" % "1.5.6" % Runtime,
       // http4s (for microservices)
@@ -67,19 +142,7 @@ lazy val Chess = project
       "org.http4s" %% "http4s-ember-server" % "0.23.30",
       "org.http4s" %% "http4s-ember-client" % "0.23.30",
       "org.http4s" %% "http4s-circe" % "0.23.30",
-      // Database dependencies
-      "org.typelevel" %% "cats-effect" % "3.5.4",
-      "io.github.kirill5k" %% "mongo4cats-core" % "0.7.8",
-      "io.github.kirill5k" %% "mongo4cats-circe" % "0.7.8",
-      "org.tpolecat" %% "doobie-core" % "1.0.0-RC5",
-      "org.tpolecat" %% "doobie-hikari" % "1.0.0-RC5",
-      "org.tpolecat" %% "doobie-postgres" % "1.0.0-RC5",
-      "org.postgresql" % "postgresql" % "42.7.3",
-      "com.zaxxer" % "HikariCP" % "5.1.0",
-      "org.testcontainers" % "testcontainers" % "1.19.8" % Test,
-      "org.testcontainers" % "postgresql" % "1.19.8" % Test,
-      "org.testcontainers" % "mongodb" % "1.19.8" % Test,
-      "de.flapdoodle.embed" % "de.flapdoodle.embed.mongo" % "4.13.1" % Test
+      "org.typelevel" %% "cats-effect" % "3.5.4"
     ),
     coverageExcludedFiles := ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*;.*GameServer.*;.*GatewayServer.*;.*UIServer.*",
     coverageMinimumStmtTotal := 40,

@@ -13,7 +13,7 @@ import scalafx.stage.Stage
 import scalafx.stage.FileChooser
 import scalafx.stage.FileChooser.ExtensionFilter
 import chess.controller.{GameController, ComputerPlayer, MoveStrategy}
-import chess.controller.puzzle.PuzzleParser
+import chess.application.puzzle.PuzzleParser
 import chess.model.Puzzle
 import chess.model.Opening
 import chess.persistence.OpeningRepository
@@ -64,10 +64,10 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
   private[aview] var gameMode: GameMode = GameMode.HumanVsHuman
   private[aview] val whiteComputer: ComputerPlayer = new ComputerPlayer(
-    new IterativeDeepeningStrategy(2000L)
+    new OpeningContinuationStrategy(openings)
   )
   private[aview] val blackComputer: ComputerPlayer = new ComputerPlayer(
-    new IterativeDeepeningStrategy(2000L)
+    new OpeningContinuationStrategy(openings)
   )
   // Whether a background computer-move thread is currently scheduled
   @volatile private var computerScheduled: Boolean = false

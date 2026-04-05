@@ -212,7 +212,7 @@ services:
   ui-service:
     build:
       context: .
-      dockerfile: services/ui/Dockerfile
+      dockerfile: Dockerfile.ui-service
     ports:
       - "8082:8082"
     environment:
@@ -368,8 +368,8 @@ docker-compose down
 # Terminal 1: Game Service
 sbt "runMain chess.microservices.game.GameServer"
 
-# Terminal 2: UI Service
-cd services/ui/frontend && npm run dev
+# Terminal 2: Frontend
+cd frontend && npm run dev
 
 # Terminal 3: API Gateway
 sbt "runMain chess.microservices.gateway.GatewayServer"

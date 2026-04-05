@@ -429,7 +429,7 @@ chess/
 │   ├── game/              # Game Service
 │   │   ├── GameServer.scala
 │   │   ├── GameRoutes.scala
-│   │   └── GameService.scala
+│   │   └── ...
 │   ├── gateway/           # API Gateway
 │   │   ├── GatewayServer.scala
 │   │   ├── GatewayRoutes.scala
@@ -438,7 +438,8 @@ chess/
 │   │   └── UIServer.scala
 │   └── shared/            # Shared models
 │       └── ApiModels.scala
-└── services/ui/static/    # Frontend assets
+├── frontend/              # Main web frontend
+└── realtime/              # Realtime service module
 ```
 
 ✅ **Advantages:**

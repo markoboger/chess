@@ -2,8 +2,8 @@ package chess.seeder
 
 import cats.effect.IO
 import cats.implicits.*
+import chess.application.opening.OpeningParser
 import chess.persistence.OpeningRepository
-import chess.controller.io.opening.OpeningParser
 
 /** Seeds an [[OpeningRepository]] from Lichess TSV or CSV classpath resources.
   *

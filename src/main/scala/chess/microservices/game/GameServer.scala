@@ -1,9 +1,13 @@
 package chess.microservices.game
 
 import cats.effect.{IO, IOApp}
+import chess.application.game.GameSessionService
 import com.comcast.ip4s.*
+import org.http4s.Uri
+import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.ember.server.EmberServerBuilder
 import chess.AppBindings.given
+import chess.realtime.HttpGameEventPublisher
 
 /** Game Service microservice
   *
@@ -23,18 +27,29 @@ import chess.AppBindings.given
 object GameServer extends IOApp.Simple:
 
   private val port = sys.env.getOrElse("PORT", "8081")
+  private val realtimeServiceUrl = sys.env.getOrElse("REALTIME_SERVICE_URL", "http://localhost:8083")
 
   def run: IO[Unit] =
-    val routes = GameRoutes.routes
+    val realtimeUri = Uri.unsafeFromString(realtimeServiceUrl)
 
-    EmberServerBuilder
+    EmberClientBuilder
       .default[IO]
-      .withHost(ipv4"0.0.0.0")
-      .withPort(Port.fromString(port).getOrElse(port"8081"))
-      .withHttpApp(routes.orNotFound)
       .build
+      .flatMap { client =>
+        val publisher = new HttpGameEventPublisher(client, realtimeUri)
+        val gameSessions = new GameSessionService(publisher)
+        val routes = GameRoutes.routes(gameSessions)
+
+        EmberServerBuilder
+          .default[IO]
+          .withHost(ipv4"0.0.0.0")
+          .withPort(Port.fromString(port).getOrElse(port"8081"))
+          .withHttpApp(routes.orNotFound)
+          .build
+      }
       .use { server =>
         IO.println(s"Game Service started at ${server.address}") *>
+          IO.println(s"Realtime publisher target: $realtimeServiceUrl") *>
           IO.println("") *>
           IO.println("Available endpoints:") *>
           IO.println("  GET    /health             - Health check") *>

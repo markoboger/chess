@@ -1,10 +1,10 @@
 package chess.seeder
 
 import cats.effect.{IO, IOApp, ExitCode}
+import chess.application.opening.OpeningParser
 import chess.model.Opening
 import chess.persistence.mongodb.MongoOpeningRepository
 import chess.persistence.postgres.PostgresOpeningRepository
-import chess.controller.io.opening.OpeningParser
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
 import mongo4cats.client.MongoClient

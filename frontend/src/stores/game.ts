@@ -55,7 +55,7 @@ export const useGameStore = defineStore('game', () => {
   const gameMode = ref<GameMode>('hvh')
   const paused = ref(false)
   const computerScheduled = ref(false)
-  const whiteComputerStrategy = ref<ComputerStrategyId>('greedy')
+  const whiteComputerStrategy = ref<ComputerStrategyId>('opening-continuation')
   const blackComputerStrategy = ref<ComputerStrategyId>('opening-continuation')
 
   // ── Puzzle mode ──────────────────────────────────────────────────────
@@ -256,7 +256,7 @@ export const useGameStore = defineStore('game', () => {
     resetClock()
   }
 
-  // ── Computer player (random legal moves) ─────────────────────────────
+  // ── Computer player ───────────────────────────────────────────────────
   function isComputerTurn(): boolean {
     if (gameMode.value === 'hvh') return false
     if (gameMode.value === 'hvc') return latestTurn.value === 'b'

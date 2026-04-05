@@ -2,6 +2,7 @@ package chess.microservices.game
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
+import chess.application.game.GameSessionService
 import chess.AppBindings.given
 import chess.microservices.shared.*
 import io.circe.syntax.*
@@ -14,7 +15,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class GameRoutesSpec extends AnyWordSpec with Matchers {
 
-  private val app = GameRoutes.routes.orNotFound
+  private val app = GameRoutes.routes(new GameSessionService()).orNotFound
 
   private def run(req: Request[IO]): Response[IO] = app.run(req).unsafeRunSync()
 

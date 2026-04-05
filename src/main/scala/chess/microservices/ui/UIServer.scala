@@ -19,7 +19,7 @@ import org.http4s.circe.CirceEntityCodec.given
 object UIServer extends IOApp.Simple:
 
   private val port = sys.env.getOrElse("PORT", "8082").toInt
-  private val staticRoot = Path("services/ui/static")
+  private val staticRoot = Path("frontend/dist")
 
   def routes: HttpRoutes[IO] = HttpRoutes.of[IO] {
 
@@ -65,7 +65,7 @@ object UIServer extends IOApp.Simple:
       .use { server =>
         IO.println(s"UI Service started at ${server.address}") *>
           IO.println("") *>
-          IO.println("Serving static files from: services/ui/static/") *>
+          IO.println("Serving static files from: frontend/dist/") *>
           IO.println("") *>
           IO.println("Press Ctrl+C to stop the server") *>
           IO.never
