@@ -2,8 +2,8 @@ package chess.persistence.mongodb
 
 import cats.effect.IO
 import cats.implicits.*
-import chess.persistence.model.Opening
-import chess.persistence.repository.OpeningRepository
+import chess.model.Opening
+import chess.persistence.OpeningRepository
 import io.circe.generic.auto.*
 import io.circe.syntax.*
 import mongo4cats.circe.*
@@ -74,6 +74,9 @@ class MongoOpeningRepository(collection: MongoCollection[IO, Opening]) extends O
       randomSkip = if count > 0 then Random.nextInt(count.toInt) else 0
       opening <- collection.find(Filter.empty).skip(randomSkip).first
     yield opening
+
+  override def findByFen(fen: String): IO[Option[Opening]] =
+    collection.find(Filter.eq("fen", fen)).first
 
   override def count(): IO[Long] =
     collection.count(Filter.empty)

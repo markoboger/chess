@@ -1,4 +1,4 @@
-package chess.persistence.model
+package chess.model
 
 import java.time.Instant
 import java.util.UUID

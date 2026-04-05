@@ -15,8 +15,8 @@ import scalafx.stage.FileChooser.ExtensionFilter
 import chess.controller.{GameController, ComputerPlayer, MoveStrategy}
 import chess.controller.puzzle.PuzzleParser
 import chess.model.Puzzle
-import chess.persistence.model.Opening
-import chess.persistence.repository.OpeningRepository
+import chess.model.Opening
+import chess.persistence.OpeningRepository
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import chess.controller.strategy.{
@@ -78,6 +78,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private lazy val openings: List[Opening] =
     summon[OpeningRepository[IO]].findAll(limit = 10000).unsafeRunSync()
 
+  private lazy val openingsByFen: Map[String, Opening] =
+    openings.map(o => o.fen -> o).toMap
+
   private var pauseButton: Button = uninitialized
   private var gameButtonBox: HBox = uninitialized
   private[aview] var primaryStage: Stage = uninitialized
@@ -138,6 +141,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
           updatePgnDisplay()
           updateBoard()
           updateCapturedPanel()
+          updateOpeningLabel()
           triggerComputerMoveIfNeeded()
         case MoveResult.Failed(_, _) =>
           // Errors are handled inline by the originating action
@@ -628,6 +632,24 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       paused = false
       updatePauseButton()
     }
+
+  private def updateOpeningLabel(): Unit = {
+    if (openingInfoLabel == null) return
+    val fen = controller.getBoardAsFEN
+    openingsByFen.get(fen) match {
+      case Some(o) =>
+        openingInfoLabel.text = s"${o.eco}  ${o.name}\n${o.moves}"
+        openingInfoLabel.visible = true
+        openingInfoLabel.managed = true
+        if (puzzleInfoLabel != null) {
+          puzzleInfoLabel.visible = false
+          puzzleInfoLabel.managed = false
+        }
+      case None =>
+        openingInfoLabel.visible = false
+        openingInfoLabel.managed = false
+    }
+  }
 
   private def updatePgnDisplay(): Unit = {
     pgnDisplay.children.clear()

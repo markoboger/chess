@@ -1,19 +1,19 @@
-package chess.persistence.util
+package chess.seeder
 
 import cats.effect.{IO, IOApp, ExitCode}
-import chess.persistence.model.Opening
+import chess.model.Opening
 import chess.persistence.mongodb.MongoOpeningRepository
 import chess.persistence.postgres.PostgresOpeningRepository
+import chess.controller.io.opening.OpeningParser
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
 import mongo4cats.client.MongoClient
 import mongo4cats.circe._
 import io.circe.generic.auto._
 
-/** CLI application that seeds the Lichess openings into both databases
-  * and prints a timing comparison.
+/** CLI application that seeds the Lichess openings into both databases and prints a timing comparison.
   *
-  * Usage: sbt "runMain chess.persistence.util.SeedOpeningsApp"
+  * Usage: sbt "seeder/runMain chess.seeder.SeedOpeningsApp"
   */
 object SeedOpeningsApp extends IOApp:
 
@@ -23,31 +23,25 @@ object SeedOpeningsApp extends IOApp:
       _ <- IO.println("Chess Openings Database Seeder")
       _ <- IO.println("=" * 60)
 
-      // Step 1: Parse openings from TSV files (in-memory, no DB needed)
       _ <- IO.println("\n[1/5] Parsing Lichess TSV files...")
       parseStart <- IO.monotonic
-      openings <- IO(OpeningSeeder.parseLichessOpenings())
+      openings <- IO(OpeningParser.parseLichessOpenings())
       parseEnd <- IO.monotonic
-      parseDuration = (parseEnd - parseStart).toMillis
-      _ <- IO.println(s"  Parsed ${openings.length} openings in ${parseDuration}ms")
-      _ <- IO(OpeningSeeder.printStatistics(openings))
+      _ <- IO.println(s"  Parsed ${openings.length} openings in ${(parseEnd - parseStart).toMillis}ms")
+      _ <- IO(OpeningParser.printStatistics(openings))
 
-      // Step 2: Seed PostgreSQL
       _ <- IO.println("\n[2/5] Seeding PostgreSQL...")
       pgResult <- seedPostgres(openings)
       _ <- IO.println(s"  Write: ${pgResult._1} openings in ${pgResult._2}ms")
 
-      // Step 3: Seed MongoDB
       _ <- IO.println("\n[3/5] Seeding MongoDB...")
       mongoResult <- seedMongo(openings)
       _ <- IO.println(s"  Write: ${mongoResult._1} openings in ${mongoResult._2}ms")
 
-      // Step 4: Read benchmarks
       _ <- IO.println("\n[4/5] Read benchmarks...")
       pgReadMs <- benchmarkPostgresReads()
       mongoReadMs <- benchmarkMongoReads()
 
-      // Step 5: Summary
       _ <- IO.println("\n[5/5] Summary")
       _ <- IO.println("=" * 60)
       _ <- IO.println(f"  ${"Operation"}%-30s ${"PostgreSQL"}%12s ${"MongoDB"}%12s")
@@ -62,55 +56,35 @@ object SeedOpeningsApp extends IOApp:
     yield ExitCode.Success
 
   private def seedPostgres(openings: List[Opening]): IO[(Int, Long)] =
-    val pgHost = sys.env.getOrElse("POSTGRES_HOST", "localhost")
-    val pgPort = sys.env.getOrElse("POSTGRES_PORT", "5432")
-    val pgDb = sys.env.getOrElse("POSTGRES_DATABASE", "chess")
-    val pgUser = sys.env.getOrElse("POSTGRES_USER", "chess")
-    val pgPass = sys.env.getOrElse("POSTGRES_PASSWORD", "chess123")
-    val url = s"jdbc:postgresql://$pgHost:$pgPort/$pgDb"
-
+    val url = pgUrl
     ExecutionContexts.fixedThreadPool[IO](4).use { ce =>
-      HikariTransactor.newHikariTransactor[IO](
-        "org.postgresql.Driver", url, pgUser, pgPass, ce
-      ).use { xa =>
+      HikariTransactor.newHikariTransactor[IO]("org.postgresql.Driver", url, pgUser, pgPass, ce).use { xa =>
         for
           repo <- PostgresOpeningRepository.create(xa)
-          _    <- repo.deleteAll()
+          _ <- repo.deleteAll()
           start <- IO.monotonic
           count <- repo.saveAll(openings)
-          end   <- IO.monotonic
+          end <- IO.monotonic
         yield (count, (end - start).toMillis)
       }
     }
 
   private def seedMongo(openings: List[Opening]): IO[(Int, Long)] =
-    val mongoUri = sys.env.getOrElse("MONGO_URI", "mongodb://chess:chess123@localhost:27017")
-    val mongoDb = sys.env.getOrElse("MONGO_DATABASE", "chess")
-
     MongoClient.fromConnectionString[IO](mongoUri).use { client =>
       for
         db <- client.getDatabase(mongoDb)
         col <- db.getCollectionWithCodec[Opening]("openings")
         repo = new MongoOpeningRepository(col)
-        _    <- repo.deleteAll()
+        _ <- repo.deleteAll()
         start <- IO.monotonic
         count <- repo.saveAll(openings)
-        end   <- IO.monotonic
+        end <- IO.monotonic
       yield (count, (end - start).toMillis)
     }
 
   private def benchmarkPostgresReads(): IO[(Long, Long, Long, Long)] =
-    val pgHost = sys.env.getOrElse("POSTGRES_HOST", "localhost")
-    val pgPort = sys.env.getOrElse("POSTGRES_PORT", "5432")
-    val pgDb = sys.env.getOrElse("POSTGRES_DATABASE", "chess")
-    val pgUser = sys.env.getOrElse("POSTGRES_USER", "chess")
-    val pgPass = sys.env.getOrElse("POSTGRES_PASSWORD", "chess123")
-    val url = s"jdbc:postgresql://$pgHost:$pgPort/$pgDb"
-
     ExecutionContexts.fixedThreadPool[IO](4).use { ce =>
-      HikariTransactor.newHikariTransactor[IO](
-        "org.postgresql.Driver", url, pgUser, pgPass, ce
-      ).use { xa =>
+      HikariTransactor.newHikariTransactor[IO]("org.postgresql.Driver", pgUrl, pgUser, pgPass, ce).use { xa =>
         for
           repo <- PostgresOpeningRepository.create(xa)
           t1 <- timed(repo.findByEco("A00"))
@@ -122,9 +96,6 @@ object SeedOpeningsApp extends IOApp:
     }
 
   private def benchmarkMongoReads(): IO[(Long, Long, Long, Long)] =
-    val mongoUri = sys.env.getOrElse("MONGO_URI", "mongodb://chess:chess123@localhost:27017")
-    val mongoDb = sys.env.getOrElse("MONGO_DATABASE", "chess")
-
     MongoClient.fromConnectionString[IO](mongoUri).use { client =>
       for
         db <- client.getDatabase(mongoDb)
@@ -140,6 +111,14 @@ object SeedOpeningsApp extends IOApp:
   private def timed[A](action: IO[A]): IO[Long] =
     for
       start <- IO.monotonic
-      _     <- action
-      end   <- IO.monotonic
+      _ <- action
+      end <- IO.monotonic
     yield (end - start).toMillis
+
+  private def pgUrl =
+    s"jdbc:postgresql://${sys.env.getOrElse("POSTGRES_HOST", "localhost")}:${sys.env.getOrElse("POSTGRES_PORT", "5432")}/${sys.env
+        .getOrElse("POSTGRES_DATABASE", "chess")}"
+  private def pgUser = sys.env.getOrElse("POSTGRES_USER", "chess")
+  private def pgPass = sys.env.getOrElse("POSTGRES_PASSWORD", "chess123")
+  private def mongoUri = sys.env.getOrElse("MONGO_URI", "mongodb://chess:chess123@localhost:27017")
+  private def mongoDb = sys.env.getOrElse("MONGO_DATABASE", "chess")

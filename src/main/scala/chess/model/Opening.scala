@@ -1,4 +1,4 @@
-package chess.persistence.model
+package chess.model
 
 /** Represents a chess opening stored in the database.
   *

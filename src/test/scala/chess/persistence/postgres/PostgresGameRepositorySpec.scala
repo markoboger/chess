@@ -2,7 +2,7 @@ package chess.persistence.postgres
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import chess.persistence.model.PersistedGame
+import chess.model.PersistedGame
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
 import org.scalatest.BeforeAndAfterAll

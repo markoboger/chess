@@ -2,8 +2,8 @@ package chess.persistence.postgres
 
 import cats.effect.IO
 import cats.implicits.*
-import chess.persistence.model.Opening
-import chess.persistence.repository.OpeningRepository
+import chess.model.Opening
+import chess.persistence.OpeningRepository
 import doobie.*
 import doobie.implicits.*
 import doobie.postgres.implicits.*
@@ -109,6 +109,14 @@ class PostgresOpeningRepository(xa: Transactor[IO]) extends OpeningRepository[IO
         LIMIT 1
       """.query[Opening].option.transact(xa)
     yield opening
+
+  override def findByFen(fen: String): IO[Option[Opening]] =
+    sql"""
+      SELECT eco, name, moves, fen, move_count
+      FROM openings
+      WHERE fen = $fen
+      LIMIT 1
+    """.query[Opening].option.transact(xa)
 
   override def count(): IO[Long] =
     sql"SELECT COUNT(*) FROM openings"

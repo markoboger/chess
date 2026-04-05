@@ -17,6 +17,19 @@ val javafxClassifier = {
   s"$os$arch"
 }
 
+lazy val Seeder = project
+  .in(file("seeder"))
+  .dependsOn(Chess)
+  .settings(
+    name := "Chess-Seeder",
+    scalaVersion := "3.5.0",
+    Compile / mainClass := Some("chess.seeder.SeedOpeningsApp"),
+    libraryDependencies ++= Seq(
+      "org.scalatest" %% "scalatest" % "3.2.19" % Test
+    ),
+    publish / skip := true
+  )
+
 lazy val Benchmarks = project
   .in(file("benchmark"))
   .enablePlugins(JmhPlugin)
@@ -68,7 +81,7 @@ lazy val Chess = project
       "org.testcontainers" % "mongodb" % "1.19.8" % Test,
       "de.flapdoodle.embed" % "de.flapdoodle.embed.mongo" % "4.13.1" % Test
     ),
-    coverageExcludedFiles := ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*;.*GameServer.*;.*GatewayServer.*;.*UIServer.*;.*SeedOpeningsApp.*",
+    coverageExcludedFiles := ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*;.*GameServer.*;.*GatewayServer.*;.*UIServer.*",
     coverageMinimumStmtTotal := 40,
     coverageFailOnMinimum := false
   )

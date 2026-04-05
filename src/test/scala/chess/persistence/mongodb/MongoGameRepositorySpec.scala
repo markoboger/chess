@@ -2,7 +2,7 @@ package chess.persistence.mongodb
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import chess.persistence.model.PersistedGame
+import chess.model.PersistedGame
 import io.circe.generic.auto.*
 import mongo4cats.circe.*
 import mongo4cats.client.MongoClient

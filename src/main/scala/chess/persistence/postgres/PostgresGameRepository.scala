@@ -2,8 +2,8 @@ package chess.persistence.postgres
 
 import cats.effect.IO
 import cats.implicits.*
-import chess.persistence.model.PersistedGame
-import chess.persistence.repository.GameRepository
+import chess.model.PersistedGame
+import chess.persistence.GameRepository
 import doobie.*
 import doobie.implicits.*
 import doobie.postgres.implicits.*
@@ -95,9 +95,7 @@ class PostgresGameRepository(xa: Transactor[IO]) extends GameRepository[IO]:
     """.query[PersistedGame].to[List].transact(xa)
 
   override def delete(id: UUID): IO[Boolean] =
-    sql"DELETE FROM games WHERE id = $id"
-      .update
-      .run
+    sql"DELETE FROM games WHERE id = $id".update.run
       .transact(xa)
       .map(_ > 0)
 
@@ -108,9 +106,7 @@ class PostgresGameRepository(xa: Transactor[IO]) extends GameRepository[IO]:
       .transact(xa)
 
   override def deleteAll(): IO[Long] =
-    sql"DELETE FROM games"
-      .update
-      .run
+    sql"DELETE FROM games".update.run
       .transact(xa)
       .map(_.toLong)
 

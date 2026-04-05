@@ -1,6 +1,6 @@
-package chess.persistence.repository
+package chess.persistence
 
-import chess.persistence.model.Opening
+import chess.model.Opening
 
 /** Repository abstraction for chess opening library.
   *
@@ -89,6 +89,15 @@ trait OpeningRepository[F[_]]:
     *   A random opening wrapped in effect F
     */
   def findRandom(): F[Option[Opening]]
+
+  /** Finds an opening by its exact FEN position string (piece-placement only, as produced by FenIO.save).
+    *
+    * @param fen
+    *   The piece-placement FEN string (e.g. "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR")
+    * @return
+    *   The matching opening, or None if the position is not in the database
+    */
+  def findByFen(fen: String): F[Option[Opening]]
 
   /** Counts total number of openings in the database.
     *

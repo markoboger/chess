@@ -1,9 +1,9 @@
 package chess.persistence.memory
 
 import cats.effect.IO
-import chess.persistence.model.Opening
-import chess.persistence.repository.OpeningRepository
-import chess.persistence.util.OpeningSeeder
+import chess.model.Opening
+import chess.persistence.OpeningRepository
+import chess.controller.io.OpeningIO
 
 import scala.util.Random
 
@@ -16,14 +16,19 @@ class InMemoryOpeningRepository(initial: List[Opening] = Nil) extends OpeningRep
   private var store: Map[(String, String), Opening] =
     initial.map(o => (o.eco, o.name) -> o).toMap
 
+  private var fenIndex: Map[String, Opening] =
+    initial.map(o => o.fen -> o).toMap
+
   override def save(opening: Opening): IO[Opening] = IO {
     store = store + ((opening.eco, opening.name) -> opening)
+    fenIndex = fenIndex + (opening.fen -> opening)
     opening
   }
 
   override def saveAll(openings: List[Opening]): IO[Int] = IO {
     val entries = openings.map(o => (o.eco, o.name) -> o)
     store = store ++ entries
+    fenIndex = fenIndex ++ openings.map(o => o.fen -> o)
     entries.length
   }
 
@@ -56,13 +61,16 @@ class InMemoryOpeningRepository(initial: List[Opening] = Nil) extends OpeningRep
 
   override def count(): IO[Long] = IO(store.size.toLong)
 
+  override def findByFen(fen: String): IO[Option[Opening]] = IO(fenIndex.get(fen))
+
   override def deleteAll(): IO[Long] = IO {
     val n = store.size.toLong
     store = Map.empty
+    fenIndex = Map.empty
     n
   }
 
 object InMemoryOpeningRepository:
   /** Creates a repository pre-loaded with all Lichess openings from TSV resources. */
-  def fromLichess(): InMemoryOpeningRepository =
-    new InMemoryOpeningRepository(OpeningSeeder.parseLichessOpenings())
+  def fromLichess()(using io: OpeningIO): InMemoryOpeningRepository =
+    new InMemoryOpeningRepository(io.parseLichessOpenings())
