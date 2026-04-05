@@ -3,7 +3,7 @@ package chess.persistence.mongodb
 import cats.effect.IO
 import cats.implicits.*
 import chess.persistence.model.Opening
-import chess.persistence.repository.OpeningRepository
+import chess.persistence.OpeningRepository
 import io.circe.generic.auto.*
 import io.circe.syntax.*
 import mongo4cats.circe.*

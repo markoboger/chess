@@ -6,7 +6,7 @@ import chess.controller.GameController
 import chess.controller.io.{FenIO, PgnIO}
 import chess.model.Board
 import chess.persistence.model.Opening
-import chess.persistence.repository.OpeningRepository
+import chess.persistence.OpeningRepository
 
 import scala.io.Source
 import scala.util.{Try, Using}

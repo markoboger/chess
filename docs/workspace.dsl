@@ -122,14 +122,14 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
                 }
 
                 # ── chess.persistence ─────────────────────────────────────────
+                group "chess.persistence" {
+                    openingRepoTrait = component "OpeningRepository[F[_]]" "trait (higher-kinded). save, saveAll, findByEcoAndName, findByName(query,limit), findAll(limit,offset), findByMoveCount(maxMoves), count: F[Int]. Bound via AppBindings given." "trait · OpeningRepository.scala"
+                    gameRepoTrait    = component "GameRepository[F[_]]"    "trait (higher-kinded). save(game), findById(id), findAll(limit,offset), findByStatus(status), delete(id): F[Boolean]." "trait · GameRepository.scala"
+                }
+
                 group "chess.persistence.model" {
                     openingClass       = component "Opening"       "case class (eco: String, name: String, moves: String, fen: String, moveCount: Int). Composite key (eco,name). Opening.unsafe(eco,name,moves,fen,moveCount) factory." "case class · Opening.scala"
                     persistedGameClass = component "PersistedGame" "case class (id: UUID, fen: String, pgn: String, status: String, createdAt: Instant, updatedAt: Instant). PersistedGame.create(fen?,pgn?,status?) factory." "case class · PersistedGame.scala"
-                }
-
-                group "chess.persistence.repository" {
-                    openingRepoTrait = component "OpeningRepository[F[_]]" "trait (higher-kinded). save, saveAll, findByEcoAndName, findByName(query,limit), findAll(limit,offset), findByMoveCount(maxMoves), count: F[Int]. Bound via AppBindings given." "trait · OpeningRepository.scala"
-                    gameRepoTrait    = component "GameRepository[F[_]]"    "trait (higher-kinded). save(game), findById(id), findAll(limit,offset), findByStatus(status), delete(id): F[Boolean]." "trait · GameRepository.scala"
                 }
 
                 group "chess.persistence.memory" {

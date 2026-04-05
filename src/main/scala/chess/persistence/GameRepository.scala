@@ -1,4 +1,4 @@
-package chess.persistence.repository
+package chess.persistence
 
 import chess.persistence.model.PersistedGame
 import java.util.UUID

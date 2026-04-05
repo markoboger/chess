@@ -16,7 +16,7 @@ import chess.controller.{GameController, ComputerPlayer, MoveStrategy}
 import chess.controller.puzzle.PuzzleParser
 import chess.model.Puzzle
 import chess.persistence.model.Opening
-import chess.persistence.repository.OpeningRepository
+import chess.persistence.OpeningRepository
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import chess.controller.strategy.{

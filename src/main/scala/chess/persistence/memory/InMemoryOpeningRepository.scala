@@ -2,7 +2,7 @@ package chess.persistence.memory
 
 import cats.effect.IO
 import chess.persistence.model.Opening
-import chess.persistence.repository.OpeningRepository
+import chess.persistence.OpeningRepository
 import chess.persistence.util.OpeningSeeder
 
 import scala.util.Random
