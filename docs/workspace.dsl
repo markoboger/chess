@@ -203,7 +203,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
             # VUE UI — Vue.js 3 SPA served by nginx  (docker-compose: chess-vue-ui)
             # Deployed as a Docker container; replaces the Scala UI Service in the compose stack.
             # ================================================================
-            vueUI = container "Vue UI" "Vue.js 3 single-page application built with Vite and TypeScript. Manages game state with Pinia; renders the chess board using chess.js; calls the API Gateway for all game operations. Built with 'npm run build' and served by nginx with SPA fallback routing." "Vue 3 / TypeScript / Pinia / Tailwind CSS / chess.js / nginx:alpine · host port 3000" "WebApp" {}
+            vueUI = container "Vue UI" "Vue.js 3 single-page application built with Vite and TypeScript. Manages game state with Pinia; renders the chess board using chess.js; calls the API Gateway for all game operations. Built with 'npm run build' and served by nginx with SPA fallback routing." "Vue 3 / TypeScript / Pinia / Tailwind CSS / chess.js / nginx:alpine · host port 3000" "WebApp"
 
             # ================================================================
             # SEEDER — chess.seeder subproject (one-shot CLI tool)
