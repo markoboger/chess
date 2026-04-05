@@ -89,6 +89,8 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
                     quiescenceStratClass = component "QuiescenceStrategy" "class (depth: Int = 3, qDepth: Int = 6). name=Quiescence. After minimax bottoms out, quiescence(board,remaining,alpha,beta): Int searches captures only until a quiet position is reached." "class · QuiescenceStrategy.scala"
 
                     idStratClass = component "IterativeDeepeningStrategy" "class (var timeLimitMs: Long = 2000). name=IterativeDeepening. searchAtDepth(board,color,depth): Option[Move]. Iterates depth 1 to infinity; stops when time budget expires; returns best result from last fully completed depth." "class · IterativeDeepeningStrategy.scala"
+
+                    openingBookStratClass = component "OpeningBookStrategy" "class (openings: List[Opening] = OpeningParser.parseLichessOpenings(), fallback: MoveStrategy = QuiescenceStrategy). Picks one opening at random on White's first move; plays both colors' book moves by ply index. Abandons book if a move is illegal (opponent deviated). Falls back to the engine once the opening is exhausted. reset() re-picks for the next game." "class · OpeningBookStrategy.scala"
                 }
 
                 # ── chess.controller.io ───────────────────────────────────────
@@ -267,8 +269,10 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         computerPlayerComp -> evaluatorObj      "Reads material balance for repetition guard"
 
         minimaxStratClass    -> evaluatorObj    "evaluate(board, color)"
-        quiescenceStratClass -> evaluatorObj    "evaluate(board, color)"
-        idStratClass         -> evaluatorObj    "evaluate(board, color)"
+        quiescenceStratClass   -> evaluatorObj          "evaluate(board, color)"
+        idStratClass           -> evaluatorObj          "evaluate(board, color)"
+        openingBookStratClass  -> openingParserComp     "parseLichessOpenings() at construction"
+        openingBookStratClass  -> quiescenceStratClass  "delegates to fallback after opening"
         materialStratClass   -> evaluatorObj    "materialValue(role)"
         pstStratClass        -> evaluatorObj    "evaluate(board, color)"
 
@@ -380,6 +384,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
             include gameCtrlComp computerPlayerComp moveStrategyTrait observerComp
             include evaluatorObj randomStratClass greedyStratClass materialStratClass
             include pstStratClass minimaxStratClass quiescenceStratClass idStratClass
+            include openingBookStratClass
             autoLayout
             title "Level 4 - chess.controller + chess.controller.strategy (classes, objects, traits)"
         }
