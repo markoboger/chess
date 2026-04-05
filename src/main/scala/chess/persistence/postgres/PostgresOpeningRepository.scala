@@ -110,6 +110,14 @@ class PostgresOpeningRepository(xa: Transactor[IO]) extends OpeningRepository[IO
       """.query[Opening].option.transact(xa)
     yield opening
 
+  override def findByFen(fen: String): IO[Option[Opening]] =
+    sql"""
+      SELECT eco, name, moves, fen, move_count
+      FROM openings
+      WHERE fen = $fen
+      LIMIT 1
+    """.query[Opening].option.transact(xa)
+
   override def count(): IO[Long] =
     sql"SELECT COUNT(*) FROM openings"
       .query[Long]

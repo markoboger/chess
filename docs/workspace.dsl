@@ -133,12 +133,12 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
 
                 # ── chess.persistence ─────────────────────────────────────────
                 group "chess.persistence" {
-                    openingRepoTrait = component "OpeningRepository[F[_]]" "trait (higher-kinded). save, saveAll, findByEcoAndName, findByName(query,limit), findAll(limit,offset), findByMoveCount(maxMoves), count: F[Int]. Bound via AppBindings given." "trait · OpeningRepository.scala"
+                    openingRepoTrait = component "OpeningRepository[F[_]]" "trait (higher-kinded). save, saveAll, findByEco, findByEcoAndName, findByName(query,limit), findAll(limit,offset), findByMoveCount(maxMoves), findByFen(fen): F[Option[Opening]], count, deleteAll. Bound via AppBindings given." "trait · OpeningRepository.scala"
                     gameRepoTrait    = component "GameRepository[F[_]]"    "trait (higher-kinded). save(game), findById(id), findAll(limit,offset), findByStatus(status), delete(id): F[Boolean]." "trait · GameRepository.scala"
                 }
 
                 group "chess.persistence.memory" {
-                    inMemoryOpeningComp = component "InMemoryOpeningRepository" "class. Cats Effect IO + mutable Map[(eco,name), Opening]. fromLichess()(using OpeningIO): loads all 5 TSV files at startup. DEFAULT OpeningRepository[IO] binding in AppBindings." "class · InMemoryOpeningRepository.scala"
+                    inMemoryOpeningComp = component "InMemoryOpeningRepository" "class. Cats Effect IO + mutable Map[(eco,name), Opening] + Map[fen, Opening]. findByFen is O(1) via FEN index. fromLichess()(using OpeningIO): loads all 5 TSV files at startup. DEFAULT OpeningRepository[IO] binding in AppBindings." "class · InMemoryOpeningRepository.scala"
                 }
 
                 group "chess.persistence.postgres" {
@@ -153,7 +153,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
 
                 # ── chess.aview ───────────────────────────────────────────────
                 group "chess.aview" {
-                    chessGUIComp    = component "ChessGUI"    "class. JavaFX/ScalaFX board UI. Drag-and-drop + text-field input, back/forward history buttons, FEN display, PGN TextArea, opening name label, New Game. Extends Observer[MoveResult]; self-registers on GameController." "class · ChessGUI.scala"
+                    chessGUIComp    = component "ChessGUI"    "class. JavaFX/ScalaFX board UI. Drag-and-drop + text-field input, back/forward history buttons, FEN display, PGN TextArea, opening name label (auto-updated after each move via FEN lookup in openingsByFen map), New Game. Extends Observer[MoveResult]; self-registers on GameController." "class · ChessGUI.scala"
                     consoleViewComp = component "ConsoleView" "class. ANSI terminal renderer. Prints Unicode board, active color, FEN, game events after each move. Reads PGN from stdin. Extends Observer[MoveResult]; self-registers on GameController." "class · ConsoleView.scala"
                 }
 

@@ -75,6 +75,9 @@ class MongoOpeningRepository(collection: MongoCollection[IO, Opening]) extends O
       opening <- collection.find(Filter.empty).skip(randomSkip).first
     yield opening
 
+  override def findByFen(fen: String): IO[Option[Opening]] =
+    collection.find(Filter.eq("fen", fen)).first
+
   override def count(): IO[Long] =
     collection.count(Filter.empty)
 
