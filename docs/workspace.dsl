@@ -147,8 +147,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
                 }
 
                 group "chess.persistence.util" {
-                    openingSeederComp = component "OpeningSeeder" "object. parseTsvOpenings / parseCsvOpenings. Deduplicates by (eco,name). Bulk-saves to any OpeningRepository[IO]. seedFromCsvResource(repo,path): IO[Int]." "object · OpeningSeeder.scala"
-                    seedAppComp       = component "SeedOpeningsApp" "object (IOApp). One-shot DB seeding: connects to Postgres or MongoDB, calls OpeningSeeder, logs count. Excluded from coverage." "object · SeedOpeningsApp.scala"
+                    openingParserComp = component "OpeningParser" "object. Pure parsing only — no IO effect type. parseLichessOpenings(): List[Opening], parseTsvLine, parseCsvOpenings, parseTsvResource/parseCsvResource: Try[List[Opening]], computeFenAndMoveCount, deduplicate, validateOpenings, printStatistics. No repository dependency." "object · OpeningParser.scala"
                 }
 
                 # ── chess.aview ───────────────────────────────────────────────
@@ -199,6 +198,16 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
                 }
             }
 
+            # ================================================================
+            # SEEDER — chess.seeder subproject (one-shot CLI tool)
+            # ================================================================
+            seeder = container "Seeder" "One-shot CLI tool that seeds the Lichess opening library into PostgreSQL and MongoDB. Run via: sbt 'seeder/runMain chess.seeder.SeedOpeningsApp'." "Scala 3 / Cats Effect IO · sbt subproject" "Application" {
+                group "chess.seeder" {
+                    openingSeederComp = component "OpeningSeeder" "object. seedLichessOpenings(repo): IO[Int], seedFromTsvResource(repo,path): IO[Int], seedFromCsvResource(repo,path): IO[Int]. Delegates parsing to OpeningParser from the Chess container." "object · OpeningSeeder.scala"
+                    seedAppComp       = component "SeedOpeningsApp" "object (IOApp). Parses all five Lichess TSV files via OpeningParser, writes to Postgres + MongoDB, prints timing comparison table." "object · SeedOpeningsApp.scala"
+                }
+            }
+
             # ── Databases ────────────────────────────────────────────────────
             postgres = container "PostgreSQL" "Tables: games, openings. Accessed via Doobie HikariCP Transactor." "PostgreSQL 15" "Database"
             mongodb  = container "MongoDB"    "Collections: games, openings. Accessed via mongo4cats."            "MongoDB 7"    "Database"
@@ -212,8 +221,7 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         # ── People → Containers ────────────────────────────────────────────────
         player    -> chess    "Launches desktop app"
         player    -> gateway  "HTTP requests (browser / REST client)"
-        developer -> postgres "Seeds openings (SeedOpeningsApp)"
-        developer -> mongodb  "Seeds openings (SeedOpeningsApp)"
+        developer -> seeder   "Runs one-shot seeding CLI"
 
         # ── Container → Container ─────────────────────────────────────────────
         gateway     -> gameService "Proxies /api/games/*" "HTTP/JSON"
@@ -224,6 +232,10 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         chess       -> postgres    "Reads / writes games and openings" "JDBC / Doobie"
         chess       -> mongodb     "Reads / writes games and openings" "mongo4cats"
         chess       -> lichessOpenings "Loads TSV files from classpath at startup"
+        seeder      -> chess       "Calls OpeningParser (in-process via sbt dependsOn)"
+        seeder      -> postgres    "Bulk-inserts openings" "JDBC / Doobie"
+        seeder      -> mongodb     "Bulk-inserts openings" "mongo4cats"
+        seeder      -> lichessOpenings "Reads TSV files from classpath"
 
         # ── chess.model — Level 4 class relationships ─────────────────────────
         pieceClass          -> roleEnum            "role: Role"
@@ -280,8 +292,11 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         postgresOpeningComp -> postgres          "JDBC / Doobie"
         mongoGameComp       -> mongodb           "mongo4cats"
         mongoOpeningComp    -> mongodb           "mongo4cats"
-        inMemoryOpeningComp -> openingSeederComp "Seeded at startup by"
-        openingSeederComp   -> openingRepoTrait  "Bulk-saves via"
+        inMemoryOpeningComp -> openingParserComp  "Seeded at startup by (parseLichessOpenings)"
+        openingSeederComp   -> openingParserComp  "Delegates parsing to"
+        openingSeederComp   -> openingRepoTrait   "Bulk-saves via"
+        seedAppComp         -> openingSeederComp  "Calls seed methods"
+        seedAppComp         -> openingParserComp  "Calls parseLichessOpenings + printStatistics"
 
         # chess.aview
         chessAppComp    -> appBindingsComp  "Imports given instances from"
@@ -381,12 +396,11 @@ workspace "Chess Application" "Scala chess application — one sbt build. Packag
         component chess "L4_Persistence" {
             include openingClass persistedGameClass
             include openingRepoTrait gameRepoTrait
-            include inMemoryOpeningComp
+            include inMemoryOpeningComp openingParserComp
             include postgresGameComp postgresOpeningComp
             include mongoGameComp mongoOpeningComp
-            include openingSeederComp seedAppComp
             autoLayout
-            title "Level 4 - chess.persistence (models, repository traits, adapters)"
+            title "Level 4 - chess.persistence (models, repository traits, adapters, parser)"
         }
 
         # ── Level 4 — chess.aview: views and entry points ──────────────────────

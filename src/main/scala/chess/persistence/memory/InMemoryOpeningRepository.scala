@@ -3,7 +3,7 @@ package chess.persistence.memory
 import cats.effect.IO
 import chess.persistence.model.Opening
 import chess.persistence.OpeningRepository
-import chess.persistence.util.OpeningSeeder
+import chess.persistence.util.OpeningParser
 
 import scala.util.Random
 
@@ -65,4 +65,4 @@ class InMemoryOpeningRepository(initial: List[Opening] = Nil) extends OpeningRep
 object InMemoryOpeningRepository:
   /** Creates a repository pre-loaded with all Lichess openings from TSV resources. */
   def fromLichess(): InMemoryOpeningRepository =
-    new InMemoryOpeningRepository(OpeningSeeder.parseLichessOpenings())
+    new InMemoryOpeningRepository(OpeningParser.parseLichessOpenings())
