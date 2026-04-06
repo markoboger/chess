@@ -10,36 +10,14 @@
       {{ gameStore.error }}
     </div>
 
-    <!-- Clock + Captured pieces panel -->
-    <div class="clock-captures-panel">
-      <div class="captures-side">
-        <div class="captured-row">
-          <span v-for="(sym, i) in gameStore.capturedPieces.byBlack" :key="'bc'+i" class="captured-piece">{{ sym }}</span>
-          <span v-if="gameStore.capturedPieces.byBlack.length === 0" class="captured-empty">&nbsp;</span>
-        </div>
-        <div class="material-label">{{ gameStore.capturedPieces.advantageText }}</div>
-        <div class="captured-row">
-          <span v-for="(sym, i) in gameStore.capturedPieces.byWhite" :key="'wc'+i" class="captured-piece">{{ sym }}</span>
-          <span v-if="gameStore.capturedPieces.byWhite.length === 0" class="captured-empty">&nbsp;</span>
-        </div>
-      </div>
-      <div class="clock-side">
-        <div class="clock-label">BLACK</div>
-        <div class="clock-time" :class="{ 'clock-active': gameStore.latestTurn === 'b' && gameStore.clockStarted, 'clock-danger': isBlackLow }">
-          {{ gameStore.blackClockDisplay }}
-        </div>
-        <div class="clock-label">WHITE</div>
-        <div class="clock-time" :class="{ 'clock-active': gameStore.latestTurn === 'w' && gameStore.clockStarted, 'clock-danger': isWhiteLow }">
-          {{ gameStore.whiteClockDisplay }}
-        </div>
-      </div>
-    </div>
-
     <!-- PGN display -->
     <div class="pgn-section">
       <div class="section-header">
-        <span class="section-title">Game PGN</span>
-        <button class="copy-btn" @click="copyPgn" :title="copyPgnLabel">{{ copyPgnIcon }}</button>
+        <span class="section-title">Moves</span>
+        <button class="copy-btn" @click="copyPgn" :title="copyPgnLabel">
+          <Check v-if="copySuccess" :size="14" />
+          <Copy v-else :size="14" />
+        </button>
       </div>
       <div class="pgn-scroll" ref="pgnScrollRef">
         <span v-if="gameStore.pgnMoves.length === 0" class="pgn-empty">No moves yet</span>
@@ -57,28 +35,27 @@
 
     <!-- Navigation -->
     <div class="nav-row">
-      <button class="nav-btn" @click="gameStore.goToMove(0)" :disabled="gameStore.currentIndex === 0" title="Start">⏮</button>
-      <button class="nav-btn" @click="gameStore.backward()" :disabled="gameStore.currentIndex === 0" title="Back">◀</button>
-      <button class="nav-btn" @click="gameStore.forward()" :disabled="gameStore.isAtLatest" title="Forward">▶</button>
-      <button class="nav-btn" @click="gameStore.goToMove(gameStore.boardStates.length - 1)" :disabled="gameStore.isAtLatest" title="End">⏭</button>
+      <button class="nav-btn" @click="gameStore.goToMove(0)" :disabled="gameStore.currentIndex === 0" title="Start"><ChevronsLeft :size="16" /></button>
+      <button class="nav-btn" @click="gameStore.backward()" :disabled="gameStore.currentIndex === 0" title="Back"><ChevronLeft :size="16" /></button>
+      <button class="nav-btn" @click="gameStore.forward()" :disabled="gameStore.isAtLatest" title="Forward"><ChevronRight :size="16" /></button>
+      <button class="nav-btn" @click="gameStore.goToMove(gameStore.boardStates.length - 1)" :disabled="gameStore.isAtLatest" title="End"><ChevronsRight :size="16" /></button>
     </div>
 
-    <!-- FEN display -->
-    <div class="fen-section">
-      <div class="section-header">
-        <span class="section-title">FEN</span>
-        <button class="copy-btn" @click="copyFen" :title="copyFenLabel">{{ copyFenIcon }}</button>
-      </div>
-      <div class="fen-text">{{ gameStore.fen }}</div>
-    </div>
-
-    <!-- Game buttons -->
+    <!-- Game action buttons -->
     <div class="button-row">
-      <button class="btn-new-game" @click="gameStore.resetGame()">★ New Game</button>
-      <button v-if="gameStore.gameMode !== 'cvc'" class="btn-run" @click="gameStore.setGameMode('cvc')">▶ Run</button>
+      <button class="btn-new-game" @click="gameStore.resetGame()" title="New Game"><SquarePlus :size="15" /> New Game</button>
+      <button v-if="gameStore.gameMode !== 'cvc'" class="btn-run" @click="gameStore.setGameMode('cvc')" title="Run"><Play :size="15" /> Run</button>
       <button v-if="gameStore.gameMode === 'cvc'" class="btn-pause" @click="gameStore.togglePause()">
-        {{ gameStore.paused ? '▶ Continue' : '⏸ Pause' }}
+        <template v-if="gameStore.paused"><Play :size="15" /> Continue</template>
+        <template v-else><Pause :size="15" /> Pause</template>
       </button>
+    </div>
+
+    <!-- Undo / Redo / Flip -->
+    <div class="tool-row">
+      <button class="tool-btn" @click="gameStore.undo()" :disabled="!gameStore.canUndo" title="Undo"><Undo2 :size="16" /></button>
+      <button class="tool-btn" @click="gameStore.redo()" :disabled="!gameStore.canRedo" title="Redo"><Redo2 :size="16" /></button>
+      <button class="tool-btn" @click="gameStore.flipBoard()" title="Flip Board"><ArrowUpDown :size="16" /></button>
     </div>
   </div>
 </template>
@@ -86,14 +63,17 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { useGameStore } from '../../stores/game'
+import {
+  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
+  SquarePlus, Play, Pause, Undo2, Redo2, ArrowUpDown,
+  Copy, Check
+} from 'lucide-vue-next'
 
 const gameStore = useGameStore()
 const pgnScrollRef = ref<HTMLElement | null>(null)
 
-const copyPgnIcon = ref('📋')
+const copySuccess = ref(false)
 const copyPgnLabel = ref('Copy PGN')
-const copyFenIcon = ref('📋')
-const copyFenLabel = ref('Copy FEN')
 
 const statusClass = computed(() => {
   if (gameStore.gameOverByTimeout) return 'status-checkmate'
@@ -104,26 +84,13 @@ const statusClass = computed(() => {
   return ''
 })
 
-const isWhiteLow = computed(() => {
-  if (gameStore.clockMode.kind !== 'timed') return false
-  return gameStore.whiteTimeMs < 30000
-})
-
-const isBlackLow = computed(() => {
-  if (gameStore.clockMode.kind !== 'timed') return false
-  return gameStore.blackTimeMs < 30000
-})
-
-function copyToClipboard(text: string, iconRef: typeof copyPgnIcon, labelRef: typeof copyPgnLabel) {
-  navigator.clipboard.writeText(text).then(() => {
-    iconRef.value = '✓'
-    labelRef.value = 'Copied!'
-    setTimeout(() => { iconRef.value = '📋'; labelRef.value = iconRef === copyPgnIcon ? 'Copy PGN' : 'Copy FEN' }, 1500)
+function copyPgn() {
+  navigator.clipboard.writeText(gameStore.pgnText).then(() => {
+    copySuccess.value = true
+    copyPgnLabel.value = 'Copied!'
+    setTimeout(() => { copySuccess.value = false; copyPgnLabel.value = 'Copy PGN' }, 1500)
   })
 }
-
-function copyPgn() { copyToClipboard(gameStore.pgnText, copyPgnIcon, copyPgnLabel) }
-function copyFen() { copyToClipboard(gameStore.fen, copyFenIcon, copyFenLabel) }
 
 // Auto-scroll PGN to active move
 watch(() => gameStore.currentIndex, async () => {
@@ -140,6 +107,8 @@ watch(() => gameStore.currentIndex, async () => {
   display: flex;
   flex-direction: column;
   gap: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .status-bar {
@@ -163,98 +132,47 @@ watch(() => gameStore.currentIndex, async () => {
   border-bottom: 1px solid #f5c6cb;
 }
 
-/* Clock + Captures panel */
-.clock-captures-panel {
-  display: flex;
-  background: #ebebeb;
-  border-bottom: 1px solid #ddd;
-}
-.captures-side {
+/* PGN section */
+.pgn-section {
+  padding: 0 12px;
   flex: 1;
-  padding: 8px 12px;
-}
-.clock-side {
-  padding: 6px 14px;
-  text-align: right;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 0;
-  border-left: 1px solid #ddd;
+  min-height: 0;
 }
-.clock-label {
-  font-size: 10px;
-  font-weight: 700;
-  color: #888;
-  letter-spacing: 0.5px;
-}
-.clock-time {
-  font-family: monospace;
-  font-size: 22px;
-  font-weight: 700;
-  color: #888;
-  line-height: 1.2;
-}
-.clock-time.clock-active {
-  color: #333;
-  background: #d5e8d4;
-  border-radius: 4px;
-  padding: 0 4px;
-}
-.clock-time.clock-danger {
-  color: #e74c3c;
-}
-.clock-time.clock-active.clock-danger {
-  color: #e74c3c;
-  background: #fde8e8;
-}
-
-.captured-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1px;
-  min-height: 24px;
-  align-items: center;
-}
-.captured-piece { font-size: 20px; line-height: 1; }
-.captured-empty { font-size: 20px; }
-.material-label {
-  text-align: center;
-  font-weight: 700;
-  font-size: 11px;
-  color: #555;
-  padding: 1px 0;
-}
-
-.pgn-section { padding: 0 16px; }
 .section-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 0 6px;
+  padding: 8px 0 4px;
+  flex-shrink: 0;
 }
 .section-title { font-weight: 600; font-size: 13px; color: #555; }
 .copy-btn {
   font-size: 13px;
-  padding: 2px 6px;
+  padding: 3px 6px;
   border: 1px solid #ddd;
   border-radius: 4px;
   background: #fafafa;
   cursor: pointer;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .copy-btn:hover { background: #eee; }
 
 .pgn-scroll {
   font-family: monospace;
   font-size: 13px;
-  line-height: 1.6;
-  height: 330px;
+  line-height: 1.3;
+  flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: 6px 8px;
   background: white;
   border: 1px solid #ddd;
   border-radius: 6px;
+  min-height: 120px;
 }
 .pgn-empty { color: #aaa; font-style: italic; }
 .pgn-number { color: #888; margin-right: 2px; }
@@ -271,18 +189,20 @@ watch(() => gameStore.currentIndex, async () => {
   background: #e3f2fd;
 }
 
+/* Navigation row */
 .nav-row {
   display: flex;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 16px;
+  gap: 4px;
+  padding: 6px 12px;
+  flex-shrink: 0;
 }
 .nav-btn {
-  width: 48px;
-  height: 36px;
-  font-size: 16px;
+  width: 40px;
+  height: 30px;
+  font-size: 14px;
   border: 1px solid #ccc;
-  border-radius: 6px;
+  border-radius: 5px;
   background: #fafafa;
   cursor: pointer;
   display: flex;
@@ -292,27 +212,16 @@ watch(() => gameStore.currentIndex, async () => {
 .nav-btn:hover:not(:disabled) { background: #e8e8e8; }
 .nav-btn:disabled { opacity: 0.35; cursor: default; }
 
-.fen-section { padding: 0 16px; }
-.fen-text {
-  font-family: monospace;
-  font-size: 11px;
-  padding: 6px 8px;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  word-break: break-all;
-  color: #333;
-  line-height: 1.4;
-}
-
+/* Game action buttons */
 .button-row {
   display: flex;
   justify-content: center;
-  gap: 10px;
-  padding: 14px 16px;
+  gap: 8px;
+  padding: 8px 12px 4px;
+  flex-shrink: 0;
 }
 .btn-new-game {
-  padding: 10px 20px;
+  padding: 8px 16px;
   font-size: 13px;
   font-weight: 700;
   border: none;
@@ -321,11 +230,14 @@ watch(() => gameStore.currentIndex, async () => {
   background: #f1c40f;
   color: #333;
   transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .btn-new-game:hover { background: #d4ac0d; transform: scale(1.02); }
 
 .btn-run {
-  padding: 10px 20px;
+  padding: 8px 16px;
   font-size: 13px;
   font-weight: 700;
   border: none;
@@ -334,11 +246,14 @@ watch(() => gameStore.currentIndex, async () => {
   background: #27ae60;
   color: white;
   transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .btn-run:hover { background: #219a52; transform: scale(1.02); }
 
 .btn-pause {
-  padding: 10px 20px;
+  padding: 8px 16px;
   font-size: 13px;
   font-weight: 700;
   border: none;
@@ -347,6 +262,33 @@ watch(() => gameStore.currentIndex, async () => {
   background: #e67e22;
   color: white;
   transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .btn-pause:hover { background: #cf6d17; transform: scale(1.02); }
+
+/* Tool row (Undo / Redo / Flip) */
+.tool-row {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 12px 10px;
+  flex-shrink: 0;
+}
+.tool-btn {
+  width: 36px;
+  height: 30px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background: #fafafa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s;
+}
+.tool-btn:hover:not(:disabled) { background: #e8e8e8; }
+.tool-btn:disabled { opacity: 0.35; cursor: default; }
 </style>

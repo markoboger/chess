@@ -67,13 +67,18 @@ import { useGameStore } from '../../stores/game'
 
 const gameStore = useGameStore()
 
-const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-const ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
+const filesNormal = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+const ranksNormal = ['8', '7', '6', '5', '4', '3', '2', '1']
+const filesFlipped = [...filesNormal].reverse()
+const ranksFlipped = [...ranksNormal].reverse()
+
+const files = computed(() => gameStore.boardFlipped ? filesFlipped : filesNormal)
+const ranks = computed(() => gameStore.boardFlipped ? ranksFlipped : ranksNormal)
 
 const squares = computed(() => {
   const result: string[] = []
-  for (const rank of ranks) {
-    for (const file of files) {
+  for (const rank of ranks.value) {
+    for (const file of files.value) {
       result.push(`${file}${rank}`)
     }
   }
@@ -144,6 +149,7 @@ function getPieceSymbol(square: string): string {
   display: flex;
   justify-content: center;
   padding: 8px;
+  --sq: min(80px, calc((100vw - 400px) / 8));
 }
 
 .board-with-coords {
@@ -159,11 +165,11 @@ function getPieceSymbol(square: string): string {
 }
 
 .coord-spacer {
-  width: 24px;
+  width: calc(var(--sq) * 0.3);
 }
 
 .coord-file {
-  width: 72px;
+  width: var(--sq);
   text-align: center;
   font-weight: 700;
   font-size: 13px;
@@ -177,8 +183,8 @@ function getPieceSymbol(square: string): string {
 }
 
 .coord-rank {
-  height: 72px;
-  width: 24px;
+  height: var(--sq);
+  width: calc(var(--sq) * 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -194,8 +200,8 @@ function getPieceSymbol(square: string): string {
 
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(8, 72px);
-  grid-template-rows: repeat(8, 72px);
+  grid-template-columns: repeat(8, var(--sq));
+  grid-template-rows: repeat(8, var(--sq));
   border: 3px solid #333;
   border-radius: 4px;
   overflow: hidden;
@@ -216,7 +222,7 @@ function getPieceSymbol(square: string): string {
 }
 
 .piece {
-  font-size: 46px;
+  font-size: calc(var(--sq) * 0.625);
   line-height: 1;
   cursor: grab;
   transition: transform 0.15s;
@@ -233,8 +239,8 @@ function getPieceSymbol(square: string): string {
 
 .move-dot {
   position: absolute;
-  width: 22px;
-  height: 22px;
+  width: calc(var(--sq) * 0.275);
+  height: calc(var(--sq) * 0.275);
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.2);
   pointer-events: none;
@@ -243,10 +249,10 @@ function getPieceSymbol(square: string): string {
 
 .capture-ring {
   position: absolute;
-  width: 62px;
-  height: 62px;
+  width: calc(var(--sq) * 0.775);
+  height: calc(var(--sq) * 0.775);
   border-radius: 50%;
-  border: 6px solid rgba(0, 0, 0, 0.2);
+  border: calc(var(--sq) * 0.075) solid rgba(0, 0, 0, 0.2);
   pointer-events: none;
   z-index: 1;
 }
@@ -313,17 +319,10 @@ function getPieceSymbol(square: string): string {
   margin-top: 4px;
 }
 
-/* Responsive */
-@media (max-width: 640px) {
-  .board-grid {
-    grid-template-columns: repeat(8, 48px);
-    grid-template-rows: repeat(8, 48px);
+/* Responsive: when sidebar stacks below on narrow screens */
+@media (max-width: 900px) {
+  .board-wrapper {
+    --sq: min(80px, calc((100vw - 80px) / 8));
   }
-  .coord-file { width: 48px; font-size: 11px; }
-  .coord-rank { height: 48px; font-size: 11px; width: 18px; }
-  .coord-spacer { width: 18px; }
-  .piece { font-size: 32px; }
-  .move-dot { width: 14px; height: 14px; }
-  .capture-ring { width: 40px; height: 40px; border-width: 4px; }
 }
 </style>

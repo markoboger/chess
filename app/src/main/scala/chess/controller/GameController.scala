@@ -30,6 +30,10 @@ final class GameController(initialBoard: Board)(using
   private var _pgnMoves: Vector[String] = Vector.empty
   private var _currentIndex: Int = 0
 
+  // Redo buffer for undo/redo support
+  private var _redoHistory: Vector[HistoryState] = Vector.empty
+  private var _redoMoves: Vector[String] = Vector.empty
+
   // Position repetition tracking: key → count
   private case class PositionKey(
       squares: Vector[Vector[Option[Piece]]],
@@ -69,6 +73,12 @@ final class GameController(initialBoard: Board)(using
   /** Whether we are viewing the latest position (moves are allowed). */
   def isAtLatest: Boolean = _currentIndex == _history.length - 1
 
+  /** Whether undo is possible (at least one move in history). */
+  def canUndo: Boolean = _history.length > 1
+
+  /** Whether redo is possible (redo buffer is non-empty). */
+  def canRedo: Boolean = _redoHistory.nonEmpty
+
   /** Format the move history as a PGN move text. */
   def pgnText: String = pgnIO.save(_pgnMoves)
 
@@ -90,6 +100,49 @@ final class GameController(initialBoard: Board)(using
     if (_currentIndex < _history.length - 1) {
       _currentIndex += 1
       val state = _history(_currentIndex)
+      currentBoard = state.board
+      _isWhiteToMove = state.whiteToMove
+      _halfmoveClock = state.halfmoveClock
+      _fullmoveNumber = state.fullmoveNumber
+      notifyObservers(MoveResult.Moved(currentBoard, gameEventAt(_currentIndex)))
+    }
+  }
+
+  /** Undo the last move: truncate history and push removed state onto the redo buffer. First jumps to the latest
+    * position if navigating in history.
+    */
+  def undo(): Unit = {
+    // If not at latest, jump to latest first
+    if (!isAtLatest) goToMove(_history.length - 1)
+    if (_history.length > 1) {
+      // Push removed state/move onto redo buffer
+      _redoHistory = _history.last +: _redoHistory
+      _redoMoves = _pgnMoves.last +: _redoMoves
+      // Truncate history
+      _history = _history.dropRight(1)
+      _pgnMoves = _pgnMoves.dropRight(1)
+      _currentIndex = _history.length - 1
+      val state = _history(_currentIndex)
+      currentBoard = state.board
+      _isWhiteToMove = state.whiteToMove
+      _halfmoveClock = state.halfmoveClock
+      _fullmoveNumber = state.fullmoveNumber
+      notifyObservers(MoveResult.Moved(currentBoard, gameEventAt(_currentIndex)))
+    }
+  }
+
+  /** Redo a previously undone move: pop from the redo buffer and append to history. */
+  def redo(): Unit = {
+    if (_redoHistory.nonEmpty) {
+      // If not at latest, jump to latest first
+      if (!isAtLatest) goToMove(_history.length - 1)
+      val state = _redoHistory.head
+      val move = _redoMoves.head
+      _redoHistory = _redoHistory.tail
+      _redoMoves = _redoMoves.tail
+      _history = _history :+ state
+      _pgnMoves = _pgnMoves :+ move
+      _currentIndex = _history.length - 1
       currentBoard = state.board
       _isWhiteToMove = state.whiteToMove
       _halfmoveClock = state.halfmoveClock
@@ -131,6 +184,8 @@ final class GameController(initialBoard: Board)(using
     _isWhiteToMove = whiteToMove
     _halfmoveClock = halfmoveClock
     _fullmoveNumber = fullmoveNumber
+    _redoHistory = Vector.empty
+    _redoMoves = Vector.empty
     positionCounts = Map(positionKey(board, whiteToMove) -> 1)
   }
 
@@ -229,6 +284,8 @@ final class GameController(initialBoard: Board)(using
             )
             _pgnMoves = _pgnMoves :+ pgn
             _currentIndex = _history.length - 1
+            _redoHistory = Vector.empty
+            _redoMoves = Vector.empty
             val key = positionKey(moved.board, _isWhiteToMove)
             val count = positionCounts.getOrElse(key, 0) + 1
             positionCounts = positionCounts.updated(key, count)

@@ -443,6 +443,173 @@ final class GameControllerSpec extends AnyWordSpec with Matchers:
       controller.pgnMoves shouldBe empty
       controller.currentIndex shouldBe 0
     }
+
+    "undo the last move" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.applyMove(Square("e7"), Square("e5"))
+      controller.boardStates.length shouldBe 3
+
+      controller.undo()
+      controller.boardStates.length shouldBe 2
+      controller.pgnMoves.length shouldBe 1
+      controller.currentIndex shouldBe 1
+      controller.isAtLatest shouldBe true
+      controller.isWhiteToMove shouldBe false
+    }
+
+    "undo multiple moves" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.applyMove(Square("e7"), Square("e5"))
+
+      controller.undo()
+      controller.undo()
+      controller.boardStates.length shouldBe 1
+      controller.pgnMoves shouldBe empty
+      controller.currentIndex shouldBe 0
+      controller.board shouldBe Board.initial
+      controller.isWhiteToMove shouldBe true
+    }
+
+    "not undo past the initial position" in {
+      val controller = new GameController(Board.initial)
+      controller.undo()
+      controller.boardStates.length shouldBe 1
+      controller.currentIndex shouldBe 0
+    }
+
+    "redo a previously undone move" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      val afterE4 = controller.board
+
+      controller.undo()
+      controller.board shouldBe Board.initial
+      controller.canRedo shouldBe true
+
+      controller.redo()
+      controller.board shouldBe afterE4
+      controller.boardStates.length shouldBe 2
+      controller.pgnMoves.length shouldBe 1
+      controller.isAtLatest shouldBe true
+    }
+
+    "redo multiple moves" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.applyMove(Square("e7"), Square("e5"))
+      val afterE5 = controller.board
+
+      controller.undo()
+      controller.undo()
+      controller.board shouldBe Board.initial
+
+      controller.redo()
+      controller.pgnMoves.length shouldBe 1
+      controller.redo()
+      controller.board shouldBe afterE5
+      controller.pgnMoves.length shouldBe 2
+    }
+
+    "not redo when redo buffer is empty" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.canRedo shouldBe false
+      controller.redo()
+      controller.boardStates.length shouldBe 2
+    }
+
+    "clear redo buffer when a new move is made" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.applyMove(Square("e7"), Square("e5"))
+
+      controller.undo()
+      controller.canRedo shouldBe true
+
+      // Make a different move instead of redo
+      controller.applyMove(Square("d7"), Square("d5"))
+      controller.canRedo shouldBe false
+      controller.pgnMoves.length shouldBe 2
+    }
+
+    "clear redo buffer on announceInitial" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.undo()
+      controller.canRedo shouldBe true
+
+      controller.announceInitial(Board.initial)
+      controller.canRedo shouldBe false
+    }
+
+    "clear redo buffer on loadFromFEN" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.undo()
+      controller.canRedo shouldBe true
+
+      controller.loadFromFEN("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR")
+      controller.canRedo shouldBe false
+    }
+
+    "report canUndo correctly" in {
+      val controller = new GameController(Board.initial)
+      controller.canUndo shouldBe false
+
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.canUndo shouldBe true
+
+      controller.undo()
+      controller.canUndo shouldBe false
+    }
+
+    "notify observers on undo" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+
+      val observer = new TestObserver
+      controller.add(observer)
+
+      controller.undo()
+      observer.lastEvent shouldBe defined
+      observer.lastEvent.get.isSuccess shouldBe true
+      observer.lastEvent.get.board shouldBe Board.initial
+    }
+
+    "notify observers on redo" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      val afterE4 = controller.board
+      controller.undo()
+
+      val observer = new TestObserver
+      controller.add(observer)
+
+      controller.redo()
+      observer.lastEvent shouldBe defined
+      observer.lastEvent.get.isSuccess shouldBe true
+      observer.lastEvent.get.board shouldBe afterE4
+    }
+
+    "undo jumps to latest if navigated backward" in {
+      val controller = new GameController(Board.initial)
+      controller.applyMove(Square("e2"), Square("e4"))
+      controller.applyMove(Square("e7"), Square("e5"))
+      controller.applyMove(Square("g1"), Square("f3"))
+
+      // Navigate backward
+      controller.backward()
+      controller.backward()
+      controller.isAtLatest shouldBe false
+
+      // Undo should jump to latest first, then undo last move
+      controller.undo()
+      controller.boardStates.length shouldBe 3
+      controller.isAtLatest shouldBe true
+      controller.pgnMoves.length shouldBe 2
+    }
   }
 
   "GameController.loadPgnMoves" should {

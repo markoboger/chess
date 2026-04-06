@@ -52,11 +52,14 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   controller.add(this)
 
   private[aview] var selectedSquare: Option[Square] = None
+  private[aview] var boardFlipped: Boolean = false
   private var boardSquares: Array[Array[Rectangle]] =
     Array.ofDim[Rectangle](8, 8)
   private var boardLabels: Array[Array[Text]] = Array.ofDim[Text](8, 8)
   private var boardDots: Array[Array[scalafx.scene.shape.Circle]] =
     Array.ofDim[scalafx.scene.shape.Circle](8, 8)
+  private var fileLabels: Array[Label] = Array.ofDim[Label](8)
+  private var rankLabels: Array[Label] = Array.ofDim[Label](8)
   private[aview] var showLegalMoves: Boolean = true
 
   enum GameMode:
@@ -117,6 +120,52 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var lastPgnLength: Int = 0
   private var clockSystem: ActorSystem[chess.controller.clock.ClockActor.Command] = uninitialized
   private[aview] var initialized: Boolean = false
+
+  // ── Lucide icon SVG paths (24×24 viewBox) ──────────────────────────
+  private val IconChevronsLeft = Seq("m11 17-5-5 5-5", "m18 17-5-5 5-5")
+  private val IconChevronLeft = Seq("m15 18-6-6 6-6")
+  private val IconChevronRight = Seq("m9 18 6-6-6-6")
+  private val IconChevronsRight = Seq("m6 17 5-5-5-5", "m13 17 5-5-5-5")
+  private val IconUndo = Seq("M9 14 4 9l5-5", "M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11")
+  private val IconRedo = Seq("m15 14 5-5-5-5", "M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13")
+  private val IconArrowUpDown = Seq("m21 16-4 4-4-4", "M17 20V4", "m3 8 4-4 4 4", "M7 4v16")
+  private val IconPlay = Seq("M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z")
+  private val IconPause = Seq(
+    "M15 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z",
+    "M6 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"
+  )
+  private val IconSquarePlus = Seq(
+    "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z",
+    "M8 12h8",
+    "M12 8v8"
+  )
+  private val IconCopy = Seq(
+    "M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z",
+    "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+  )
+  private val IconCheck = Seq("M20 6 9 17l-5-5")
+
+  private def lucideIcon(
+      paths: Seq[String],
+      size: Double = 16,
+      strokeColor: javafx.scene.paint.Color = javafx.scene.paint.Color.web("#555")
+  ): javafx.scene.Group = {
+    val group = new javafx.scene.Group()
+    paths.foreach { d =>
+      val svgPath = new javafx.scene.shape.SVGPath()
+      svgPath.setContent(d)
+      svgPath.setFill(javafx.scene.paint.Color.TRANSPARENT)
+      svgPath.setStroke(strokeColor)
+      svgPath.setStrokeWidth(2.0)
+      svgPath.setStrokeLineCap(javafx.scene.shape.StrokeLineCap.ROUND)
+      svgPath.setStrokeLineJoin(javafx.scene.shape.StrokeLineJoin.ROUND)
+      group.getChildren.add(svgPath)
+    }
+    val scale = size / 24.0
+    group.setScaleX(scale)
+    group.setScaleY(scale)
+    group
+  }
 
   override def update(event: MoveResult): Unit = {
     if (!initialized) return
@@ -228,34 +277,28 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     }
 
     // Add file labels (a-h) at the bottom
-    for (file <- File.all) {
-      val fileLabel = new Label(file.letter.toString) {
+    for (i <- 0 until 8) {
+      val file = File.all(i)
+      val fl = new Label(file.letter.toString) {
         font = Font.font("Arial", FontWeight.Bold, 16)
         prefWidth = 80
         prefHeight = 25
         alignment = Pos.Center
       }
-      boardPane.add(
-        fileLabel,
-        file.index,
-        9
-      ) // Row 9 is below the board (rows 1-8)
+      fileLabels(i) = fl
+      boardPane.add(fl, i + 1, 9)
     }
 
     // Add rank labels (8-1) on the left
-    for (rank <- Rank.all.reverse) {
-      val row = 8 - rank.index
-      val rankLabel = new Label(rank.index.toString) {
+    for (gridRow <- 0 until 8) {
+      val rl = new Label((8 - gridRow).toString) {
         font = Font.font("Arial", FontWeight.Bold, 16)
         prefWidth = 25
         prefHeight = 80
         alignment = Pos.Center
       }
-      boardPane.add(
-        rankLabel,
-        0,
-        row + 1
-      ) // Column 0 is left of the board (cols 1-8)
+      rankLabels(gridRow) = rl
+      boardPane.add(rl, 0, gridRow + 1)
     }
 
     // Create the chess squares
@@ -363,83 +406,49 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
     pgnScrollPane = new ScrollPane {
       content = pgnDisplay
-      prefHeight = 320
+      prefHeight = 450
       fitToWidth = true
       style = "-fx-background-color: white;"
     }
 
-    val backButton = new Button("\u25C0 Back") {
-      prefWidth = 120
-      style = "-fx-font-size: 13px; -fx-padding: 8px;"
-      onAction = _ => {
-        controller.backward()
-        selectedSquare = None
-      }
+    val navBtnStyle = "-fx-padding: 4px 10px;"
+    val startButton = new Button() {
+      style = navBtnStyle
+      tooltip = new Tooltip("Start")
+      delegate.setGraphic(lucideIcon(IconChevronsLeft))
+      onAction = _ => { controller.goToMove(0); selectedSquare = None }
+    }
+    val backButton = new Button() {
+      style = navBtnStyle
+      tooltip = new Tooltip("Back")
+      delegate.setGraphic(lucideIcon(IconChevronLeft))
+      onAction = _ => { controller.backward(); selectedSquare = None }
+    }
+    val forwardButton = new Button() {
+      style = navBtnStyle
+      tooltip = new Tooltip("Forward")
+      delegate.setGraphic(lucideIcon(IconChevronRight))
+      onAction = _ => { controller.forward(); selectedSquare = None }
+    }
+    val endButton = new Button() {
+      style = navBtnStyle
+      tooltip = new Tooltip("End")
+      delegate.setGraphic(lucideIcon(IconChevronsRight))
+      onAction = _ => { controller.goToMove(controller.boardStates.length - 1); selectedSquare = None }
     }
 
-    val forwardButton = new Button("Forward \u25B6") {
-      prefWidth = 120
-      style = "-fx-font-size: 13px; -fx-padding: 8px;"
-      onAction = _ => {
-        controller.forward()
-        selectedSquare = None
-      }
-    }
-
-    val navButtonBox = new HBox(10) {
+    val navButtonBox = new HBox(6) {
       alignment = Pos.Center
-      children = Seq(backButton, forwardButton)
-    }
-
-    // FEN display — styled to match the PGN area
-    val fenLabel = new Label("FEN") {
-      font = Font.font("Arial", FontWeight.Normal, 14)
-    }
-
-    val copyFenButton = new Button("\uD83D\uDCCB") {
-      style = "-fx-font-size: 13px; -fx-padding: 2px 6px;"
-      tooltip = new Tooltip("Copy FEN to clipboard")
-      onAction = _ => {
-        val content = new ClipboardContent()
-        content.putString(controller.getBoardAsFEN)
-        Clipboard.getSystemClipboard.setContent(content)
-        text = "\u2713"
-        new Thread(() => {
-          Thread.sleep(1500)
-          Platform.runLater(() => text = "\uD83D\uDCCB")
-        }).start()
-      }
-    }
-
-    val fenHeader = new HBox(6) {
-      alignment = Pos.CenterLeft
-      padding = Insets(10, 0, 5, 0)
-      children = Seq(fenLabel, copyFenButton)
-    }
-
-    fenText = new scalafx.scene.text.Text {
-      font = Font.font("Monospaced", FontWeight.Normal, 11)
-      text = controller.getBoardAsFEN
-    }
-
-    val fenTextFlow = new TextFlow {
-      padding = Insets(5)
-      prefWidth = 250
-      children = Seq(fenText)
-    }
-
-    val fenScrollPane = new ScrollPane {
-      content = fenTextFlow
-      prefHeight = 55
-      fitToWidth = true
-      style = "-fx-background-color: white;"
+      children = Seq(startButton, backButton, forwardButton, endButton)
     }
 
     // New Game button (yellow)
-    val resetButton = new Button("\u2605 New Game") {
-      prefWidth = 120
+    val resetButton = new Button("New Game") {
+      prefWidth = 130
       style =
         "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #f1c40f; -fx-text-fill: #333333; -fx-font-weight: bold;"
+      delegate.setGraphic(lucideIcon(IconSquarePlus, 14, javafx.scene.paint.Color.web("#333")))
+      contentDisplay = scalafx.scene.control.ContentDisplay.Left
       onAction = _ => {
         paused = false
         gameMode = GameMode.HumanVsHuman
@@ -467,10 +476,12 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     }
 
     // Run button (green) — visible in non-CvC modes; switches to CvC and starts play
-    runButton = new Button("\u25B6 Run") {
+    runButton = new Button("Run") {
       prefWidth = 120
       style =
         "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold;"
+      delegate.setGraphic(lucideIcon(IconPlay, 14, javafx.scene.paint.Color.WHITE))
+      contentDisplay = scalafx.scene.control.ContentDisplay.Left
       onAction = _ => {
         gameMode = GameMode.ComputerVsComputer
         updatePauseButtonVisibility()
@@ -479,10 +490,12 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     }
 
     // Pause / Continue button (orange when running, green when paused)
-    pauseButton = new Button("\u23F8 Pause") {
-      prefWidth = 120
+    pauseButton = new Button("Pause") {
+      prefWidth = 130
       style =
         "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #e67e22; -fx-text-fill: white; -fx-font-weight: bold;"
+      delegate.setGraphic(lucideIcon(IconPause, 14, javafx.scene.paint.Color.WHITE))
+      contentDisplay = scalafx.scene.control.ContentDisplay.Left
       onAction = _ => {
         paused = !paused
         updatePauseButton()
@@ -506,6 +519,31 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     }
     pauseButton.visible = false
     pauseButton.managed = false
+
+    // Undo / Redo / Flip tool buttons
+    val toolBtnStyle = "-fx-padding: 4px 10px;"
+    val undoButton = new Button() {
+      style = toolBtnStyle
+      tooltip = new Tooltip("Undo")
+      delegate.setGraphic(lucideIcon(IconUndo))
+      onAction = _ => { controller.undo(); selectedSquare = None }
+    }
+    val redoButton = new Button() {
+      style = toolBtnStyle
+      tooltip = new Tooltip("Redo")
+      delegate.setGraphic(lucideIcon(IconRedo))
+      onAction = _ => { controller.redo(); selectedSquare = None }
+    }
+    val flipButton = new Button() {
+      style = toolBtnStyle
+      tooltip = new Tooltip("Flip Board")
+      delegate.setGraphic(lucideIcon(IconArrowUpDown))
+      onAction = _ => { boardFlipped = !boardFlipped; updateBoard() }
+    }
+    val toolButtonBox = new HBox(6) {
+      alignment = Pos.Center
+      children = Seq(undoButton, redoButton, flipButton)
+    }
 
     puzzleInfoLabel = new Label("") {
       wrapText = true
@@ -552,10 +590,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         pgnScrollPane,
         navButtonBox,
         new Separator(),
-        fenHeader,
-        fenScrollPane,
-        new Separator(),
         gameButtonBox,
+        toolButtonBox,
         openingInfoLabel,
         puzzleInfoLabel,
         puzzleLink
@@ -611,11 +647,13 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private[aview] def updatePauseButton(): Unit =
     if (pauseButton == null) return
     if (paused) {
-      pauseButton.text = "\u25B6 Continue"
+      pauseButton.text = "Continue"
+      pauseButton.delegate.setGraphic(lucideIcon(IconPlay, 14, javafx.scene.paint.Color.WHITE))
       pauseButton.style =
         "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold;"
     } else {
-      pauseButton.text = "\u23F8 Pause"
+      pauseButton.text = "Pause"
+      pauseButton.delegate.setGraphic(lucideIcon(IconPause, 14, javafx.scene.paint.Color.WHITE))
       pauseButton.style =
         "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #e67e22; -fx-text-fill: white; -fx-font-weight: bold;"
     }
@@ -685,22 +723,52 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       }
       pgnDisplay.children.add(moveText)
       if (isActive) activeNode = Some(moveText)
+
+      // Line break after every full move (i.e. after Black's move)
+      if (i % 2 == 1) pgnDisplay.children.add(new Text("\n"))
     }
 
-    // Scroll so the active move is visible; fall back to bottom if none
+    // Always scroll to the bottom to show the latest moves
     Platform.runLater(() => {
-      activeNode match {
-        case Some(node) =>
-          val totalH = pgnDisplay.delegate.prefHeight(-1)
-          val viewH = pgnScrollPane.height.value
-          if (totalH > viewH) {
-            val nodeY = node.delegate.getBoundsInParent.getMinY
-            pgnScrollPane.vvalue = Math.min(1.0, nodeY / (totalH - viewH))
-          }
-        case None =>
-          pgnScrollPane.vvalue = 1.0
-      }
+      pgnScrollPane.vvalue = 1.0
     })
+  }
+
+  private[aview] def createFenBar(): HBox = {
+    val fenLabel = new Label("FEN") {
+      font = Font.font("Arial", FontWeight.Bold, 12)
+      style = "-fx-text-fill: #666666;"
+      padding = Insets(0, 4, 0, 0)
+    }
+
+    fenText = new scalafx.scene.text.Text {
+      font = Font.font("Monospaced", FontWeight.Normal, 12)
+      fill = Color.web("#333333")
+      text = controller.getBoardAsFEN
+    }
+
+    val copyFenButton = new Button() {
+      style = "-fx-padding: 2px 5px;"
+      tooltip = new Tooltip("Copy FEN to clipboard")
+      delegate.setGraphic(lucideIcon(IconCopy, 13))
+      onAction = _ => {
+        val content = new ClipboardContent()
+        content.putString(controller.getBoardAsFEN)
+        Clipboard.getSystemClipboard.setContent(content)
+        delegate.setGraphic(lucideIcon(IconCheck, 13, javafx.scene.paint.Color.web("#27ae60")))
+        new Thread(() => {
+          Thread.sleep(1500)
+          Platform.runLater(() => delegate.setGraphic(lucideIcon(IconCopy, 13)))
+        }).start()
+      }
+    }
+
+    new HBox(6) {
+      alignment = Pos.CenterLeft
+      padding = Insets(4, 12, 4, 12)
+      style = "-fx-background-color: #f7f6f4;"
+      children = Seq(fenLabel, fenText, copyFenButton)
+    }
   }
 
   private[aview] def createCapturedPanel(): HBox = {
@@ -927,6 +995,17 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     )
 
   private[aview] def updateBoard(): Unit = {
+    // Update file/rank labels for current orientation
+    for (i <- 0 until 8) {
+      if (boardFlipped) {
+        fileLabels(i).text = ('h' - i).toChar.toString
+        rankLabels(i).text = (i + 1).toString
+      } else {
+        fileLabels(i).text = ('a' + i).toChar.toString
+        rankLabels(i).text = (8 - i).toString
+      }
+    }
+
     // Compute legal target squares once for the selected piece
     val legalTargets: Set[Square] = if (showLegalMoves) {
       selectedSquare
@@ -951,8 +1030,9 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       rank <- Rank.all
       file <- File.all
     } {
-      val row = 8 - rank.index
-      val col = file.index - 1
+      // Map chess square to grid position based on flip state
+      val row = if (boardFlipped) rank.index - 1 else 8 - rank.index
+      val col = if (boardFlipped) 8 - file.index else file.index - 1
       val sq = Square(file, rank)
 
       val squareRect = boardSquares(row)(col)
@@ -1545,11 +1625,46 @@ class ChessGUILauncher extends javafx.application.Application {
 
     // Set up the scene
     gui.primaryStage.title = "Chess Game - ScalaFX"
+
+    val boardPane = gui.createBoardPane()
+    val capturedPanel = gui.createCapturedPanel()
+    val fenBar = gui.createFenBar()
+
+    // Wrap board in a scalable Group + Pane so it resizes with the window
+    val boardGroup = new scalafx.scene.Group(boardPane)
+    val scaleTransform = new javafx.scene.transform.Scale(1, 1, 0, 0)
+    boardGroup.delegate.getTransforms.add(scaleTransform)
+
+    val boardContainer = new Pane {
+      children = Seq(boardGroup)
+      style = "-fx-background-color: transparent;"
+    }
+    VBox.setVgrow(boardContainer, Priority.Always)
+
+    def rescaleBoard(): Unit = {
+      val availW = boardContainer.width.value
+      val availH = boardContainer.height.value
+      if (availW > 10 && availH > 10) {
+        val nativeW = boardPane.boundsInLocal.value.getWidth
+        val nativeH = boardPane.boundsInLocal.value.getHeight
+        if (nativeW > 0 && nativeH > 0) {
+          val s = Math.min(availW / nativeW, availH / nativeH)
+          scaleTransform.setX(s)
+          scaleTransform.setY(s)
+          boardGroup.layoutX = (availW - nativeW * s) / 2
+          boardGroup.layoutY = (availH - nativeH * s) / 2
+        }
+      }
+    }
+
+    boardContainer.width.onChange((_, _, _) => rescaleBoard())
+    boardContainer.height.onChange((_, _, _) => rescaleBoard())
+
     gui.primaryStage.scene = new Scene(1050, 900) {
       root = new BorderPane {
         top = gui.createMenuBar()
         center = new VBox {
-          children = Seq(gui.createBoardPane(), gui.createCapturedPanel())
+          children = Seq(boardContainer, capturedPanel, fenBar)
         }
         right = gui.createControlPanel()
         style = "-fx-background-color: #f5f5f5;"
@@ -1594,6 +1709,9 @@ class ChessGUILauncher extends javafx.application.Application {
     gui.primaryStage.requestFocus()
 
     println("[JavaFX] Window created, attempting to show...")
+
+    // Initial board rescale after layout is complete
+    Platform.runLater(() => rescaleBoard())
 
     // Aggressively bring window to front with multiple attempts
     Platform.runLater(() => {

@@ -37,13 +37,13 @@ export type ComputerStrategyId =
 
 export const COMPUTER_STRATEGIES: { id: ComputerStrategyId; label: string }[] = [
   { id: 'opening-continuation', label: 'Opening Continuation' },
-  { id: 'random',               label: 'Random' },
-  { id: 'greedy',               label: 'Greedy' },
-  { id: 'material-balance',     label: 'Material Balance' },
-  { id: 'piece-square',         label: 'Piece-Square Tables' },
-  { id: 'minimax',              label: 'Minimax (d=3)' },
-  { id: 'quiescence',           label: 'Minimax+QSearch (d=3)' },
-  { id: 'iterative-deepening',  label: 'Iterative Deepening' },
+  { id: 'random', label: 'Random' },
+  { id: 'greedy', label: 'Greedy' },
+  { id: 'material-balance', label: 'Material Balance' },
+  { id: 'piece-square', label: 'Piece-Square Tables' },
+  { id: 'minimax', label: 'Minimax (d=3)' },
+  { id: 'quiescence', label: 'Minimax+QSearch (d=3)' },
+  { id: 'iterative-deepening', label: 'Iterative Deepening' },
 ]
 
 export const useGameStore = defineStore('game', () => {
@@ -65,6 +65,11 @@ export const useGameStore = defineStore('game', () => {
   const status = ref<GameStatus>('in_progress')
   const pendingPromotion = ref<{ from: string; to: string } | null>(null)
   const showLegalMoves = ref(true)
+  const boardFlipped = ref(false)
+
+  // Redo buffer for undo/redo support
+  const redoStates = ref<string[]>([])
+  const redoMoves = ref<string[]>([])
 
   // ── Game mode ────────────────────────────────────────────────────────
   const gameMode = ref<GameMode>('hvh')
@@ -97,6 +102,8 @@ export const useGameStore = defineStore('game', () => {
   const isDraw = computed(() => viewChess.value.isDraw())
   const isGameOver = computed(() => viewChess.value.isGameOver() || gameOverByTimeout.value)
   const isAtLatest = computed(() => currentIndex.value === boardStates.value.length - 1)
+  const canUndo = computed(() => boardStates.value.length > 1)
+  const canRedo = computed(() => redoStates.value.length > 0)
 
   const latestTurn = computed((): Turn => chess.value.turn())
 
@@ -405,6 +412,8 @@ export const useGameStore = defineStore('game', () => {
     lastMove.value = null
     error.value = null
     pendingPromotion.value = null
+    redoStates.value = []
+    redoMoves.value = []
   }
 
   async function applyMove(from: string, to: string, promotion?: string): Promise<boolean> {
@@ -434,6 +443,8 @@ export const useGameStore = defineStore('game', () => {
       pgnMoves.value = [...pgnMoves.value, result.san]
       boardStates.value = [...boardStates.value, response.fen]
       currentIndex.value = boardStates.value.length - 1
+      redoStates.value = []
+      redoMoves.value = []
       lastMove.value = { from: result.from, to: result.to }
       selectedSquare.value = null
       legalMoves.value = []
@@ -548,6 +559,57 @@ export const useGameStore = defineStore('game', () => {
     selectedSquare.value = null
     legalMoves.value = []
     updateLastMoveFromIndex()
+  }
+
+  async function undo() {
+    if (!isAtLatest.value) goToMove(boardStates.value.length - 1)
+    if (boardStates.value.length <= 1) return
+
+    redoStates.value = [boardStates.value[boardStates.value.length - 1], ...redoStates.value]
+    redoMoves.value = [pgnMoves.value[pgnMoves.value.length - 1], ...redoMoves.value]
+
+    boardStates.value = boardStates.value.slice(0, -1)
+    pgnMoves.value = pgnMoves.value.slice(0, -1)
+    currentIndex.value = boardStates.value.length - 1
+
+    const newFen = boardStates.value[currentIndex.value]
+    chess.value = new Chess(newFen)
+    selectedSquare.value = null
+    legalMoves.value = []
+    updateLastMoveFromIndex()
+    syncStatusFromChess()
+
+    if (gameId.value) {
+      try { await gameApi.loadFen(gameId.value, newFen) } catch { /* best-effort */ }
+    }
+  }
+
+  async function redo() {
+    if (redoStates.value.length === 0) return
+    if (!isAtLatest.value) goToMove(boardStates.value.length - 1)
+
+    const state = redoStates.value[0]
+    const move = redoMoves.value[0]
+    redoStates.value = redoStates.value.slice(1)
+    redoMoves.value = redoMoves.value.slice(1)
+
+    boardStates.value = [...boardStates.value, state]
+    pgnMoves.value = [...pgnMoves.value, move]
+    currentIndex.value = boardStates.value.length - 1
+
+    chess.value = new Chess(state)
+    selectedSquare.value = null
+    legalMoves.value = []
+    updateLastMoveFromIndex()
+    syncStatusFromChess()
+
+    if (gameId.value) {
+      try { await gameApi.loadFen(gameId.value, state) } catch { /* best-effort */ }
+    }
+  }
+
+  function flipBoard() {
+    boardFlipped.value = !boardFlipped.value
   }
 
   function updateLastMoveFromIndex() {
@@ -720,6 +782,12 @@ export const useGameStore = defineStore('game', () => {
     backward,
     forward,
     goToMove,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    flipBoard,
+    boardFlipped,
     resetGame,
     triggerComputerMoveIfNeeded,
     // Import/Export

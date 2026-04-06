@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import NavBar from './components/layout/NavBar.vue'
 import ChessBoard from './components/board/ChessBoard.vue'
+import BoardInfoPanel from './components/controls/BoardInfoPanel.vue'
 import GameControls from './components/controls/GameControls.vue'
 import OpeningBadge from './components/game/OpeningBadge.vue'
 import PuzzlePanel from './components/game/PuzzlePanel.vue'
@@ -76,27 +77,31 @@ function handleKeydown(e: KeyboardEvent) {
     />
 
     <main class="app-main">
-      <!-- Board column -->
-      <div class="board-column">
-        <div class="board-card">
-          <ChessBoard />
+      <div class="game-row">
+        <!-- Left: board + info -->
+        <div class="left-card">
+          <div class="board-area">
+            <ChessBoard />
+          </div>
+          <BoardInfoPanel />
         </div>
-        <div class="opening-row">
-          <OpeningBadge v-if="!puzzleStore.active" />
-          <span v-else-if="puzzleStore.puzzle" class="puzzle-mode-badge">
-            🧩 Puzzle mode · Find the best move
-          </span>
+
+        <!-- Right: sidebar -->
+        <div class="sidebar-wrapper">
+          <div class="sidebar-card">
+            <Transition name="panel" mode="out-in">
+              <PuzzlePanel v-if="activeView === 'puzzles'" key="puzzles" @puzzle-loaded="() => {}" />
+              <GameControls v-else key="game" />
+            </Transition>
+          </div>
         </div>
       </div>
 
-      <!-- Sidebar -->
-      <div class="sidebar-column">
-        <div class="sidebar-card">
-          <Transition name="panel" mode="out-in">
-            <PuzzlePanel v-if="activeView === 'puzzles'" key="puzzles" @puzzle-loaded="() => {}" />
-            <GameControls v-else key="game" />
-          </Transition>
-        </div>
+      <div class="opening-row">
+        <OpeningBadge v-if="!puzzleStore.active" />
+        <span v-else-if="puzzleStore.puzzle" class="puzzle-mode-badge">
+          🧩 Puzzle mode · Find the best move
+        </span>
       </div>
     </main>
   </div>
@@ -124,32 +129,34 @@ body {
 .app-main {
   flex: 1;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
   padding: 24px 20px;
-  gap: 0;
   max-width: 1280px;
   margin: 0 auto;
   width: 100%;
 }
 
-/* ── Board column ──────────────────────────────────────────────────── */
-.board-column {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
+/* ── Game row (board + sidebar, same height) ──────────────────── */
+.game-row {
+  display: grid;
+  grid-template-columns: auto 320px;
 }
 
-.board-card {
+.left-card {
   background: white;
   border-radius: 12px 0 0 12px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+  overflow: hidden;
+}
+
+.board-area {
   padding: 16px;
 }
 
 .opening-row {
   padding-left: 4px;
+  padding-top: 8px;
   min-height: 28px;
 }
 
@@ -166,19 +173,24 @@ body {
   color: #7a4e2d;
 }
 
-/* ── Sidebar column ────────────────────────────────────────────────── */
-.sidebar-column {
-  flex-shrink: 0;
+/* ── Sidebar ──────────────────────────────────────────────────────── */
+.sidebar-wrapper {
+  position: relative;
 }
 
 .sidebar-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: white;
   border-radius: 0 12px 12px 0;
   box-shadow: 0 4px 20px rgba(0,0,0,0.10);
   border-left: 1px solid #e0ddd8;
-  width: 320px;
-  min-height: 580px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* ── Panel transition ──────────────────────────────────────────────── */
@@ -188,24 +200,29 @@ body {
 /* ── Responsive ────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .app-main {
-    flex-direction: column;
-    align-items: center;
     padding: 16px 12px;
-    gap: 16px;
   }
 
-  .board-column { align-items: center; }
+  .game-row {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    justify-items: center;
+  }
 
-  .board-card {
+  .left-card {
     border-radius: 12px;
   }
 
+  .sidebar-wrapper {
+    position: static;
+  }
+
   .sidebar-card {
+    position: static;
     border-radius: 12px;
     border-left: none;
     width: 100%;
     max-width: 620px;
-    min-height: auto;
   }
 }
 
