@@ -28,12 +28,21 @@ object GameRoutes:
       case GET -> Root / "health" =>
         Ok(HealthResponse("ok", "game-service"))
 
+      // GET /games - List all active game sessions
+      case GET -> Root / "games" =>
+        gameSessions.listGames.flatMap { list =>
+          val summaries = list.map { case (id, status, settings) =>
+            GameSummary(id, status, settings)
+          }
+          Ok(ListGamesResponse(summaries))
+        }
+
       // POST /games - Create new game
       case req @ POST -> Root / "games" =>
         req.asJsonDecode[CreateGameRequest].flatMap { request =>
-          gameSessions.createGame(request.startFen).flatMap {
+          gameSessions.createGame(request.startFen, request.settings).flatMap {
             case Right((gameId, fen)) =>
-              Ok(CreateGameResponse(gameId, fen))
+              Ok(CreateGameResponse(gameId, fen, request.settings))
             case Left(error) =>
               BadRequest(ErrorResponse(error))
           }
@@ -42,11 +51,15 @@ object GameRoutes:
       // GET /games/:id - Get game state
       case GET -> Root / "games" / gameId =>
         gameSessions.getGameState(gameId).flatMap {
-          case Some((fen, pgn, status)) =>
-            Ok(GameStateResponse(gameId, fen, pgn, status))
+          case Some((fen, pgn, status, settings)) =>
+            Ok(GameStateResponse(gameId, fen, pgn, status, settings))
           case None =>
             NotFound(ErrorResponse("Game not found"))
         }
+
+      // DELETE /games - Delete all game sessions
+      case DELETE -> Root / "games" =>
+        gameSessions.deleteAllGames *> NoContent()
 
       // DELETE /games/:id - Delete game
       case DELETE -> Root / "games" / gameId =>

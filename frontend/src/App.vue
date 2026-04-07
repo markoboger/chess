@@ -6,6 +6,7 @@ import BoardInfoPanel from './components/controls/BoardInfoPanel.vue'
 import GameControls from './components/controls/GameControls.vue'
 import OpeningBadge from './components/game/OpeningBadge.vue'
 import PuzzlePanel from './components/game/PuzzlePanel.vue'
+import NewGameDialog from './components/ui/NewGameDialog.vue'
 import { useGameStore } from './stores/game'
 import { usePuzzleStore } from './stores/puzzle'
 import { useOpeningStore } from './stores/opening'
@@ -15,6 +16,7 @@ const puzzleStore = usePuzzleStore()
 const openingStore = useOpeningStore()
 
 const activeView = ref<'game' | 'puzzles'>('game')
+const showNewGameDialog = ref(false)
 
 function togglePuzzles() {
   activeView.value = activeView.value === 'puzzles' ? 'game' : 'puzzles'
@@ -26,19 +28,33 @@ function togglePuzzles() {
 }
 
 function handleNewGame() {
-  activeView.value = 'game'
   puzzleStore.reset()
   gameStore.puzzleMode = false
-  gameStore.resetGame()
+  activeView.value = 'game'
+  showNewGameDialog.value = true
+}
+
+function handleGameStarted() {
+  showNewGameDialog.value = false
 }
 
 onMounted(async () => {
-  await gameStore.createGame()
+  // URL-based join: ?session=<id>
+  const params = new URLSearchParams(window.location.search)
+  const sessionParam = params.get('session')
+  if (sessionParam) {
+    await gameStore.joinGame(sessionParam.trim())
+    // Clean the URL without a page reload
+    window.history.replaceState({}, '', window.location.pathname)
+  } else {
+    await gameStore.createGame()
+  }
   openingStore.init()   // pre-load opening map in background
   window.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
+  gameStore.stopPolling()
   window.removeEventListener('keydown', handleKeydown)
 })
 
@@ -76,6 +92,12 @@ function handleKeydown(e: KeyboardEvent) {
       @toggle-puzzles="togglePuzzles"
     />
 
+    <NewGameDialog
+      :visible="showNewGameDialog"
+      @close="showNewGameDialog = false"
+      @started="handleGameStarted"
+    />
+
     <main class="app-main">
       <div class="game-row">
         <!-- Left: board + info -->
@@ -91,7 +113,7 @@ function handleKeydown(e: KeyboardEvent) {
           <div class="sidebar-card">
             <Transition name="panel" mode="out-in">
               <PuzzlePanel v-if="activeView === 'puzzles'" key="puzzles" @puzzle-loaded="() => {}" />
-              <GameControls v-else key="game" />
+              <GameControls v-else key="game" @new-game="handleNewGame" />
             </Transition>
           </div>
         </div>

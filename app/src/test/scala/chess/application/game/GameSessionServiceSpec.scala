@@ -73,7 +73,7 @@ class GameSessionServiceSpec extends AnyWordSpec with Matchers {
       val (gameId, _) = svc.createGame().unsafeRunSync().toOption.get
       val state = svc.getGameState(gameId).unsafeRunSync()
       state shouldBe defined
-      val (fen, pgn, status) = state.get
+      val (fen, pgn, status, settings) = state.get
       fen should not be empty
       status should not be empty
     }

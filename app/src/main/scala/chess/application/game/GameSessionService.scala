@@ -4,7 +4,7 @@ import cats.effect.{IO, Ref}
 import chess.controller.{GameController, MoveStrategy}
 import chess.controller.io.{FenIO, PgnIO}
 import chess.controller.strategy.*
-import chess.model.{Board, Color, MoveResult}
+import chess.model.{Board, Color, GameSettings, MoveResult}
 
 import java.time.Instant
 import java.util.UUID
@@ -18,9 +18,12 @@ import java.util.UUID
 class GameSessionService(
     publisher: GameEventPublisher = GameEventPublisher.noop
 )(using fenIO: FenIO, pgnIO: PgnIO):
-  private val games: Ref[IO, Map[String, GameController]] = Ref.unsafe(Map.empty)
+  private val games: Ref[IO, Map[String, (GameController, GameSettings)]] = Ref.unsafe(Map.empty)
 
-  def createGame(startFen: Option[String] = None): IO[Either[String, (String, String)]] =
+  def createGame(
+      startFen: Option[String] = None,
+      settings: GameSettings = GameSettings()
+  ): IO[Either[String, (String, String)]] =
     startFen match
       case Some(fen) =>
         fenIO.load(fen) match
@@ -29,7 +32,7 @@ class GameSessionService(
             val controller = GameController(board)
             val fenStr = controller.getBoardAsFEN
             games
-              .update(_.updated(gameId, controller))
+              .update(_.updated(gameId, (controller, settings)))
               .flatMap(_ => publishSnapshot("game_created", gameId, controller))
               .as(Right((gameId, fenStr)))
           case scala.util.Failure(e) =>
@@ -39,16 +42,25 @@ class GameSessionService(
         val controller = GameController(Board.initial)
         val fen = controller.getBoardAsFEN
         games
-          .update(_.updated(gameId, controller))
+          .update(_.updated(gameId, (controller, settings)))
           .flatMap(_ => publishSnapshot("game_created", gameId, controller))
           .as(Right((gameId, fen)))
 
+  def listGames: IO[List[(String, String, chess.model.GameSettings)]] =
+    games.get.map(_.toList.map { case (id, (ctrl, settings)) => (id, ctrl.gameStatus, settings) })
+
+  def deleteAllGames: IO[Unit] =
+    games.set(Map.empty)
+
   def getGame(gameId: String): IO[Option[GameController]] =
-    games.get.map(_.get(gameId))
+    games.get.map(_.get(gameId).map(_._1))
+
+  def getSettings(gameId: String): IO[Option[GameSettings]] =
+    games.get.map(_.get(gameId).map(_._2))
 
   def deleteGame(gameId: String): IO[Boolean] =
     games.modify { gamesMap =>
-      if gamesMap.contains(gameId) then (gamesMap - gameId, true)
+      if gamesMap.contains(gameId) then (gamesMap.removed(gameId), true)
       else (gamesMap, false)
     }.flatTap { deleted =>
       if deleted then publisher.publish(
@@ -66,12 +78,12 @@ class GameSessionService(
       else IO.unit
     }
 
-  def getGameState(gameId: String): IO[Option[(String, String, String)]] =
-    getGame(gameId).map(_.map { controller =>
+  def getGameState(gameId: String): IO[Option[(String, String, String, GameSettings)]] =
+    games.get.map(_.get(gameId).map { case (controller, settings) =>
       val fen = controller.getBoardAsFEN
       val pgn = controller.pgnText
       val status = controller.gameStatus
-      (fen, pgn, status)
+      (fen, pgn, status, settings)
     })
 
   def makeMove(gameId: String, move: String): IO[Either[String, (String, Option[String])]] =

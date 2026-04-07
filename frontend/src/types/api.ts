@@ -1,10 +1,21 @@
+export interface GameSettings {
+  whiteIsHuman: boolean
+  blackIsHuman: boolean
+  whiteStrategy: string
+  blackStrategy: string
+  clockInitialMs?: number
+  clockIncrementMs?: number
+}
+
 export interface CreateGameRequest {
   startFen?: string
+  settings?: GameSettings
 }
 
 export interface CreateGameResponse {
   gameId: string
   fen: string
+  settings: GameSettings
 }
 
 export interface GameStateResponse {
@@ -12,6 +23,17 @@ export interface GameStateResponse {
   fen: string
   pgn: string
   status: string
+  settings: GameSettings
+}
+
+export interface GameSummary {
+  gameId: string
+  status: string
+  settings: GameSettings
+}
+
+export interface ListGamesResponse {
+  games: GameSummary[]
 }
 
 export interface MakeMoveRequest {

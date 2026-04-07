@@ -43,8 +43,8 @@
 
     <!-- Game action buttons -->
     <div class="button-row">
-      <button class="btn-new-game" @click="gameStore.resetGame()" title="New Game"><SquarePlus :size="15" /> New Game</button>
-      <button v-if="gameStore.gameMode !== 'cvc'" class="btn-run" @click="gameStore.setGameMode('cvc')" title="Run"><Play :size="15" /> Run</button>
+      <button class="btn-new-game" @click="emit('new-game')" title="New Game"><SquarePlus :size="15" /> New Game</button>
+      <button v-if="gameStore.gameMode === 'hvc'" class="btn-run" @click="gameStore.setGameMode('cvc')" title="Run"><Play :size="15" /> Run</button>
       <button v-if="gameStore.gameMode === 'cvc'" class="btn-pause" @click="gameStore.togglePause()">
         <template v-if="gameStore.paused"><Play :size="15" /> Continue</template>
         <template v-else><Pause :size="15" /> Pause</template>
@@ -68,6 +68,8 @@ import {
   SquarePlus, Play, Pause, Undo2, Redo2, ArrowUpDown,
   Copy, Check
 } from 'lucide-vue-next'
+
+const emit = defineEmits<{ 'new-game': [] }>()
 
 const gameStore = useGameStore()
 const pgnScrollRef = ref<HTMLElement | null>(null)

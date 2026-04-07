@@ -10,19 +10,19 @@ object GameEventServer extends IOApp.Simple:
 
   def run: IO[Unit] =
     InMemoryGameEventHub.create.flatMap { hub =>
-      val routes = GameEventRoutes.routes(hub)
-
       EmberServerBuilder
         .default[IO]
         .withHost(ipv4"0.0.0.0")
         .withPort(Port.fromString(port).getOrElse(port"8083"))
-        .withHttpApp(routes.orNotFound)
+        .withHttpWebSocketApp { wsBuilder =>
+          GameEventRoutes.routes(hub, wsBuilder).orNotFound
+        }
         .build
         .use { server =>
           IO.println(s"Realtime Service started at ${server.address}") *>
-            IO.println("Available endpoints:") *>
-            IO.println("  GET /health") *>
-            IO.println("  GET /events/:gameId") *>
+            IO.println("  POST /events      — ingest game event") *>
+            IO.println("  GET  /ws/:gameId  — WebSocket subscription") *>
+            IO.println("  GET  /health") *>
             IO.never
         }
     }

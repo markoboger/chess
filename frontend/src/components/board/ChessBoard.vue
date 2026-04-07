@@ -132,7 +132,7 @@ function isLegalTarget(square: string): boolean {
 }
 
 function hasPiece(square: string): boolean {
-  return gameStore.viewChess.get(square as any) !== null
+  return !!gameStore.viewChess.get(square as any)
 }
 
 function getPieceSymbol(square: string): string {

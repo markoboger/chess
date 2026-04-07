@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { Chess } from 'chess.js'
 import type { GameStatus, Turn } from '../types/game'
+import type { GameSettings } from '../types/api'
 import { useOpeningStore } from './opening'
 import { gameApi } from '../api/game-api'
 
@@ -25,6 +26,7 @@ export const CLOCK_PRESETS: { label: string; mode: ClockMode }[] = [
 
 export type GameMode = 'hvh' | 'hvc' | 'cvc'
 export type ComputerSide = 'white' | 'black'
+export type PlayerColor = 'white' | 'black' | 'spectator'
 export type ComputerStrategyId =
   | 'random'
   | 'greedy'
@@ -67,6 +69,23 @@ export const useGameStore = defineStore('game', () => {
   const showLegalMoves = ref(true)
   const boardFlipped = ref(false)
 
+  // ── Session / multiplayer ────────────────────────────────────────────
+  // Which side the local player controls in the current session
+  const myColor = ref<PlayerColor>('white')
+
+  // Whether each side is human (tracks GameSettings)
+  const whiteIsHuman = ref(true)
+  const blackIsHuman = ref(true)
+
+  // WebSocket for opponent move updates
+  let wsConnection: WebSocket | null = null
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let reconnectAttempts = 0
+  let intentionalWsClose = false
+
+  // Generation counter — incremented on every new game; lets stale setTimeout callbacks self-cancel
+  let gameGeneration = 0
+
   // Redo buffer for undo/redo support
   const redoStates = ref<string[]>([])
   const redoMoves = ref<string[]>([])
@@ -75,6 +94,8 @@ export const useGameStore = defineStore('game', () => {
   const gameMode = ref<GameMode>('hvh')
   const paused = ref(false)
   const computerScheduled = ref(false)
+  // Guard against concurrent applyMove calls (e.g. double-click while HTTP is in-flight)
+  const moveInFlight = ref(false)
   const whiteComputerStrategy = ref<ComputerStrategyId>('opening-continuation')
   const blackComputerStrategy = ref<ComputerStrategyId>('opening-continuation')
 
@@ -281,10 +302,172 @@ export const useGameStore = defineStore('game', () => {
   // ── Computer player ───────────────────────────────────────────────────
   function isComputerTurn(): boolean {
     if (gameMode.value === 'hvh') return false
-    if (gameMode.value === 'hvc') return latestTurn.value === 'b'
     if (gameMode.value === 'cvc') return true
-    return false
+    // hvc: one side is computer — use whiteIsHuman/blackIsHuman to know which
+    return latestTurn.value === 'w' ? !whiteIsHuman.value : !blackIsHuman.value
   }
+
+  // ── WebSocket (receive opponent moves in HvH sessions) ───────────────
+  function isMyTurn(): boolean {
+    if (myColor.value === 'spectator') return false
+    return myColor.value === 'white' ? latestTurn.value === 'w' : latestTurn.value === 'b'
+  }
+
+  function clearReconnectTimer() {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+  }
+
+  function syncFromGameState(
+    response: Awaited<ReturnType<typeof gameApi.getGameState>>,
+    options: { resetClockState?: boolean } = {}
+  ) {
+    chess.value = new Chess(response.fen)
+
+    const s = response.settings
+    whiteIsHuman.value = s?.whiteIsHuman ?? true
+    blackIsHuman.value = s?.blackIsHuman ?? true
+    const isHvH = whiteIsHuman.value && blackIsHuman.value
+    const isCvC = !whiteIsHuman.value && !blackIsHuman.value
+    gameMode.value = isHvH ? 'hvh' : isCvC ? 'cvc' : 'hvc'
+    if (s) {
+      whiteComputerStrategy.value = (s.whiteStrategy as ComputerStrategyId) || 'opening-continuation'
+      blackComputerStrategy.value = (s.blackStrategy as ComputerStrategyId) || 'opening-continuation'
+      if (s.clockInitialMs) {
+        clockMode.value = { kind: 'timed', initialMs: s.clockInitialMs, incrementMs: s.clockIncrementMs ?? 0, label: '' }
+      } else {
+        clockMode.value = { kind: 'none' }
+      }
+    }
+
+    const parsedMoves: string[] = []
+    if (response.pgn.trim()) {
+      try {
+        const tempChess = new Chess()
+        tempChess.loadPgn(response.pgn)
+        parsedMoves.push(...tempChess.history())
+      } catch { /* ignore */ }
+    }
+
+    const states: string[] = ['rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1']
+    const replay = new Chess()
+    for (const san of parsedMoves) {
+      try { replay.move(san); states.push(replay.fen()) } catch { break }
+    }
+
+    boardStates.value = states
+    pgnMoves.value = parsedMoves
+    currentIndex.value = states.length - 1
+    selectedSquare.value = null
+    legalMoves.value = []
+    lastMove.value = null
+    pendingPromotion.value = null
+    redoStates.value = []
+    redoMoves.value = []
+    moveInFlight.value = false
+    if (options.resetClockState ?? false) resetClock()
+    syncStatusFromChess()
+    updateLastMoveFromIndex()
+  }
+
+  async function reconnectSession(id: string, generation: number) {
+    if (generation !== gameGeneration || gameId.value !== id || intentionalWsClose) return
+    try {
+      const response = await gameApi.getGameState(id)
+      if (generation !== gameGeneration || gameId.value !== id || intentionalWsClose) return
+      syncFromGameState(response)
+      connectWebSocket(id)
+    } catch {
+      scheduleReconnect(id, generation)
+    }
+  }
+
+  function scheduleReconnect(id: string, generation: number) {
+    if (intentionalWsClose || generation !== gameGeneration || gameId.value !== id) return
+    if (!(whiteIsHuman.value && blackIsHuman.value)) return
+    clearReconnectTimer()
+    const delay = Math.min(1000 * (2 ** reconnectAttempts), 10000)
+    reconnectAttempts += 1
+    reconnectTimer = setTimeout(() => {
+      void reconnectSession(id, generation)
+    }, delay)
+  }
+
+  function connectWebSocket(id: string) {
+    disconnectWebSocket()
+    intentionalWsClose = false
+    clearReconnectTimer()
+    const generation = gameGeneration
+    const wsBase = import.meta.env.VITE_REALTIME_WS_URL ?? 'ws://localhost:8083'
+    const ws = new WebSocket(`${wsBase}/ws/${id}`)
+    ws.onopen = () => {
+      reconnectAttempts = 0
+    }
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data as string)
+        if (msg.eventType === 'heartbeat') return
+        if (msg.eventType !== 'move_applied') return
+        const newFen: string = msg.fen
+        console.log('[WS] move_applied received', { move: msg.move, pgn: msg.pgn, fen: newFen, currentPgnLen: pgnMoves.value.length, moveInFlight: moveInFlight.value })
+        // Compare only piece-placement + active-color (first two FEN fields) because chess.js
+        // strips en passant squares that have no capturing pawn, producing a different string
+        // than the backend FEN even for the same board state.
+        const fenSig = (f: string) => f.split(' ').slice(0, 2).join(' ')
+        if (!newFen || fenSig(newFen) === fenSig(chess.value.fen())) { console.log('[WS] skipped: fenSig match'); return }
+        // Parse PGN before modifying state so we can detect stale events
+        const parsedMoves: string[] = []
+        if (msg.pgn?.trim()) {
+          try { const t = new Chess(); t.loadPgn(msg.pgn); parsedMoves.push(...t.history()) } catch { /* ignore */ }
+        }
+        // Reject stale WS events that would revert to an earlier position.
+        // This happens when a delayed event for an older move arrives after the
+        // frontend has already advanced further (via HTTP response or a newer WS event).
+        if (parsedMoves.length > 0 && parsedMoves.length < pgnMoves.value.length) { console.log('[WS] skipped: stale event', parsedMoves.length, '<', pgnMoves.value.length); return }
+        console.log('[WS] APPLYING move', { parsedMoves, gameMode: gameMode.value })
+        // Apply the move
+        chess.value = new Chess(newFen)
+        if (parsedMoves.length > 0) {
+          const states: string[] = ['rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1']
+          const r = new Chess()
+          for (const san of parsedMoves) { try { r.move(san); states.push(r.fen()) } catch { break } }
+          boardStates.value = states
+          pgnMoves.value = parsedMoves
+        } else {
+          const moveSan: string = msg.move ?? ''
+          boardStates.value = [...boardStates.value, newFen]
+          if (moveSan) pgnMoves.value = [...pgnMoves.value, moveSan]
+        }
+        redoStates.value = []
+        redoMoves.value = []
+        currentIndex.value = boardStates.value.length - 1
+        selectedSquare.value = null
+        legalMoves.value = []
+        updateLastMoveFromIndex()
+        syncStatusFromChess()
+        switchClock()
+        triggerComputerMoveIfNeeded()
+      } catch { /* ignore malformed messages */ }
+    }
+    ws.onerror = () => { /* silent — server may not be running */ }
+    ws.onclose = () => {
+      if (!intentionalWsClose && generation === gameGeneration && gameId.value === id) {
+        scheduleReconnect(id, generation)
+      }
+    }
+    wsConnection = ws
+  }
+
+  function disconnectWebSocket() {
+    intentionalWsClose = true
+    clearReconnectTimer()
+    if (wsConnection) { wsConnection.close(); wsConnection = null }
+  }
+
+  // Keep stopPolling as an alias so App.vue's onUnmounted call still works
+  function stopPolling() { disconnectWebSocket() }
 
   function currentComputerStrategy(): ComputerStrategyId {
     return latestTurn.value === 'w' ? whiteComputerStrategy.value : blackComputerStrategy.value
@@ -340,9 +523,11 @@ export const useGameStore = defineStore('game', () => {
 
     computerScheduled.value = true
     const delay = gameMode.value === 'cvc' ? 400 : 250
+    const gen = gameGeneration   // capture so the callback can detect a new game
 
     setTimeout(async () => {
       computerScheduled.value = false
+      if (gen !== gameGeneration) return   // new game was created — discard stale callback
       if (paused.value || isGameOver.value || !isComputerTurn() || !isAtLatest.value) return
 
       const strategy = currentComputerStrategy()
@@ -378,26 +563,118 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function triggerComputerMoveIfNeeded() {
+    console.log('[trigger] isComputerTurn=', isComputerTurn(), 'gameMode=', gameMode.value, 'whiteIsHuman=', whiteIsHuman.value, 'blackIsHuman=', blackIsHuman.value, 'latestTurn=', latestTurn.value)
     if (!isGameOver.value && !paused.value && isComputerTurn() && isAtLatest.value) {
+      console.log('[trigger] TRIGGERING computer move')
       makeComputerMove()
     }
   }
 
   // ── Actions ──────────────────────────────────────────────────────────
-  async function createGame(startFen?: string) {
+  async function createGame(startFen?: string, settings?: GameSettings, playAs?: PlayerColor) {
     loading.value = true
     error.value = null
+    paused.value = false
+    gameGeneration++                  // invalidate all stale computer-move callbacks
+    computerScheduled.value = false
+    moveInFlight.value = false
+    disconnectWebSocket()
     try {
-      const response = await gameApi.createGame(startFen ? { startFen } : undefined)
+      const response = await gameApi.createGame(
+        (startFen || settings) ? { startFen, settings } : undefined
+      )
       chess.value = new Chess(response.fen)
       gameId.value = response.gameId
       gameOverByTimeout.value = false
+
+      // Derive effective settings: prefer backend response, fall back to what was requested,
+      // then defaults.  This ensures gameMode is always updated even if the backend omits settings.
+      const s = response.settings ?? settings
+      const effectiveWhiteHuman = s?.whiteIsHuman ?? true
+      const effectiveBlackHuman = s?.blackIsHuman ?? true
+      whiteIsHuman.value = effectiveWhiteHuman
+      blackIsHuman.value = effectiveBlackHuman
+      const isHvH = effectiveWhiteHuman && effectiveBlackHuman
+      const isCvC = !effectiveWhiteHuman && !effectiveBlackHuman
+      gameMode.value = isHvH ? 'hvh' : isCvC ? 'cvc' : 'hvc'
+
+      if (s) {
+        whiteComputerStrategy.value = (s.whiteStrategy as ComputerStrategyId) || 'opening-continuation'
+        blackComputerStrategy.value = (s.blackStrategy as ComputerStrategyId) || 'opening-continuation'
+        if (s.clockInitialMs) {
+          clockMode.value = { kind: 'timed', initialMs: s.clockInitialMs, incrementMs: s.clockIncrementMs ?? 0, label: '' }
+        } else {
+          clockMode.value = { kind: 'none' }
+        }
+      }
+
+      // Determine which side the local player controls.
+      // For a local HvH game the creator plays both sides freely (spectator = no restriction).
+      // The board is still flipped for convenience if they chose Black in the dialog.
+      // Move restrictions only apply to the remote joiner (set in joinGame).
+      if (!effectiveWhiteHuman || !effectiveBlackHuman) {
+        // Has a computer side: the human player needs a specific color
+        myColor.value = playAs ?? (effectiveWhiteHuman ? 'white' : effectiveBlackHuman ? 'black' : 'spectator')
+        boardFlipped.value = myColor.value === 'black'
+      } else {
+        // Local HvH: no move restriction; flip board to match the chosen starting side
+        myColor.value = 'spectator'
+        boardFlipped.value = playAs === 'black'
+      }
+
       resetHistory()
       resetClock()
       syncStatusFromChess()
       triggerComputerMoveIfNeeded()
+      // Connect WebSocket for HvH sessions to receive opponent moves
+      if (response.gameId && whiteIsHuman.value && blackIsHuman.value) {
+        connectWebSocket(response.gameId)
+      }
     } catch {
       error.value = 'Could not create game via backend.'
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function joinGame(sessionId: string): Promise<boolean> {
+    loading.value = true
+    error.value = null
+    paused.value = false
+    gameGeneration++
+    computerScheduled.value = false
+    disconnectWebSocket()
+    try {
+      const response = await gameApi.getGameState(sessionId)
+      gameId.value = response.gameId
+      gameOverByTimeout.value = false
+
+      const s = response.settings
+      const effectiveWhiteHuman = s?.whiteIsHuman ?? true
+      const effectiveBlackHuman = s?.blackIsHuman ?? true
+      const joinIsHvH = effectiveWhiteHuman && effectiveBlackHuman
+      const joinIsCvC = !effectiveWhiteHuman && !effectiveBlackHuman
+
+      // Joiner plays as Black in a two-human game; otherwise spectator for CvC
+      if (joinIsHvH) {
+        myColor.value = 'black'
+      } else {
+        myColor.value = 'spectator'
+      }
+      boardFlipped.value = myColor.value === 'black'
+      syncFromGameState(response, { resetClockState: true })
+      triggerComputerMoveIfNeeded()
+      connectWebSocket(sessionId)
+      return true
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        error.value = 'Game not found. The session may have expired (server was restarted).'
+      } else if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+        error.value = 'Connection timed out. Check that the game service is running.'
+      } else {
+        error.value = 'Could not join game. Check that all services are running.'
+      }
+      return false
     } finally {
       loading.value = false
     }
@@ -417,6 +694,13 @@ export const useGameStore = defineStore('game', () => {
   }
 
   async function applyMove(from: string, to: string, promotion?: string): Promise<boolean> {
+    console.log('[applyMove] CALLED', from, '->', to, 'moveInFlight=', moveInFlight.value, new Error().stack?.split('\n').slice(1, 4).join(' | '))
+    // Prevent a second move being sent while one HTTP round-trip is already in flight.
+    // Without this guard a double-click (or any concurrent path) sends two requests to
+    // the backend: the first applies the intended move and flips the turn; the second
+    // then resolves the same SAN notation for the *other* side (e.g. "d5" becomes the
+    // white e4×d5 capture), causing an unintended auto-move.
+    if (moveInFlight.value) return false
     if (!isAtLatest.value) {
       error.value = 'Navigate to latest position before making a move.'
       return false
@@ -437,23 +721,33 @@ export const useGameStore = defineStore('game', () => {
       return false
     }
 
+    moveInFlight.value = true
     try {
+      const lenBefore = boardStates.value.length
       const response = await gameApi.makeMove(gameId.value, result.san)
-      chess.value = new Chess(response.fen)
-      pgnMoves.value = [...pgnMoves.value, result.san]
-      boardStates.value = [...boardStates.value, response.fen]
-      currentIndex.value = boardStates.value.length - 1
-      redoStates.value = []
-      redoMoves.value = []
+      // The WS echo may have already applied this move while we were awaiting.
+      // Use boardStates length rather than FEN comparison: chess.js strips en passant
+      // squares that have no capturing pawn, so the FEN strings differ even for the
+      // same board state, making FEN comparison unreliable as a dedup guard.
+      if (boardStates.value.length === lenBefore) {
+        chess.value = new Chess(response.fen)
+        pgnMoves.value = [...pgnMoves.value, result.san]
+        boardStates.value = [...boardStates.value, response.fen]
+        currentIndex.value = boardStates.value.length - 1
+        redoStates.value = []
+        redoMoves.value = []
+        syncStatusFromChess()
+        switchClock()
+      }
       lastMove.value = { from: result.from, to: result.to }
       selectedSquare.value = null
       legalMoves.value = []
-      syncStatusFromChess()
-      switchClock()
       return true
     } catch (err: any) {
       error.value = err?.response?.data?.error || 'Move rejected by backend.'
       return false
+    } finally {
+      moveInFlight.value = false
     }
   }
 
@@ -461,8 +755,12 @@ export const useGameStore = defineStore('game', () => {
     if (pendingPromotion.value) return
     if (!isAtLatest.value) return
     if (isGameOver.value) return
-    // Block human clicks when it's computer's turn (not applicable in puzzle mode)
+    // Block all interaction while a move HTTP round-trip is in flight
+    if (moveInFlight.value) return
+    // Block when it's computer's turn (skip in puzzle mode)
     if (!puzzleMode.value && isComputerTurn()) return
+    // Block when it's the remote opponent's turn in a session
+    if (!puzzleMode.value && myColor.value !== 'spectator' && !isMyTurn()) return
 
     const piece = viewChess.value.get(square as any)
     const currentTurn = viewChess.value.turn()
@@ -519,6 +817,17 @@ export const useGameStore = defineStore('game', () => {
   function setGameMode(mode: GameMode) {
     gameMode.value = mode
     if (mode !== 'cvc') { paused.value = false }
+    // Keep whiteIsHuman/blackIsHuman in sync so isComputerTurn() is consistent
+    // with the new mode.  Without this, switching from a prior HvC game to 'hvh'
+    // and then back to 'hvc' leaves the stale "whiteIsHuman=false" in place,
+    // making the computer immediately play for white.
+    if (mode === 'hvh') {
+      whiteIsHuman.value = true
+      blackIsHuman.value = true
+    } else if (mode === 'cvc') {
+      whiteIsHuman.value = false
+      blackIsHuman.value = false
+    }
     triggerComputerMoveIfNeeded()
   }
 
@@ -707,6 +1016,7 @@ export const useGameStore = defineStore('game', () => {
   function resetGame() {
     gameMode.value = 'hvh'
     paused.value = false
+    disconnectWebSocket()
     void createGame()
   }
 
@@ -722,6 +1032,9 @@ export const useGameStore = defineStore('game', () => {
     chess,
     viewChess,
     gameId,
+    myColor,
+    whiteIsHuman,
+    blackIsHuman,
     fen,
     status,
     selectedSquare,
@@ -775,6 +1088,7 @@ export const useGameStore = defineStore('game', () => {
     pieceSymbols,
     // Actions
     createGame,
+    joinGame,
     applyMove,
     selectSquare,
     promote,
@@ -790,6 +1104,10 @@ export const useGameStore = defineStore('game', () => {
     boardFlipped,
     resetGame,
     triggerComputerMoveIfNeeded,
+    stopPolling,
+    // Session WebSocket
+    connectWebSocket,
+    disconnectWebSocket,
     // Import/Export
     loadFenString,
     loadPgnString,

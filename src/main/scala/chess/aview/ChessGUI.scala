@@ -121,6 +121,21 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var clockSystem: ActorSystem[chess.controller.clock.ClockActor.Command] = uninitialized
   private[aview] var initialized: Boolean = false
 
+  // ── Session / backend integration ───────────────────────────────────────────
+  private val backendUrl = sys.env.getOrElse("CHESS_API_URL", "http://localhost:8081")
+  private val wsBaseUrl  = sys.env.getOrElse("CHESS_WS_URL",  "ws://localhost:8083")
+  private val httpClient: java.net.http.HttpClient = java.net.http.HttpClient.newHttpClient()
+  @volatile private var currentSessionId: Option[String] = None
+  @volatile private var wsGeneration: Int = 0
+  @volatile private var wsConn: Option[java.net.http.WebSocket] = None
+  private val sessionMovePublicationGate = new SessionMovePublicationGate
+  // 'w' = plays white, 'b' = plays black, 'x' = no restriction (local)
+  private var mySessionColor: Char = 'x'
+  private var sessionIdText: scalafx.scene.text.Text = uninitialized
+  private var sessionBar: HBox = uninitialized
+
+  private case class SessionInfo(gameId: String, status: String, whiteIsHuman: Boolean, blackIsHuman: Boolean)
+
   // ── Lucide icon SVG paths (24×24 viewBox) ──────────────────────────
   private val IconChevronsLeft = Seq("m11 17-5-5 5-5", "m18 17-5-5 5-5")
   private val IconChevronLeft = Seq("m15 18-6-6 6-6")
@@ -177,6 +192,13 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
           if (newPgnLength > lastPgnLength) {
             lastPgnLength = newPgnLength
             switchClock()
+            // Publish move to backend when playing in a session
+            if (sessionMovePublicationGate.shouldPublishObservedMove()) {
+              for {
+                sid <- currentSessionId
+                san <- controller.pgnMoves.lastOption
+              } postMoveToBackend(sid, san)
+            }
           }
           playerLabel.text = gameEvent match {
             case GameEvent.Checkmate           => "Checkmate!"
@@ -267,6 +289,426 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       t.setDaemon(true)
       t.start()
     }
+
+  // ── HTTP helpers ─────────────────────────────────────────────────────────────
+
+  private def httpPost(url: String, body: String): Option[String] =
+    Try {
+      val req = java.net.http.HttpRequest.newBuilder()
+        .uri(java.net.URI.create(url))
+        .header("Content-Type", "application/json")
+        .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))
+        .timeout(java.time.Duration.ofSeconds(3))
+        .build()
+      val r = httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofString())
+      if (r.statusCode() / 100 == 2) Some(r.body()) else None
+    }.getOrElse(None)
+
+  private def httpGet(url: String): Option[String] =
+    Try {
+      val req = java.net.http.HttpRequest.newBuilder()
+        .uri(java.net.URI.create(url))
+        .GET()
+        .timeout(java.time.Duration.ofSeconds(3))
+        .build()
+      val r = httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofString())
+      if (r.statusCode() == 200) Some(r.body()) else None
+    }.getOrElse(None)
+
+  private def httpDelete(url: String): Unit =
+    Try {
+      val req = java.net.http.HttpRequest.newBuilder()
+        .uri(java.net.URI.create(url))
+        .DELETE()
+        .timeout(java.time.Duration.ofSeconds(3))
+        .build()
+      httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.discarding())
+    }
+
+  private def jsonStr(json: String, key: String): Option[String] =
+    s""""$key"\\s*:\\s*"([^"]*)"""".r.findFirstMatchIn(json).map(_.group(1))
+
+  private def jsonBool(json: String, key: String): Option[Boolean] =
+    s""""$key"\\s*:\\s*(true|false)""".r.findFirstMatchIn(json).map(_.group(1) == "true")
+
+  // ── Session backend calls ────────────────────────────────────────────────────
+
+  private def registerSession(
+    whiteIsHuman: Boolean, blackIsHuman: Boolean,
+    whiteStrat: String, blackStrat: String,
+    clockMs: Option[Long], incMs: Option[Long],
+    startFen: Option[String]
+  ): Option[String] = {
+    val incField    = incMs.filter(_ > 0).map(i => s""","clockIncrementMs":$i""").getOrElse("")
+    val clockFields = clockMs.map(ms => s""","clockInitialMs":$ms$incField""").getOrElse("")
+    val fenField = startFen.filter(_.nonEmpty).map(f => s""","startFen":"$f"""").getOrElse("")
+    val body = s"""{"settings":{"whiteIsHuman":$whiteIsHuman,"blackIsHuman":$blackIsHuman,"whiteStrategy":"$whiteStrat","blackStrategy":"$blackStrat"$clockFields}$fenField}"""
+    httpPost(s"$backendUrl/games", body).flatMap(jsonStr(_, "gameId"))
+  }
+
+  private def loadSessions(): List[SessionInfo] =
+    httpGet(s"$backendUrl/games").map { json =>
+      val ids      = """"gameId"\s*:\s*"([^"]+)"""".r.findAllMatchIn(json).map(_.group(1)).toList
+      val statuses = """"status"\s*:\s*"([^"]+)"""".r.findAllMatchIn(json).map(_.group(1)).toList
+      val whites   = """"whiteIsHuman"\s*:\s*(true|false)""".r.findAllMatchIn(json).map(_.group(1) == "true").toList
+      val blacks   = """"blackIsHuman"\s*:\s*(true|false)""".r.findAllMatchIn(json).map(_.group(1) == "true").toList
+      ids.zipWithIndex.map { case (id, i) =>
+        SessionInfo(id, statuses.applyOrElse(i, _ => ""), whites.applyOrElse(i, _ => true), blacks.applyOrElse(i, _ => true))
+      }
+    }.getOrElse(List.empty)
+
+  private def postMoveToBackend(gameId: String, san: String): Unit = {
+    val t = new Thread(() => { httpPost(s"$backendUrl/games/$gameId/moves", s"""{"move":"$san"}"""); () }, "backend-move")
+    t.setDaemon(true); t.start()
+  }
+
+  // ── WebSocket ────────────────────────────────────────────────────────────────
+
+  private def connectWebSocket(gameId: String): Unit = {
+    disconnectWebSocket()
+    val gen = wsGeneration
+    val t = new Thread(() => { Try {
+      val uri = java.net.URI.create(s"$wsBaseUrl/ws/$gameId")
+      val sb  = new StringBuilder()
+      val listener = new java.net.http.WebSocket.Listener {
+        override def onText(ws: java.net.http.WebSocket, data: CharSequence, last: Boolean): java.util.concurrent.CompletionStage[?] = {
+          sb.append(data)
+          if (last) {
+            val msg = sb.toString(); sb.clear()
+            if (gen == wsGeneration) Platform.runLater(() => handleWsMessage(msg))
+          }
+          ws.request(1)
+          null
+        }
+        override def onError(ws: java.net.http.WebSocket, error: Throwable): Unit = ()
+      }
+      val ws = httpClient.newWebSocketBuilder()
+        .buildAsync(uri, listener)
+        .get(5, java.util.concurrent.TimeUnit.SECONDS)
+      wsConn = Some(ws)
+      ws.request(1)
+    }; () }, "ws-connect")
+    t.setDaemon(true); t.start()
+  }
+
+  private def disconnectWebSocket(): Unit = {
+    wsGeneration += 1
+    wsConn.foreach(ws => Try(ws.sendClose(java.net.http.WebSocket.NORMAL_CLOSURE, "").get(1, java.util.concurrent.TimeUnit.SECONDS)))
+    wsConn = None
+  }
+
+  private def parseSanMoves(pgn: String): Vector[String] =
+    pgn.replaceAll("""\d+\.""", " ").replaceAll("""\s+""", " ").trim
+      .split(" ").filter(_.nonEmpty).toVector
+
+  private def handleWsMessage(json: String): Unit =
+    if (jsonStr(json, "eventType").contains("move_applied")) {
+      jsonStr(json, "pgn").foreach { pgn =>
+        val incoming = parseSanMoves(pgn)
+        val current  = controller.pgnMoves.length
+        if (incoming.length > current) {
+          val san = incoming(current)
+          sessionMovePublicationGate.markRemoteMoveApplied()
+          controller.applyPgnMove(san) // fires update() via observer
+        }
+      }
+    }
+
+  private def updateSessionBar(): Unit =
+    if (sessionIdText != null) {
+      currentSessionId match {
+        case Some(id) =>
+          sessionIdText.text = id
+          if (sessionBar != null) { sessionBar.visible = true; sessionBar.managed = true }
+        case None =>
+          sessionIdText.text = ""
+          if (sessionBar != null) { sessionBar.visible = false; sessionBar.managed = false }
+      }
+    }
+
+  // ── Session bar ───────────────────────────────────────────────────────────────
+
+  private[aview] def createSessionBar(): HBox = {
+    val lbl = new Label("SESSION") {
+      font = Font.font("Arial", FontWeight.Bold, 10)
+      style = "-fx-text-fill: #2d5a1b;"
+      padding = Insets(0, 4, 0, 0)
+    }
+    sessionIdText = new scalafx.scene.text.Text {
+      font = Font.font("Monospaced", FontWeight.Normal, 11)
+      fill = Color.web("#2d5a1b")
+    }
+    val copyBtn = new Button() {
+      style = "-fx-padding: 2px 5px;"
+      tooltip = new Tooltip("Copy session ID")
+      delegate.setGraphic(lucideIcon(IconCopy, 13))
+      onAction = _ => currentSessionId.foreach { id =>
+        val c = new ClipboardContent(); c.putString(id)
+        Clipboard.getSystemClipboard.setContent(c)
+        delegate.setGraphic(lucideIcon(IconCheck, 13, javafx.scene.paint.Color.web("#27ae60")))
+        val t = new Thread(() => { Thread.sleep(1500); Platform.runLater(() => delegate.setGraphic(lucideIcon(IconCopy, 13))) })
+        t.setDaemon(true); t.start()
+      }
+    }
+    sessionBar = new HBox(6) {
+      alignment = Pos.CenterLeft
+      padding = Insets(4, 12, 4, 12)
+      style = "-fx-background-color: #f0f8e6; -fx-border-color: #d5e8b8; -fx-border-width: 1 0 0 0;"
+      children = Seq(lbl, sessionIdText, copyBtn)
+      visible = false
+      managed = false
+    }
+    sessionBar
+  }
+
+  // ── Strategy helper ───────────────────────────────────────────────────────────
+
+  private def strategyForId(id: String): MoveStrategy = id match {
+    case "random"              => new RandomStrategy()
+    case "greedy"              => new GreedyStrategy()
+    case "material-balance"    => new MaterialBalanceStrategy()
+    case "piece-square"        => new PieceSquareStrategy()
+    case "minimax"             => new MinimaxStrategy(3)
+    case "quiescence"          => new QuiescenceStrategy(3)
+    case "iterative-deepening" => new IterativeDeepeningStrategy()
+    case _                     => new OpeningContinuationStrategy(openings)
+  }
+
+  // ── New Game dialog ───────────────────────────────────────────────────────────
+
+  private[aview] def showNewGameDialog(): Unit = {
+    var whiteHuman = true; var blackHuman = true
+    var whiteStrat = "opening-continuation"; var blackStrat = "opening-continuation"
+    var clockMs: Option[Long] = None; var incMs: Option[Long] = None
+    var playAsWhite = true
+
+    val stratIds     = Array("opening-continuation","random","greedy","material-balance","piece-square","minimax","quiescence","iterative-deepening")
+    val stratLabels  = Array("Opening Continuation","Random","Greedy","Material Balance","Piece-Square","Minimax (d=3)","Quiescence (d=3)","Iterative Deepening")
+    val clockPresets = Array(
+      ("No Limit", None, None), ("Bullet 1+0", Some(60_000L), Some(0L)),
+      ("Blitz 3+0", Some(180_000L), Some(0L)), ("Blitz 5+0", Some(300_000L), Some(0L)),
+      ("Rapid 10+0", Some(600_000L), Some(0L)), ("Blitz 3+2", Some(180_000L), Some(2_000L)),
+      ("Blitz 5+3", Some(300_000L), Some(3_000L)), ("Rapid 15+10", Some(900_000L), Some(10_000L)),
+      ("Classical 30+0", Some(1_800_000L), Some(0L))
+    )
+
+    val dlg = new javafx.stage.Stage()
+    dlg.initOwner(primaryStage.delegate)
+    dlg.initModality(javafx.stage.Modality.WINDOW_MODAL)
+    dlg.setTitle("New Game"); dlg.setResizable(false)
+
+    def mkPlayerRow(icon: String, initHuman: Boolean,
+                    onHuman: Boolean => Unit, onStrat: String => Unit
+                   ): (javafx.scene.layout.HBox, () => Unit) = {
+      val lbl = new javafx.scene.control.Label(icon)
+      lbl.setStyle("-fx-font-size:16px; -fx-min-width:30px;")
+      val humanBtn = new javafx.scene.control.ToggleButton("Human")
+      val compBtn  = new javafx.scene.control.ToggleButton("Computer")
+      val tg = new javafx.scene.control.ToggleGroup()
+      humanBtn.setToggleGroup(tg); compBtn.setToggleGroup(tg)
+      if (initHuman) humanBtn.setSelected(true) else compBtn.setSelected(true)
+      val stratBox = new javafx.scene.control.ComboBox[String]()
+      stratLabels.foreach(stratBox.getItems.add)
+      stratBox.getSelectionModel.selectFirst()
+      stratBox.setVisible(!initHuman); stratBox.setManaged(!initHuman)
+      tg.selectedToggleProperty().addListener { (_, _, t) =>
+        val isHuman = t == humanBtn
+        onHuman(isHuman)
+        stratBox.setVisible(!isHuman); stratBox.setManaged(!isHuman)
+        dlg.sizeToScene()
+      }
+      stratBox.setOnAction(_ => onStrat(stratIds(stratBox.getSelectionModel.getSelectedIndex)))
+      val row = new javafx.scene.layout.HBox(8, lbl, humanBtn, compBtn, stratBox)
+      row.setAlignment(javafx.geometry.Pos.CENTER_LEFT)
+      (row, () => { tg.getToggles })
+    }
+
+    val (whiteRow, _) = mkPlayerRow("♔  White", true, b => { whiteHuman = b }, s => { whiteStrat = s })
+    val (blackRow, _) = mkPlayerRow("♚  Black", true, b => { blackHuman = b }, s => { blackStrat = s })
+
+    val clockTG   = new javafx.scene.control.ToggleGroup()
+    val clockFlow = new javafx.scene.layout.FlowPane(6, 6)
+    clockPresets.zipWithIndex.foreach { case ((lbl, ms, inc), i) =>
+      val btn = new javafx.scene.control.ToggleButton(lbl)
+      btn.setToggleGroup(clockTG)
+      if (i == 0) btn.setSelected(true)
+      btn.setOnAction(_ => { clockMs = ms; incMs = inc })
+      clockFlow.getChildren.add(btn)
+    }
+
+    val playWhiteBtn = new javafx.scene.control.ToggleButton("♔ White")
+    val playBlackBtn = new javafx.scene.control.ToggleButton("♚ Black")
+    val playTG = new javafx.scene.control.ToggleGroup()
+    playWhiteBtn.setToggleGroup(playTG); playBlackBtn.setToggleGroup(playTG); playWhiteBtn.setSelected(true)
+    playTG.selectedToggleProperty().addListener((_, _, t) => playAsWhite = (t == playWhiteBtn))
+    val playAsLbl = new javafx.scene.control.Label("I play as")
+    playAsLbl.setStyle("-fx-font-weight:bold; -fx-font-size:12px;")
+    val playAsRow = new javafx.scene.layout.HBox(8, playAsLbl, playWhiteBtn, playBlackBtn)
+    playAsRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT)
+
+    val fenLbl = new javafx.scene.control.Label("Starting FEN (optional)")
+    fenLbl.setStyle("-fx-font-size:11px; -fx-text-fill:#888;")
+    val fenField = new javafx.scene.control.TextField()
+    fenField.setPromptText("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    fenField.setStyle("-fx-font-family:monospace; -fx-font-size:11px;"); fenField.setPrefWidth(440)
+
+    val cancelBtn = new javafx.scene.control.Button("Cancel")
+    cancelBtn.setOnAction(_ => dlg.close())
+    val startBtn = new javafx.scene.control.Button("Start Game")
+    startBtn.setDefaultButton(true)
+    startBtn.setStyle("-fx-background-color:#629924; -fx-text-fill:white; -fx-font-weight:bold;")
+    startBtn.setOnAction(_ => {
+      dlg.close()
+      val startFen = Option(fenField.getText.trim).filter(_.nonEmpty)
+      paused = false; gameOverByTimeout = false; lastPgnLength = 0; selectedSquare = None
+      gameMode = if (whiteHuman && blackHuman) GameMode.HumanVsHuman
+                 else if (!whiteHuman && !blackHuman) GameMode.ComputerVsComputer
+                 else GameMode.HumanVsComputer
+      if (!whiteHuman) { whiteComputer.strategy = strategyForId(whiteStrat); updateStrategyLabels() }
+      if (!blackHuman) { blackComputer.strategy = strategyForId(blackStrat); updateStrategyLabels() }
+      val newClock = clockMs match {
+        case Some(ms) => ClockMode.Timed(ms, incMs.getOrElse(0L), "")
+        case None     => ClockMode.NoLimit
+      }
+      applyClockMode(newClock)
+      startFen match {
+        case Some(fen) => controller.loadFromFEN(fen)
+        case None      => controller.announceInitial(Board.initial)
+      }
+      mySessionColor = if (gameMode == GameMode.HumanVsHuman) (if (playAsWhite) 'w' else 'b') else 'x'
+      boardFlipped = mySessionColor == 'b'
+      updateBoard(); updatePauseButtonVisibility()
+      if (openingInfoLabel != null) { openingInfoLabel.visible = false; openingInfoLabel.managed = false }
+      if (puzzleInfoLabel != null)  { puzzleInfoLabel.visible  = false; puzzleInfoLabel.managed  = false }
+      if (puzzleLink != null)       { puzzleLink.visible        = false; puzzleLink.managed        = false }
+      pgnDisplay.children.clear()
+      disconnectWebSocket()
+      val t = new Thread(() => {
+        val sid = registerSession(whiteHuman, blackHuman, whiteStrat, blackStrat, clockMs, incMs.filter(_ > 0), startFen)
+        Platform.runLater(() => {
+          currentSessionId = sid; updateSessionBar()
+          sid.foreach(id => if (gameMode == GameMode.HumanVsHuman) connectWebSocket(id))
+        })
+      }, "session-create")
+      t.setDaemon(true); t.start()
+      triggerComputerMoveIfNeeded()
+    })
+
+    val btnRow = new javafx.scene.layout.HBox(8, cancelBtn, startBtn)
+    btnRow.setAlignment(javafx.geometry.Pos.CENTER_RIGHT)
+    val clockLbl = new javafx.scene.control.Label("Time Control")
+    clockLbl.setStyle("-fx-font-weight:bold; -fx-font-size:12px;")
+    val root = new javafx.scene.layout.VBox(12)
+    root.setPadding(new javafx.geometry.Insets(20)); root.setPrefWidth(480)
+    root.getChildren.addAll(
+      whiteRow, blackRow, new javafx.scene.control.Separator(),
+      clockLbl, clockFlow, new javafx.scene.control.Separator(),
+      playAsRow, fenLbl, fenField, new javafx.scene.control.Separator(),
+      btnRow
+    )
+    dlg.setScene(new javafx.scene.Scene(root))
+    dlg.showAndWait()
+  }
+
+  // ── Join Session dialog ───────────────────────────────────────────────────────
+
+  private[aview] def showJoinSessionDialog(): Unit = {
+    val dlg = new javafx.stage.Stage()
+    dlg.initOwner(primaryStage.delegate)
+    dlg.initModality(javafx.stage.Modality.WINDOW_MODAL)
+    dlg.setTitle("Join Session"); dlg.setResizable(false)
+
+    val idField = new javafx.scene.control.TextField()
+    idField.setPromptText("Paste session ID here")
+    idField.setStyle("-fx-font-family:monospace; -fx-font-size:11px;")
+
+    val listView = new javafx.scene.control.ListView[String]()
+    listView.setPrefHeight(160)
+    var infos: List[SessionInfo] = List.empty
+
+    def refresh(): Unit = {
+      val t = new Thread(() => {
+        val sessions = loadSessions()
+        Platform.runLater(() => {
+          infos = sessions
+          listView.getItems.clear()
+          sessions.foreach { s =>
+            val mode = if (s.whiteIsHuman && s.blackIsHuman) "HvH"
+                       else if (!s.whiteIsHuman && !s.blackIsHuman) "CvC"
+                       else if (s.whiteIsHuman) "HvC" else "CvH"
+            listView.getItems.add(s"$mode  ${s.status.take(20)}  ${s.gameId.take(8)}…")
+          }
+        })
+      }, "session-refresh")
+      t.setDaemon(true); t.start()
+    }
+    refresh()
+
+    listView.getSelectionModel.selectedIndexProperty().addListener((_, _, idx) => {
+      val i = idx.intValue()
+      if (i >= 0 && i < infos.length) idField.setText(infos(i).gameId)
+    })
+
+    val refreshBtn = new javafx.scene.control.Button("↻")
+    refreshBtn.setOnAction(_ => refresh())
+    val delAllBtn = new javafx.scene.control.Button("Delete All")
+    delAllBtn.setStyle("-fx-text-fill:#e74c3c; -fx-border-color:#e74c3c;")
+    delAllBtn.setOnAction(_ => {
+      val t = new Thread(() => {
+        httpDelete(s"$backendUrl/games")
+        Platform.runLater(() => { listView.getItems.clear(); infos = List.empty })
+      }, "del-all")
+      t.setDaemon(true); t.start()
+    })
+    val hdr = new javafx.scene.layout.HBox(6)
+    val hdrLbl = new javafx.scene.control.Label("Active Sessions")
+    hdrLbl.setStyle("-fx-font-weight:bold; -fx-font-size:12px;")
+    hdr.getChildren.addAll(hdrLbl, refreshBtn, delAllBtn)
+    hdr.setAlignment(javafx.geometry.Pos.CENTER_LEFT)
+
+    val cancelBtn = new javafx.scene.control.Button("Cancel")
+    cancelBtn.setOnAction(_ => dlg.close())
+    val joinBtn = new javafx.scene.control.Button("Join Game")
+    joinBtn.setDefaultButton(true)
+    joinBtn.setStyle("-fx-background-color:#629924; -fx-text-fill:white; -fx-font-weight:bold;")
+    joinBtn.setOnAction(_ => {
+      val id = idField.getText.trim
+      if (id.nonEmpty) {
+        dlg.close()
+        val t = new Thread(() => {
+          httpGet(s"$backendUrl/games/$id") match {
+            case None =>
+              Platform.runLater(() => showAlert("Join Failed", "Session not found or server unreachable."))
+            case Some(json) =>
+              val fen = jsonStr(json, "fen").getOrElse("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+              val pgn = jsonStr(json, "pgn").getOrElse("")
+              val wH  = jsonBool(json, "whiteIsHuman").getOrElse(true)
+              val bH  = jsonBool(json, "blackIsHuman").getOrElse(true)
+              Platform.runLater(() => {
+                paused = false; gameOverByTimeout = false; lastPgnLength = 0; selectedSquare = None
+                gameMode = if (wH && bH) GameMode.HumanVsHuman else GameMode.HumanVsComputer
+                mySessionColor = 'b'; boardFlipped = true
+                controller.loadFromFEN(fen)
+                if (pgn.trim.nonEmpty) controller.loadPgnMoves(pgn)
+                currentSessionId = Some(id); updateSessionBar(); updateBoard(); updatePauseButtonVisibility()
+                if (wH && bH) connectWebSocket(id)
+              })
+          }
+        }, "session-join")
+        t.setDaemon(true); t.start()
+      }
+    })
+
+    val btnRow = new javafx.scene.layout.HBox(8, cancelBtn, joinBtn)
+    btnRow.setAlignment(javafx.geometry.Pos.CENTER_RIGHT)
+    val idLbl = new javafx.scene.control.Label("Or paste Session ID")
+    idLbl.setStyle("-fx-font-size:11px; -fx-text-fill:#888;")
+    val root = new javafx.scene.layout.VBox(10)
+    root.setPadding(new javafx.geometry.Insets(20)); root.setPrefWidth(440)
+    root.getChildren.addAll(hdr, listView, new javafx.scene.control.Separator(), idLbl, idField, new javafx.scene.control.Separator(), btnRow)
+    dlg.setScene(new javafx.scene.Scene(root))
+    dlg.showAndWait()
+  }
 
   private[aview] def createBoardPane(): GridPane = {
     val boardPane = new GridPane {
@@ -442,37 +884,21 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       children = Seq(startButton, backButton, forwardButton, endButton)
     }
 
-    // New Game button (yellow)
+    // New Game button (yellow) — opens the New Game dialog
     val resetButton = new Button("New Game") {
       prefWidth = 130
       style =
         "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #f1c40f; -fx-text-fill: #333333; -fx-font-weight: bold;"
       delegate.setGraphic(lucideIcon(IconSquarePlus, 14, javafx.scene.paint.Color.web("#333")))
       contentDisplay = scalafx.scene.control.ContentDisplay.Left
-      onAction = _ => {
-        paused = false
-        gameMode = GameMode.HumanVsHuman
-        gameOverByTimeout = false
-        updatePauseButtonVisibility()
-        updatePauseButton()
-        resetClock()
-        lastPgnLength = 0
-        controller.announceInitial(Board.initial)
-        selectedSquare = None
-        pgnDisplay.children.clear()
-        if (openingInfoLabel != null) {
-          openingInfoLabel.visible = false
-          openingInfoLabel.managed = false
-        }
-        if (puzzleInfoLabel != null) {
-          puzzleInfoLabel.visible = false
-          puzzleInfoLabel.managed = false
-        }
-        if (puzzleLink != null) {
-          puzzleLink.visible = false
-          puzzleLink.managed = false
-        }
-      }
+      onAction = _ => showNewGameDialog()
+    }
+
+    // Join Session button (blue)
+    val joinButton = new Button("Join") {
+      style =
+        "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #2980b9; -fx-text-fill: white; -fx-font-weight: bold;"
+      onAction = _ => showJoinSessionDialog()
     }
 
     // Run button (green) — visible in non-CvC modes; switches to CvC and starts play
@@ -515,7 +941,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
     gameButtonBox = new HBox(10) {
       alignment = Pos.Center
-      children = Seq(resetButton, runButton, pauseButton)
+      children = Seq(resetButton, joinButton, runButton, pauseButton)
     }
     pauseButton.visible = false
     pauseButton.managed = false
@@ -1090,6 +1516,10 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
   private def handleSquareClick(square: Square): Unit = {
     if (isComputerTurn || isGameOver) return
+    if (mySessionColor != 'x') {
+      val activeColor = if (controller.isWhiteToMove) 'w' else 'b'
+      if (activeColor != mySessionColor) return
+    }
     selectedSquare match {
       case None =>
         controller.board.pieceAt(square) match {
@@ -1629,6 +2059,7 @@ class ChessGUILauncher extends javafx.application.Application {
     val boardPane = gui.createBoardPane()
     val capturedPanel = gui.createCapturedPanel()
     val fenBar = gui.createFenBar()
+    val sessionBar = gui.createSessionBar()
 
     // Wrap board in a scalable Group + Pane so it resizes with the window
     val boardGroup = new scalafx.scene.Group(boardPane)
@@ -1664,7 +2095,7 @@ class ChessGUILauncher extends javafx.application.Application {
       root = new BorderPane {
         top = gui.createMenuBar()
         center = new VBox {
-          children = Seq(boardContainer, capturedPanel, fenBar)
+          children = Seq(boardContainer, capturedPanel, fenBar, sessionBar)
         }
         right = gui.createControlPanel()
         style = "-fx-background-color: #f5f5f5;"

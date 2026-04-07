@@ -1,5 +1,6 @@
 package chess.microservices.shared
 
+import chess.model.GameSettings
 import io.circe.parser.decode
 import io.circe.syntax.*
 import org.scalatest.matchers.should.Matchers
@@ -24,14 +25,14 @@ class ApiModelsSpec extends AnyWordSpec with Matchers {
 
   "CreateGameResponse" should {
     "round-trip through JSON" in {
-      val resp = CreateGameResponse("abc-123", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+      val resp = CreateGameResponse("abc-123", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", GameSettings())
       decode[CreateGameResponse](resp.asJson.noSpaces) shouldBe Right(resp)
     }
   }
 
   "GameStateResponse" should {
     "round-trip through JSON" in {
-      val resp = GameStateResponse("abc-123", "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2", "1. e4 e5", "in_progress")
+      val resp = GameStateResponse("abc-123", "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2", "1. e4 e5", "in_progress", GameSettings())
       decode[GameStateResponse](resp.asJson.noSpaces) shouldBe Right(resp)
     }
   }

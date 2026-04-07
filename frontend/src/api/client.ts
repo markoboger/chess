@@ -8,6 +8,15 @@ const apiClient = axios.create({
   },
 })
 
+apiClient.interceptors.request.use(
+  (config) => {
+    if (config.method === 'post' && config.url?.includes('/moves')) {
+      console.warn('[HTTP] POST moves:', config.url, config.data, new Error().stack?.split('\n').slice(1, 5).join(' | '))
+    }
+    return config
+  }
+)
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {

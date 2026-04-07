@@ -2,12 +2,18 @@ package chess.microservices.shared
 
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.*
+import chess.model.GameSettings
+
+given Decoder[GameSettings] = io.circe.generic.semiauto.deriveDecoder
+given Encoder[GameSettings] = io.circe.generic.semiauto.deriveEncoder
 
 /** Request to create a new game
   * @param startFen
   *   Optional FEN string for custom starting position
+  * @param settings
+  *   Game settings (player types, strategies, clock)
   */
-case class CreateGameRequest(startFen: Option[String] = None)
+case class CreateGameRequest(startFen: Option[String] = None, settings: GameSettings = GameSettings())
 
 object CreateGameRequest:
   given Decoder[CreateGameRequest] = deriveDecoder
@@ -18,8 +24,10 @@ object CreateGameRequest:
   *   Unique identifier for the game
   * @param fen
   *   Current FEN position
+  * @param settings
+  *   The game settings that were applied
   */
-case class CreateGameResponse(gameId: String, fen: String)
+case class CreateGameResponse(gameId: String, fen: String, settings: GameSettings)
 
 object CreateGameResponse:
   given Decoder[CreateGameResponse] = deriveDecoder
@@ -34,8 +42,10 @@ object CreateGameResponse:
   *   Move history in PGN format
   * @param status
   *   Game status (in_progress, checkmate, stalemate, etc.)
+  * @param settings
+  *   The game settings
   */
-case class GameStateResponse(gameId: String, fen: String, pgn: String, status: String)
+case class GameStateResponse(gameId: String, fen: String, pgn: String, status: String, settings: GameSettings)
 
 object GameStateResponse:
   given Decoder[GameStateResponse] = deriveDecoder
@@ -153,6 +163,27 @@ case class AiMoveResponse(move: Option[String])
 object AiMoveResponse:
   given Decoder[AiMoveResponse] = deriveDecoder
   given Encoder[AiMoveResponse] = deriveEncoder
+
+/** Summary of a single game session for the session list.
+  * @param gameId
+  *   Unique identifier for the game
+  * @param status
+  *   Human-readable game status (e.g. "White to move")
+  * @param settings
+  *   Game settings
+  */
+case class GameSummary(gameId: String, status: String, settings: GameSettings)
+
+object GameSummary:
+  given Decoder[GameSummary] = deriveDecoder
+  given Encoder[GameSummary] = deriveEncoder
+
+/** Response listing all active game sessions. */
+case class ListGamesResponse(games: List[GameSummary])
+
+object ListGamesResponse:
+  given Decoder[ListGamesResponse] = deriveDecoder
+  given Encoder[ListGamesResponse] = deriveEncoder
 
 /** Health check response
   * @param status

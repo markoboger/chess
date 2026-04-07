@@ -34,6 +34,16 @@
         <Copy v-else :size="13" />
       </button>
     </div>
+
+    <!-- Session ID (shown when a game is active) -->
+    <div v-if="gameStore.gameId" class="fen-bar session-bar">
+      <span class="fen-label">SESSION</span>
+      <span class="fen-text session-id-text">{{ gameStore.gameId }}</span>
+      <button class="copy-btn-sm" @click="copySession" :title="copySessionLabel">
+        <Check v-if="copySessionSuccess" :size="13" />
+        <Copy v-else :size="13" />
+      </button>
+    </div>
   </div>
 </template>
 
@@ -46,6 +56,8 @@ const gameStore = useGameStore()
 
 const copyFenSuccess = ref(false)
 const copyFenLabel = ref('Copy FEN')
+const copySessionSuccess = ref(false)
+const copySessionLabel = ref('Copy session ID')
 
 const isWhiteLow = computed(() => {
   if (gameStore.clockMode.kind !== 'timed') return false
@@ -62,6 +74,15 @@ function copyFen() {
     copyFenSuccess.value = true
     copyFenLabel.value = 'Copied!'
     setTimeout(() => { copyFenSuccess.value = false; copyFenLabel.value = 'Copy FEN' }, 1500)
+  })
+}
+
+function copySession() {
+  if (!gameStore.gameId) return
+  navigator.clipboard.writeText(gameStore.gameId).then(() => {
+    copySessionSuccess.value = true
+    copySessionLabel.value = 'Copied!'
+    setTimeout(() => { copySessionSuccess.value = false; copySessionLabel.value = 'Copy session ID' }, 1500)
   })
 }
 </script>
@@ -174,4 +195,12 @@ function copyFen() {
   justify-content: center;
 }
 .copy-btn-sm:hover { background: #eee; }
+
+.session-bar {
+  background: #f0f8e6;
+  border-top: 1px solid #d5e8b8;
+}
+.session-id-text {
+  color: #2d5a1b;
+}
 </style>

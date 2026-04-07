@@ -29,6 +29,12 @@ sbt "runMain chess.controller.parser.FENExample"
 
 # Clean build
 sbt clean compile
+
+# Microservices (run each in a separate terminal)
+sbt "runMain chess.microservices.game.GameServer"           # Game service  :8081
+sbt "runMain chess.microservices.gateway.GatewayServer"    # API Gateway   :8080
+sbt "Realtime/runMain chess.realtime.GameEventServer"      # WebSocket hub :8083
+cd frontend && npm run dev                                  # Vue dev server :5173
 ```
 
 ## Architecture

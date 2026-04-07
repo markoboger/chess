@@ -2,7 +2,10 @@ import apiClient from './client'
 import type {
   CreateGameRequest,
   CreateGameResponse,
+  GameSettings,
   GameStateResponse,
+  GameSummary,
+  ListGamesResponse,
   MakeMoveRequest,
   MakeMoveResponse,
   LoadFenRequest,
@@ -11,7 +14,14 @@ import type {
   AiMoveResponse,
 } from '../types/api'
 
+export type { GameSettings, GameSummary }
+
 export const gameApi = {
+  async listGames(): Promise<GameSummary[]> {
+    const response = await apiClient.get<ListGamesResponse>('/games')
+    return response.data.games
+  },
+
   async createGame(request?: CreateGameRequest): Promise<CreateGameResponse> {
     const response = await apiClient.post('/games', request || {})
     return response.data
@@ -42,5 +52,9 @@ export const gameApi = {
 
   async deleteGame(gameId: string): Promise<void> {
     await apiClient.delete(`/games/${gameId}`)
+  },
+
+  async deleteAllGames(): Promise<void> {
+    await apiClient.delete('/games')
   },
 }
