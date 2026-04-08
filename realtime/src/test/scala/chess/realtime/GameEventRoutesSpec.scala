@@ -4,7 +4,9 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import cats.syntax.parallel.*
 import chess.application.game.GameSessionEvent
-import org.http4s.{Method, Request, Status}
+import io.circe.syntax.*
+import org.http4s.headers.`Content-Type`
+import org.http4s.{InvalidMessageBodyFailure, MediaType, Method, Request, Status}
 import org.http4s.circe.CirceEntityCodec.given
 import org.http4s.implicits.*
 import org.http4s.websocket.WebSocketFrame
@@ -46,6 +48,19 @@ class GameEventRoutesSpec extends AnyWordSpec with Matchers {
       )
       val resp = app.run(Request[IO](Method.POST, uri"/events").withEntity(event)).unsafeRunSync()
       resp.status shouldBe Status.Accepted
+    }
+
+    "raise an invalid message body failure for an invalid event payload" in {
+      val (_, app) = makeApp()
+      val result =
+        app
+          .run(Request[IO](Method.POST, uri"/events")
+            .putHeaders(`Content-Type`(MediaType.application.json))
+            .withEntity("""{"gameId":"g1","eventType":42}""".getBytes("UTF-8")))
+          .attempt
+          .unsafeRunSync()
+
+      result.left.toOption.get shouldBe a[InvalidMessageBodyFailure]
     }
 
     "publish a posted event to subscribers" in {
@@ -91,6 +106,28 @@ class GameEventRoutesSpec extends AnyWordSpec with Matchers {
         .unsafeRunSync()
 
       frame shouldBe WebSocketFrame.Text("""{"eventType":"heartbeat"}""")
+    }
+
+    "emit published events as websocket text frames" in {
+      val hub = InMemoryGameEventHub.create.unsafeRunSync()
+      val event = GameSessionEvent(
+        gameId = "g1",
+        eventType = "move_applied",
+        fen = Some("fen"),
+        pgn = Some("1. e4"),
+        status = Some("Black to move"),
+        move = Some("e4"),
+        gameEvent = Some("normal"),
+        occurredAt = Instant.parse("2026-04-05T18:10:00Z")
+      )
+
+      val frame =
+        (
+          GameEventRoutes.outboundFrames(hub, "g1", 1.hour).take(1).compile.lastOrError,
+          IO.sleep(50.millis) *> hub.publish(event)
+        ).parMapN((received, _) => received).unsafeRunSync()
+
+      frame shouldBe WebSocketFrame.Text(event.asJson.noSpaces)
     }
   }
 }
