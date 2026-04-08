@@ -1,6 +1,8 @@
 ThisBuild / organization := "com.example"
 ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := "3.5.0"
+ThisBuild / coverageExcludedFiles :=
+  ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*;.*GameServer.*;.*GatewayServer.*;.*UIServer.*;.*GameEventServer.*"
 
 // Determine the JavaFX platform classifier for this OS/arch
 val javafxClassifier = {
@@ -145,7 +147,6 @@ lazy val Chess = project
       "org.http4s" %% "http4s-circe" % "0.23.30",
       "org.typelevel" %% "cats-effect" % "3.5.4"
     ),
-    coverageExcludedFiles := ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*;.*GameServer.*;.*GatewayServer.*;.*UIServer.*",
     coverageMinimumStmtTotal := 40,
     coverageFailOnMinimum := false
   )

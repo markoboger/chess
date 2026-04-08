@@ -14,6 +14,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 class GameRoutesSpec extends AnyWordSpec with Matchers {
+  private val validFen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
 
   private val app = GameRoutes.routes(new GameSessionService()).orNotFound
 
@@ -41,9 +42,8 @@ class GameRoutesSpec extends AnyWordSpec with Matchers {
     }
 
     "create a game from a custom FEN" in {
-      val fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
       val req = Request[IO](Method.POST, uri"/games")
-        .withEntity(CreateGameRequest(Some(fen)))
+        .withEntity(CreateGameRequest(Some(validFen)))
       val resp = run(req)
       resp.status shouldBe Status.Ok
     }
@@ -72,6 +72,16 @@ class GameRoutesSpec extends AnyWordSpec with Matchers {
     }
   }
 
+  "GET /games" should {
+    "list active games" in {
+      run(Request[IO](Method.POST, uri"/games").withEntity(CreateGameRequest(None)))
+      val resp = run(Request[IO](Method.GET, uri"/games"))
+
+      resp.status shouldBe Status.Ok
+      resp.as[ListGamesResponse].unsafeRunSync().games should not be empty
+    }
+  }
+
   "DELETE /games/:id" should {
     "delete a game and return 204" in {
       val createResp = run(
@@ -84,6 +94,15 @@ class GameRoutesSpec extends AnyWordSpec with Matchers {
 
     "return 404 for unknown game" in {
       run(Request[IO](Method.DELETE, uri"/games/no-such-id")).status shouldBe Status.NotFound
+    }
+  }
+
+  "DELETE /games" should {
+    "delete all active sessions" in {
+      run(Request[IO](Method.POST, uri"/games").withEntity(CreateGameRequest(None)))
+
+      run(Request[IO](Method.DELETE, uri"/games")).status shouldBe Status.NoContent
+      run(Request[IO](Method.GET, uri"/games")).as[ListGamesResponse].unsafeRunSync().games shouldBe empty
     }
   }
 
@@ -156,9 +175,8 @@ class GameRoutesSpec extends AnyWordSpec with Matchers {
         Request[IO](Method.POST, uri"/games").withEntity(CreateGameRequest(None))
       ).as[CreateGameResponse].unsafeRunSync()
 
-      val fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
       val req = Request[IO](Method.POST, Uri.unsafeFromString(s"/games/${createResp.gameId}/fen"))
-        .withEntity(LoadFenRequest(fen))
+        .withEntity(LoadFenRequest(validFen))
       val resp = run(req)
       resp.status shouldBe Status.Ok
       resp.as[LoadFenResponse].unsafeRunSync().success shouldBe true
@@ -177,6 +195,43 @@ class GameRoutesSpec extends AnyWordSpec with Matchers {
     "return 400 for unknown game" in {
       val req = Request[IO](Method.POST, uri"/games/no-such-id/fen")
         .withEntity(LoadFenRequest("anything"))
+      run(req).status shouldBe Status.BadRequest
+    }
+  }
+
+  "GET /openings/lookup" should {
+    "return an opening for a known FEN" in {
+      val knownFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR"
+      val resp = run(Request[IO](Method.GET, Uri.unsafeFromString(s"/openings/lookup?fen=$knownFen")))
+
+      resp.status shouldBe Status.Ok
+      val body = resp.as[OpeningLookupResponse].unsafeRunSync()
+      body.eco should not be empty
+      body.name should not be empty
+    }
+
+    "return 404 for an unknown opening" in {
+      run(Request[IO](Method.GET, uri"/openings/lookup?fen=missing-fen")).status shouldBe Status.NotFound
+    }
+  }
+
+  "POST /games/:id/ai-move" should {
+    "return a computed move for an existing game" in {
+      val createResp = run(
+        Request[IO](Method.POST, uri"/games").withEntity(CreateGameRequest(None))
+      ).as[CreateGameResponse].unsafeRunSync()
+
+      val req = Request[IO](Method.POST, Uri.unsafeFromString(s"/games/${createResp.gameId}/ai-move"))
+        .withEntity(AiMoveRequest("random"))
+      val resp = run(req)
+
+      resp.status shouldBe Status.Ok
+      resp.as[AiMoveResponse].unsafeRunSync().move shouldBe defined
+    }
+
+    "return 400 for an unknown game" in {
+      val req = Request[IO](Method.POST, uri"/games/no-such-id/ai-move")
+        .withEntity(AiMoveRequest("random"))
       run(req).status shouldBe Status.BadRequest
     }
   }

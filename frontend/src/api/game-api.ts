@@ -2,9 +2,8 @@ import apiClient from './client'
 import type {
   CreateGameRequest,
   CreateGameResponse,
-  GameSettings,
-  GameStateResponse,
   GameSummary,
+  GameStateResponse,
   ListGamesResponse,
   MakeMoveRequest,
   MakeMoveResponse,
@@ -14,7 +13,7 @@ import type {
   AiMoveResponse,
 } from '../types/api'
 
-export type { GameSettings, GameSummary }
+export type { GameSettings, GameSummary } from '../types/api'
 
 export const gameApi = {
   async listGames(): Promise<GameSummary[]> {

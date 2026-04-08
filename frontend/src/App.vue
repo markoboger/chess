@@ -40,22 +40,22 @@ function handleGameStarted() {
 
 onMounted(async () => {
   // URL-based join: ?session=<id>
-  const params = new URLSearchParams(window.location.search)
+  const params = new URLSearchParams(globalThis.location?.search ?? '')
   const sessionParam = params.get('session')
   if (sessionParam) {
     await gameStore.joinGame(sessionParam.trim())
     // Clean the URL without a page reload
-    window.history.replaceState({}, '', window.location.pathname)
+    globalThis.history?.replaceState({}, '', globalThis.location?.pathname ?? '')
   } else {
     await gameStore.createGame()
   }
   openingStore.init()   // pre-load opening map in background
-  window.addEventListener('keydown', handleKeydown)
+  globalThis.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
   gameStore.stopPolling()
-  window.removeEventListener('keydown', handleKeydown)
+  globalThis.removeEventListener('keydown', handleKeydown)
 })
 
 function handleKeydown(e: KeyboardEvent) {

@@ -6,6 +6,15 @@ import type { GameSettings } from '../types/api'
 import { useOpeningStore } from './opening'
 import { gameApi } from '../api/game-api'
 
+function formatClockTime(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
 // ── Clock mode types ─────────────────────────────────────────────────
 export interface ClockModeTimed { kind: 'timed'; initialMs: number; incrementMs: number; label: string }
 export interface ClockModeNone { kind: 'none' }
@@ -184,10 +193,13 @@ export const useGameStore = defineStore('game', () => {
     const whiteCaptured = getMaterial('b')
     const blackCaptured = getMaterial('w')
     const advantage = whiteCaptured - blackCaptured
+    let advantageText = '='
+    if (advantage > 0) advantageText = `White +${advantage}`
+    else if (advantage < 0) advantageText = `Black +${-advantage}`
     return {
       byBlack: getCaptured('w'),
       byWhite: getCaptured('b'),
-      advantageText: advantage > 0 ? `White +${advantage}` : advantage < 0 ? `Black +${-advantage}` : '=',
+      advantageText,
       advantage,
     }
   })
@@ -201,7 +213,7 @@ export const useGameStore = defineStore('game', () => {
       for (let c = 0; c < 8; c++) {
         const sq = board[r][c]
         if (sq && sq.type === 'k' && sq.color === kingColor) {
-          const file = String.fromCharCode('a'.charCodeAt(0) + c)
+          const file = String.fromCodePoint(('a'.codePointAt(0) ?? 97) + c)
           const rank = String(8 - r)
           return `${file}${rank}`
         }
@@ -210,23 +222,11 @@ export const useGameStore = defineStore('game', () => {
     return null
   })
 
-  // ── Clock helpers ────────────────────────────────────────────────────
-  function formatTime(ms: number): string {
-    const totalSec = Math.max(0, Math.floor(ms / 1000))
-    const h = Math.floor(totalSec / 3600)
-    const m = Math.floor((totalSec % 3600) / 60)
-    const s = totalSec % 60
-    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  }
-
   const whiteClockDisplay = computed(() => {
-    if (clockMode.value.kind === 'none') return formatTime(whiteTimeMs.value)
-    return formatTime(whiteTimeMs.value)
+    return formatClockTime(whiteTimeMs.value)
   })
   const blackClockDisplay = computed(() => {
-    if (clockMode.value.kind === 'none') return formatTime(blackTimeMs.value)
-    return formatTime(blackTimeMs.value)
+    return formatClockTime(blackTimeMs.value)
   })
 
   function startClock() {
@@ -331,7 +331,10 @@ export const useGameStore = defineStore('game', () => {
     blackIsHuman.value = s?.blackIsHuman ?? true
     const isHvH = whiteIsHuman.value && blackIsHuman.value
     const isCvC = !whiteIsHuman.value && !blackIsHuman.value
-    gameMode.value = isHvH ? 'hvh' : isCvC ? 'cvc' : 'hvc'
+    let nextGameMode: 'hvh' | 'hvc' | 'cvc' = 'hvc'
+    if (isHvH) nextGameMode = 'hvh'
+    else if (isCvC) nextGameMode = 'cvc'
+    gameMode.value = nextGameMode
     if (s) {
       whiteComputerStrategy.value = (s.whiteStrategy as ComputerStrategyId) || 'opening-continuation'
       blackComputerStrategy.value = (s.blackStrategy as ComputerStrategyId) || 'opening-continuation'
@@ -653,7 +656,6 @@ export const useGameStore = defineStore('game', () => {
       const effectiveWhiteHuman = s?.whiteIsHuman ?? true
       const effectiveBlackHuman = s?.blackIsHuman ?? true
       const joinIsHvH = effectiveWhiteHuman && effectiveBlackHuman
-      const joinIsCvC = !effectiveWhiteHuman && !effectiveBlackHuman
 
       // Joiner plays as Black in a two-human game; otherwise spectator for CvC
       if (joinIsHvH) {
@@ -694,7 +696,15 @@ export const useGameStore = defineStore('game', () => {
   }
 
   async function applyMove(from: string, to: string, promotion?: string): Promise<boolean> {
-    console.log('[applyMove] CALLED', from, '->', to, 'moveInFlight=', moveInFlight.value, new Error().stack?.split('\n').slice(1, 4).join(' | '))
+    console.log(
+      '[applyMove] CALLED',
+      from,
+      '->',
+      to,
+      'moveInFlight=',
+      moveInFlight.value,
+      new Error('applyMove trace').stack?.split('\n').slice(1, 4).join(' | ')
+    )
     // Prevent a second move being sent while one HTTP round-trip is already in flight.
     // Without this guard a double-click (or any concurrent path) sends two requests to
     // the backend: the first applies the intended move and flips the turn; the second
@@ -774,7 +784,7 @@ export const useGameStore = defineStore('game', () => {
         return
       }
       const fromPiece = viewChess.value.get(selectedSquare.value as any)
-      if (fromPiece && fromPiece.type === 'p') {
+      if (fromPiece?.type === 'p') {
         const toRank = square[1]
         if ((fromPiece.color === 'w' && toRank === '8') || (fromPiece.color === 'b' && toRank === '1')) {
           pendingPromotion.value = { from: selectedSquare.value, to: square }
@@ -1112,6 +1122,6 @@ export const useGameStore = defineStore('game', () => {
     loadFenString,
     loadPgnString,
     loadPgnOrFen,
-    formatTime,
+    formatTime: formatClockTime,
   }
 })

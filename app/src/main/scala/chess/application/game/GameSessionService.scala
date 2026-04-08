@@ -8,6 +8,7 @@ import chess.model.{Board, Color, GameSettings, MoveResult}
 
 import java.time.Instant
 import java.util.UUID
+import chess.application.game.GameSessionService.GameNotFound
 
 /** Application service for managing active chess game sessions.
   *
@@ -88,7 +89,7 @@ class GameSessionService(
 
   def makeMove(gameId: String, move: String): IO[Either[String, (String, Option[String])]] =
     getGame(gameId).flatMap {
-      case None => IO.pure(Left("Game not found"))
+      case None => IO.pure(Left(GameNotFound))
       case Some(controller) =>
         controller.applyPgnMove(move) match
           case MoveResult.Moved(_, event) =>
@@ -124,7 +125,7 @@ class GameSessionService(
 
   def loadFen(gameId: String, fen: String): IO[Either[String, String]] =
     getGame(gameId).flatMap {
-      case None => IO.pure(Left("Game not found"))
+      case None => IO.pure(Left(GameNotFound))
       case Some(controller) =>
         controller.loadFromFEN(fen) match
           case Right(_) =>
@@ -134,7 +135,7 @@ class GameSessionService(
 
   def computeAiMove(gameId: String, strategyId: String): IO[Either[String, Option[String]]] =
     getGame(gameId).map {
-      case None => Left("Game not found")
+      case None => Left(GameNotFound)
       case Some(controller) =>
         val strategy: MoveStrategy = strategyId match
           case "random"               => new RandomStrategy
@@ -177,6 +178,8 @@ class GameSessionService(
     )
 
 object GameSessionService:
+  val GameNotFound = "Game not found"
+
   def apply(
       publisher: GameEventPublisher = GameEventPublisher.noop
   )(using fenIO: FenIO, pgnIO: PgnIO): GameSessionService =

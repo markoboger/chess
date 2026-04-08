@@ -11,7 +11,12 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     if (config.method === 'post' && config.url?.includes('/moves')) {
-      console.warn('[HTTP] POST moves:', config.url, config.data, new Error().stack?.split('\n').slice(1, 5).join(' | '))
+      console.warn(
+        '[HTTP] POST moves:',
+        config.url,
+        config.data,
+        new Error('HTTP POST /moves trace').stack?.split('\n').slice(1, 5).join(' | ')
+      )
     }
     return config
   }

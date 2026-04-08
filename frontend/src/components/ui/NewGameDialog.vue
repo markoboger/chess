@@ -412,7 +412,7 @@ async function doJoin() {
 }
 
 .toggle-btn.active {
-  background: #629924;
+  background: #4f7c1c;
   color: #fff;
   font-weight: 700;
 }
@@ -452,7 +452,7 @@ async function doJoin() {
 }
 
 .clock-btn:hover { border-color: #629924; color: #2d5a1b; }
-.clock-btn.active { background: #629924; border-color: #629924; color: #fff; font-weight: 700; }
+.clock-btn.active { background: #4f7c1c; border-color: #4f7c1c; color: #fff; font-weight: 700; }
 
 /* ── Play as ────────────────────────────────────────────────────────── */
 .play-as-group {
@@ -510,7 +510,7 @@ async function doJoin() {
   padding: 9px 24px;
   border: none;
   border-radius: 7px;
-  background: #629924;
+  background: #4f7c1c;
   color: #fff;
   font-size: 13.5px;
   font-weight: 700;
@@ -548,12 +548,12 @@ async function doJoin() {
   vertical-align: middle;
   transition: background 0.1s, color 0.1s;
 }
-.delete-all-btn:hover:not(:disabled) { background: #e74c3c; color: #fff; }
+.delete-all-btn:hover:not(:disabled) { background: #c0392b; color: #fff; }
 .delete-all-btn:disabled { opacity: 0.4; cursor: default; }
 
 .no-sessions {
   font-size: 13px;
-  color: #aaa;
+  color: #707070;
   padding: 8px 0;
 }
 

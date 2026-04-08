@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/markoboger/chess/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/markoboger/chess/actions/workflows/ci.yml)
 [![Coverage Status](https://coveralls.io/repos/github/markoboger/chess/badge.svg?branch=main)](https://coveralls.io/github/markoboger/chess?branch=main)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=markoboger_chess&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=markoboger_chess)
 
 A complete, production-ready chess application built in Scala with **multiple user interfaces** (ScalaFX GUI, Console, Dual UI), comprehensive move validation, en passant support, and full PGN/FEN notation support.
 

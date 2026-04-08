@@ -10,6 +10,7 @@ final class FullFenSpec extends AnyWordSpec with Matchers:
 
   val startFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
   val midGameFen = "r1bqkb1r/pp3ppp/2nppn2/8/2BPP3/2N2N2/PP3PPP/R1BQK2R b KQ - 2 7"
+  val startPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 
   "FullFen.parse" should {
 
@@ -36,7 +37,7 @@ final class FullFenSpec extends AnyWordSpec with Matchers:
     }
 
     "default to white to move when side field is missing" in {
-      val fenNoSide = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+      val fenNoSide = startPosition
       val state = FullFen.parse(fenNoSide).get
       state.whiteToMove shouldBe true
     }
@@ -74,27 +75,27 @@ final class FullFenSpec extends AnyWordSpec with Matchers:
   "FullFen.render" should {
 
     "render the starting position" in {
-      val board = RegexFenParser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").get
+      val board = RegexFenParser.parseFEN(startPosition).get
       val rendered = FullFen.render(board, whiteToMove = true, halfmoveClock = 0, fullmoveNumber = 1)
-      rendered should startWith("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
+      rendered should startWith(startPosition)
       rendered should include(" w ")
       rendered should endWith("0 1")
     }
 
     "render black to move" in {
-      val board = RegexFenParser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").get
+      val board = RegexFenParser.parseFEN(startPosition).get
       val rendered = FullFen.render(board, whiteToMove = false, halfmoveClock = 0, fullmoveNumber = 1)
       rendered should include(" b ")
     }
 
     "clamp negative halfmove clock to 0 in render" in {
-      val board = RegexFenParser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").get
+      val board = RegexFenParser.parseFEN(startPosition).get
       val rendered = FullFen.render(board, whiteToMove = true, halfmoveClock = -5, fullmoveNumber = 1)
       rendered should endWith("0 1")
     }
 
     "clamp fullmove number below 1 to 1 in render" in {
-      val board = RegexFenParser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").get
+      val board = RegexFenParser.parseFEN(startPosition).get
       val rendered = FullFen.render(board, whiteToMove = true, halfmoveClock = 0, fullmoveNumber = 0)
       rendered should endWith("0 1")
     }
@@ -112,19 +113,19 @@ final class FullFenSpec extends AnyWordSpec with Matchers:
   "FullFen.openingKey" should {
 
     "return the first 4 space-separated fields" in {
-      val board = RegexFenParser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").get
+      val board = RegexFenParser.parseFEN(startPosition).get
       val key = FullFen.openingKey(board, whiteToMove = true)
       key.split("\\s+").length shouldBe 4
     }
 
     "not include halfmove clock or fullmove number" in {
-      val board = RegexFenParser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").get
+      val board = RegexFenParser.parseFEN(startPosition).get
       val key = FullFen.openingKey(board, whiteToMove = true)
       key should not endWith "0 1"
     }
 
     "differ by active color" in {
-      val board = RegexFenParser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").get
+      val board = RegexFenParser.parseFEN(startPosition).get
       val whiteKey = FullFen.openingKey(board, whiteToMove = true)
       val blackKey = FullFen.openingKey(board, whiteToMove = false)
       whiteKey should not equal blackKey
@@ -218,12 +219,12 @@ final class FullFenSpec extends AnyWordSpec with Matchers:
   "FullFen.renderEnPassant" should {
 
     "render dash when no last move" in {
-      val board = RegexFenParser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").get
+      val board = RegexFenParser.parseFEN(startPosition).get
       FullFen.renderEnPassant(board) shouldBe "-"
     }
 
     "render en passant target square after a white pawn double push" in {
-      val initBoard = RegexFenParser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").get
+      val initBoard = RegexFenParser.parseFEN(startPosition).get
       val e2 = Square(File.E, Rank._2)
       val e4 = Square(File.E, Rank._4)
       val boardAfterE4 = initBoard.move(e2, e4).board
@@ -232,7 +233,7 @@ final class FullFenSpec extends AnyWordSpec with Matchers:
     }
 
     "render en passant target square after a black pawn double push" in {
-      val initBoard = RegexFenParser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").get
+      val initBoard = RegexFenParser.parseFEN(startPosition).get
       val e7 = Square(File.E, Rank._7)
       val e5 = Square(File.E, Rank._5)
       val boardAfterE5 = initBoard.move(e7, e5).board
@@ -241,7 +242,7 @@ final class FullFenSpec extends AnyWordSpec with Matchers:
     }
 
     "render dash after a non-double pawn push" in {
-      val initBoard = RegexFenParser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").get
+      val initBoard = RegexFenParser.parseFEN(startPosition).get
       val e2 = Square(File.E, Rank._2)
       val e3 = Square(File.E, Rank._3)
       val boardAfterE3 = initBoard.move(e2, e3).board

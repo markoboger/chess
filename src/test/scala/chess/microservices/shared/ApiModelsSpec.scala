@@ -7,6 +7,9 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 class ApiModelsSpec extends AnyWordSpec with Matchers {
+  private val startFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+  private val e4Fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+  private val e4e5Fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2"
 
   "CreateGameRequest" should {
     "use None as the default start FEN" in {
@@ -18,21 +21,21 @@ class ApiModelsSpec extends AnyWordSpec with Matchers {
       decode[CreateGameRequest](req.asJson.noSpaces) shouldBe Right(req)
     }
     "round-trip through JSON with Some FEN" in {
-      val req = CreateGameRequest(Some("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"))
+      val req = CreateGameRequest(Some(startFen))
       decode[CreateGameRequest](req.asJson.noSpaces) shouldBe Right(req)
     }
   }
 
   "CreateGameResponse" should {
     "round-trip through JSON" in {
-      val resp = CreateGameResponse("abc-123", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", GameSettings())
+      val resp = CreateGameResponse("abc-123", startFen, GameSettings())
       decode[CreateGameResponse](resp.asJson.noSpaces) shouldBe Right(resp)
     }
   }
 
   "GameStateResponse" should {
     "round-trip through JSON" in {
-      val resp = GameStateResponse("abc-123", "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2", "1. e4 e5", "in_progress", GameSettings())
+      val resp = GameStateResponse("abc-123", e4e5Fen, "1. e4 e5", "in_progress", GameSettings())
       decode[GameStateResponse](resp.asJson.noSpaces) shouldBe Right(resp)
     }
   }
@@ -72,14 +75,14 @@ class ApiModelsSpec extends AnyWordSpec with Matchers {
 
   "FenResponse" should {
     "round-trip through JSON" in {
-      val resp = FenResponse("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+      val resp = FenResponse(startFen)
       decode[FenResponse](resp.asJson.noSpaces) shouldBe Right(resp)
     }
   }
 
   "LoadFenRequest" should {
     "round-trip through JSON" in {
-      val req = LoadFenRequest("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1")
+      val req = LoadFenRequest(e4Fen)
       decode[LoadFenRequest](req.asJson.noSpaces) shouldBe Right(req)
     }
   }
@@ -114,6 +117,39 @@ class ApiModelsSpec extends AnyWordSpec with Matchers {
     "round-trip through JSON" in {
       val resp = OpeningLookupResponse("B20", "Sicilian Defence", "1. e4 c5")
       decode[OpeningLookupResponse](resp.asJson.noSpaces) shouldBe Right(resp)
+    }
+  }
+
+  "AiMoveRequest" should {
+    "round-trip through JSON" in {
+      val req = AiMoveRequest("opening-intelligence")
+      decode[AiMoveRequest](req.asJson.noSpaces) shouldBe Right(req)
+    }
+  }
+
+  "AiMoveResponse" should {
+    "round-trip through JSON with a move" in {
+      val resp = AiMoveResponse(Some("Nf3"))
+      decode[AiMoveResponse](resp.asJson.noSpaces) shouldBe Right(resp)
+    }
+
+    "round-trip through JSON without a move" in {
+      val resp = AiMoveResponse(None)
+      decode[AiMoveResponse](resp.asJson.noSpaces) shouldBe Right(resp)
+    }
+  }
+
+  "GameSummary" should {
+    "round-trip through JSON" in {
+      val summary = GameSummary("abc-123", "White to move", GameSettings())
+      decode[GameSummary](summary.asJson.noSpaces) shouldBe Right(summary)
+    }
+  }
+
+  "ListGamesResponse" should {
+    "round-trip through JSON" in {
+      val resp = ListGamesResponse(List(GameSummary("abc-123", "White to move", GameSettings())))
+      decode[ListGamesResponse](resp.asJson.noSpaces) shouldBe Right(resp)
     }
   }
 

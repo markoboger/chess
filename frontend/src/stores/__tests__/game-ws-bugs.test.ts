@@ -96,9 +96,9 @@ import { gameApi } from '../../api/game-api'
 //     original HTTP caller)
 
 class MockBroker {
-  private chess = new Chess()
-  private moves: string[] = []
-  private clients: FakeWebSocket[] = []
+  private readonly chess = new Chess()
+  private readonly moves: string[] = []
+  private readonly clients: FakeWebSocket[] = []
 
   addClient(ws: FakeWebSocket) { this.clients.push(ws) }
 
@@ -126,8 +126,8 @@ class MockBroker {
     const hist = this.chess.history({ verbose: true }) as any[]
     const last = hist[hist.length - 1]
     if (last?.piece === 'p') {
-      const fromRank = parseInt(last.from[1])
-      const toRank   = parseInt(last.to[1])
+      const fromRank = Number.parseInt(last.from[1])
+      const toRank   = Number.parseInt(last.to[1])
       if (Math.abs(toRank - fromRank) === 2) {
         const file = last.to[0]
         parts[3] = toRank === 4 ? `${file}3` : `${file}6`
@@ -232,7 +232,7 @@ describe('Two-store integration: PGN consistency across moves', () => {
     // Mock makeMove: process in shared broker (broadcasts WS before returning HTTP)
     vi.mocked(gameApi.makeMove).mockImplementation(async (_gameId, san) => {
       const { fen } = broker.processMove(san)
-      return { fen, success: true, event: null }
+      return { fen, success: true, event: undefined }
     })
   })
 
@@ -270,7 +270,7 @@ describe('Two-store integration: PGN consistency across moves', () => {
     expect(storeWhite.pgnText).toBe(storeBlack.pgnText)
   })
 
-  it('after 1.e4 e5 2.Nf3: both stores show "1. e4 e5\\n2. Nf3"', async () => {
+  it(String.raw`after 1.e4 e5 2.Nf3: both stores show "1. e4 e5\n2. Nf3"`, async () => {
     await whiteMove('e2', 'e4')
     await blackMove('e7', 'e5')
     await whiteMove('g1', 'f3')
@@ -322,12 +322,10 @@ describe('WebSocket handler — PGN desync (Bug 1)', () => {
   const BACKEND_E4 = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1'
   const BACKEND_E5 = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2'
 
-  function ws() { return FakeWebSocket.instances[FakeWebSocket.instances.length - 1] }
-
   it('sync after valid-PGN opponent move', () => {
     const store = useGameStore()
     store.connectWebSocket('x')
-    ws().deliver({ eventType: 'move_applied', fen: BACKEND_E4, pgn: '1. e4' })
+    latestWebSocket().deliver({ eventType: 'move_applied', fen: BACKEND_E4, pgn: '1. e4' })
     expect(store.pgnMoves.length).toBe(1)
     expect(store.boardStates.length).toBe(2)
   })
@@ -335,8 +333,8 @@ describe('WebSocket handler — PGN desync (Bug 1)', () => {
   it('sync after two valid-PGN moves', () => {
     const store = useGameStore()
     store.connectWebSocket('x')
-    ws().deliver({ eventType: 'move_applied', fen: BACKEND_E4, pgn: '1. e4' })
-    ws().deliver({ eventType: 'move_applied', fen: BACKEND_E5, pgn: '1. e4 e5' })
+    latestWebSocket().deliver({ eventType: 'move_applied', fen: BACKEND_E4, pgn: '1. e4' })
+    latestWebSocket().deliver({ eventType: 'move_applied', fen: BACKEND_E5, pgn: '1. e4 e5' })
     expect(store.pgnMoves.length).toBe(2)
     expect(store.boardStates.length).toBe(3)
   })
@@ -344,7 +342,7 @@ describe('WebSocket handler — PGN desync (Bug 1)', () => {
   it('sync when pgn is empty (else-branch uses move field)', () => {
     const store = useGameStore()
     store.connectWebSocket('x')
-    ws().deliver({ eventType: 'move_applied', fen: BACKEND_E4, pgn: '', move: 'e4' })
+    latestWebSocket().deliver({ eventType: 'move_applied', fen: BACKEND_E4, pgn: '', move: 'e4' })
     expect(store.boardStates.length).toBe(2)
     expect(store.pgnMoves.length).toBe(1)
   })
@@ -380,3 +378,7 @@ describe('WebSocket handler — extra redo step (Bug 2)', () => {
     expect(store.canRedo).toBe(false)
   })
 })
+
+function latestWebSocket() {
+  return FakeWebSocket.instances[FakeWebSocket.instances.length - 1]
+}

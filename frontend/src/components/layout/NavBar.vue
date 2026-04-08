@@ -412,13 +412,13 @@ function copyPgn() {
 
 .nav-btn:hover,
 .nav-item.open .nav-btn {
-  background: rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.16);
   color: #fff;
 }
 
 .nav-btn-active {
-  background: rgba(98,153,36,0.3) !important;
-  color: #a8d96b !important;
+  background: rgba(50, 85, 17, 0.5) !important;
+  color: #f1ffd8 !important;
 }
 
 .nav-btn-puzzles {
@@ -657,7 +657,7 @@ function copyPgn() {
 
 .dialog-btn.cancel { background: #eee; color: #555; }
 .dialog-btn.cancel:hover { background: #ddd; }
-.dialog-btn.ok { background: #629924; color: #fff; }
+.dialog-btn.ok { background: #4f7c1c; color: #fff; }
 .dialog-btn.ok:hover { background: #4e7a1b; }
 
 /* ── Responsive: show burger, hide desktop nav ─────────────────────── */

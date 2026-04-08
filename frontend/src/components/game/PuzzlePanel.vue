@@ -273,7 +273,7 @@ function handleRetry() {
 
 .btn-primary {
   padding: 8px 16px;
-  background: #629924;
+  background: #4f7c1c;
   color: #fff;
   border: none;
   border-radius: 7px;

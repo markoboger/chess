@@ -121,9 +121,9 @@ watch(() => gameStore.currentIndex, async () => {
   background: #f5f5f5;
   border-bottom: 1px solid #e0e0e0;
 }
-.status-check { color: #e67e22; background: #fef3e2; }
-.status-checkmate { color: #c0392b; background: #fde8e8; }
-.status-draw { color: #2980b9; background: #e8f4fd; }
+.status-check { color: #8f4f05; background: #f9e2b8; }
+.status-checkmate { color: #982c21; background: #f3d0cb; }
+.status-draw { color: #165f8e; background: #d9edf9; }
 .status-paused { color: #555; background: #f0f0f0; }
 
 .error-bar {
@@ -245,7 +245,7 @@ watch(() => gameStore.currentIndex, async () => {
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  background: #27ae60;
+  background: #1f8a4c;
   color: white;
   transition: all 0.15s;
   display: inline-flex;
@@ -261,7 +261,7 @@ watch(() => gameStore.currentIndex, async () => {
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  background: #e67e22;
+  background: #b85f14;
   color: white;
   transition: all 0.15s;
   display: inline-flex;

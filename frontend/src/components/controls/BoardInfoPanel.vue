@@ -134,8 +134,8 @@ function copySession() {
   color: #e74c3c;
 }
 .clock-time.clock-active.clock-danger {
-  color: #e74c3c;
-  background: #fde8e8;
+  color: #a92424;
+  background: #f7d7d7;
 }
 
 .captured-row {

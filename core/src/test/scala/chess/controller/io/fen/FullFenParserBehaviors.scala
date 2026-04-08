@@ -8,6 +8,9 @@ import scala.util.Success
 
 /** Shared test behaviours exercising the full-FEN capabilities of any parser that exposes parseFEN and parseFullFEN. */
 trait FullFenParserBehaviors extends AnyWordSpecLike with Matchers:
+  private val startPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+  private val startFen = s"$startPosition w KQkq - 0 1"
+  private val midGameFen = "r1bqkb1r/pp3ppp/2nppn2/8/2BPP3/2N2N2/PP3PPP/R1BQK2R b KQ - 2 7"
 
   /** A parser object that exposes parseFEN and parseFullFEN. */
   type Parser = {
@@ -20,7 +23,7 @@ trait FullFenParserBehaviors extends AnyWordSpecLike with Matchers:
     s"$parserName.parseFEN with full FEN" should {
 
       "parse castling rights from a full FEN" in {
-        val board = parser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").get
+        val board = parser.parseFEN(startFen).get
         board.castlingRights.whiteKingside shouldBe true
         board.castlingRights.whiteQueenside shouldBe true
         board.castlingRights.blackKingside shouldBe true
@@ -28,7 +31,7 @@ trait FullFenParserBehaviors extends AnyWordSpecLike with Matchers:
       }
 
       "parse partial castling rights" in {
-        val board = parser.parseFEN("r1bqkb1r/pp3ppp/2nppn2/8/2BPP3/2N2N2/PP3PPP/R1BQK2R b KQ - 2 7").get
+        val board = parser.parseFEN(midGameFen).get
         board.castlingRights.whiteKingside shouldBe true
         board.castlingRights.whiteQueenside shouldBe true
         board.castlingRights.blackKingside shouldBe false
@@ -56,18 +59,18 @@ trait FullFenParserBehaviors extends AnyWordSpecLike with Matchers:
       }
 
       "leave lastMove as None when en passant field is dash" in {
-        val board = parser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").get
+        val board = parser.parseFEN(startFen).get
         board.lastMove shouldBe None
       }
 
       "succeed on board-only FEN (no trailing fields)" in {
-        val result = parser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
+        val result = parser.parseFEN(startPosition)
         result shouldBe a[Success[?]]
         result.get.castlingRights.whiteKingside shouldBe true // default
       }
 
       "succeed when castling and en passant fields are absent" in {
-        val result = parser.parseFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w")
+        val result = parser.parseFEN(s"$startPosition w")
         result shouldBe a[Success[?]]
       }
 
@@ -79,7 +82,7 @@ trait FullFenParserBehaviors extends AnyWordSpecLike with Matchers:
     s"$parserName.parseFullFEN" should {
 
       "parse the starting position" in {
-        val state = parser.parseFullFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").get
+        val state = parser.parseFullFEN(startFen).get
         state.whiteToMove shouldBe true
         state.halfmoveClock shouldBe 0
         state.fullmoveNumber shouldBe 1
@@ -88,38 +91,38 @@ trait FullFenParserBehaviors extends AnyWordSpecLike with Matchers:
       }
 
       "parse black to move" in {
-        val state = parser.parseFullFEN("r1bqkb1r/pp3ppp/2nppn2/8/2BPP3/2N2N2/PP3PPP/R1BQK2R b KQ - 2 7").get
+        val state = parser.parseFullFEN(midGameFen).get
         state.whiteToMove shouldBe false
       }
 
       "parse halfmove clock and fullmove number" in {
-        val state = parser.parseFullFEN("r1bqkb1r/pp3ppp/2nppn2/8/2BPP3/2N2N2/PP3PPP/R1BQK2R b KQ - 2 7").get
+        val state = parser.parseFullFEN(midGameFen).get
         state.halfmoveClock shouldBe 2
         state.fullmoveNumber shouldBe 7
       }
 
       "default to white to move when side field is missing" in {
-        val state = parser.parseFullFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR").get
+        val state = parser.parseFullFEN(startPosition).get
         state.whiteToMove shouldBe true
       }
 
       "default halfmove clock to 0 when missing" in {
-        val state = parser.parseFullFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -").get
+        val state = parser.parseFullFEN(s"$startPosition w KQkq -").get
         state.halfmoveClock shouldBe 0
       }
 
       "default fullmove number to 1 when missing" in {
-        val state = parser.parseFullFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -").get
+        val state = parser.parseFullFEN(s"$startPosition w KQkq -").get
         state.fullmoveNumber shouldBe 1
       }
 
       "clamp negative halfmove clock to 0" in {
-        val state = parser.parseFullFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - -3 1").get
+        val state = parser.parseFullFEN(s"$startPosition w KQkq - -3 1").get
         state.halfmoveClock shouldBe 0
       }
 
       "clamp fullmove number below 1 to 1" in {
-        val state = parser.parseFullFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 0").get
+        val state = parser.parseFullFEN(s"$startPosition w KQkq - 0 0").get
         state.fullmoveNumber shouldBe 1
       }
 
