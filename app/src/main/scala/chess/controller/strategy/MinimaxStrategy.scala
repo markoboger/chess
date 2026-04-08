@@ -2,7 +2,7 @@ package chess.controller.strategy
 
 import chess.controller.MoveStrategy
 import chess.model.{Board, Color, Square, PromotableRole, MoveResult, GameEvent, CastlingRights, Piece}
-import scala.util.Random
+import SearchSupport.SearchMode
 
 /** Minimax search with alpha-beta pruning, evaluated with material + PST.
   *
@@ -23,28 +23,26 @@ class MinimaxStrategy(val depth: Int = 3) extends MoveStrategy:
     (board.squares, board.castlingRights, maximizing)
 
   def selectMove(board: Board, color: Color): Option[(Square, Square, Option[PromotableRole])] =
-    val moves = board.legalMoves(color)
+    val moves = SearchSupport.legalSearchMoves(board, color)
     if moves.isEmpty then return None
-
-    var bestScore = -INF
-    var bestMoves = List.empty[(Square, Square, Option[PromotableRole])]
     val rootPath: Set[NodeKey] = Set(nodeKey(board, maximizing = true))
-
-    for (from, to) <- moves do
-      val promo = MoveStrategy.promotionFor(board, from, to, color)
-      board.move(from, to, promo).movedOption.foreach { (newBoard, event) =>
-        val score = event match
-          case GameEvent.Checkmate => INF
-          case GameEvent.Stalemate => 0
-          case _ => alphaBeta(newBoard, depth - 1, -INF, INF, maximizing = false, rootColor = color, rootPath)
-        if score > bestScore then
-          bestScore = score
-          bestMoves = List((from, to, promo))
-        else if score == bestScore then bestMoves = (from, to, promo) :: bestMoves
+    val (_, bestMoves) =
+      moves.foldLeft((-INF, List.empty[(Square, Square, Option[PromotableRole])])) { case ((bestScore, bestMoves), move) =>
+        val score = rootMoveScore(move, color, rootPath)
+        SearchSupport.updateBestMoves(bestScore, bestMoves, move, score)
       }
+    SearchSupport.chooseRandom(bestMoves)
 
-    if bestMoves.isEmpty then None
-    else Some(bestMoves(Random.nextInt(bestMoves.length)))
+  private def rootMoveScore(
+      move: SearchSupport.SearchMove,
+      color: Color,
+      rootPath: Set[NodeKey]
+  ): Int =
+    move.event match
+      case GameEvent.Checkmate => INF
+      case GameEvent.Stalemate => 0
+      case _ =>
+        alphaBeta(move.board, depth - 1, -INF, INF, SearchMode.Minimize, color, rootPath)
 
   /** Alpha-beta minimax.
     *
@@ -66,61 +64,37 @@ class MinimaxStrategy(val depth: Int = 3) extends MoveStrategy:
       depth: Int,
       alpha: Int,
       beta: Int,
-      maximizing: Boolean,
+      mode: SearchMode,
       rootColor: Color,
       seenInPath: Set[NodeKey]
   ): Int =
     // Detect repetition within the search path: this line is a draw.
-    val key = nodeKey(board, maximizing)
+    val key = nodeKey(board, mode == SearchMode.Maximize)
     if seenInPath.contains(key) then return 0
 
     if depth == 0 then return Evaluator.evaluate(board, rootColor)
 
-    val currentColor = if maximizing then rootColor else rootColor.opposite
-    val moves = board.legalMoves(currentColor)
-
-    // Terminal node: checkmate or stalemate
-    if moves.isEmpty then
-      return if board.isInCheck(currentColor) then
-        if maximizing then -INF + (depth * 100) // prefer faster mates
-        else INF - (depth * 100)
-      else 0 // stalemate
-
-    val nextSeen = seenInPath + key
-
-    if maximizing then
-      var best = -INF
-      var a = alpha
-      var done = false
-      val iter = moves.iterator
-      while !done && iter.hasNext do
-        val (from, to) = iter.next()
-        val promo = MoveStrategy.promotionFor(board, from, to, currentColor)
-        board.move(from, to, promo).movedOption.foreach { (newBoard, event) =>
-          val score = event match
-            case GameEvent.Checkmate => INF - (depth * 100)
-            case GameEvent.Stalemate => 0
-            case _                   => alphaBeta(newBoard, depth - 1, a, beta, maximizing = false, rootColor, nextSeen)
-          if score > best then best = score
-          if best > a then a = best
-          if a >= beta then done = true
+    val currentColor = mode.currentColor(rootColor)
+    SearchSupport
+      .terminalScore(board, currentColor, mode, depth, INF)
+      .getOrElse {
+        val nextSeen = seenInPath + key
+        val moves = SearchSupport.legalSearchMoves(board, currentColor)
+        SearchSupport.searchChildren(moves, mode, alpha, beta, INF) { (move, currentAlpha, currentBeta) =>
+          childScore(move, depth, mode, currentAlpha, currentBeta, rootColor, nextSeen)
         }
-      best
-    else
-      var best = INF
-      var b = beta
-      var done = false
-      val iter = moves.iterator
-      while !done && iter.hasNext do
-        val (from, to) = iter.next()
-        val promo = MoveStrategy.promotionFor(board, from, to, currentColor)
-        board.move(from, to, promo).movedOption.foreach { (newBoard, event) =>
-          val score = event match
-            case GameEvent.Checkmate => -INF + (depth * 100)
-            case GameEvent.Stalemate => 0
-            case _                   => alphaBeta(newBoard, depth - 1, alpha, b, maximizing = true, rootColor, nextSeen)
-          if score < best then best = score
-          if best < b then b = best
-          if b <= alpha then done = true
-        }
-      best
+      }
+
+  private def childScore(
+      move: SearchSupport.SearchMove,
+      depth: Int,
+      mode: SearchMode,
+      alpha: Int,
+      beta: Int,
+      rootColor: Color,
+      nextSeen: Set[NodeKey]
+  ): Int =
+    move.event match
+      case GameEvent.Checkmate => mode.childCheckmateScore(INF, depth)
+      case GameEvent.Stalemate => 0
+      case _                   => alphaBeta(move.board, depth - 1, alpha, beta, mode.next, rootColor, nextSeen)

@@ -2,7 +2,7 @@ package chess.controller.strategy
 
 import chess.controller.MoveStrategy
 import chess.model.{Board, Color, Square, PromotableRole, MoveResult, GameEvent, CastlingRights, Piece}
-import scala.util.Random
+import SearchSupport.SearchMode
 
 /** Alpha-beta minimax with iterative deepening and a wall-clock time budget.
   *
@@ -25,16 +25,13 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
     (board.squares, board.castlingRights, maximizing)
 
   def selectMove(board: Board, color: Color): Option[(Square, Square, Option[PromotableRole])] =
-    val moves = board.legalMoves(color)
+    val moves = SearchSupport.legalSearchMoves(board, color)
     if moves.isEmpty then return None
 
     val deadline = System.currentTimeMillis() + timeLimitMs
 
     // Depth-0 fallback: use the first legal move so we always have a result.
-    var bestMove: Option[(Square, Square, Option[PromotableRole])] =
-      moves.headOption.map { (from, to) =>
-        (from, to, MoveStrategy.promotionFor(board, from, to, color))
-      }
+    var bestMove: Option[(Square, Square, Option[PromotableRole])] = moves.headOption.map(_.asTuple)
 
     var depth = 1
     var keepGoing = true
@@ -54,52 +51,53 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
       depth: Int,
       deadline: Long
   ): (Option[(Square, Square, Option[PromotableRole])], Boolean) =
-    var bestScore = -INF
-    var bestMoves = List.empty[(Square, Square, Option[PromotableRole])]
     var aborted = false
     var mateFound = false
 
     // Seed the path with the root position (maximizing = true at root).
     val rootPath: Set[NodeKey] = Set(nodeKey(board, maximizing = true))
 
-    val iter = board.legalMoves(color).iterator
+    var bestScore = -INF
+    var bestMoves = List.empty[(Square, Square, Option[PromotableRole])]
+    val iter = SearchSupport.legalSearchMoves(board, color).iterator
     while !aborted && iter.hasNext do
-      val (from, to) = iter.next()
-      val promo = MoveStrategy.promotionFor(board, from, to, color)
-      board.move(from, to, promo).movedOption.foreach { (newBoard, event) =>
-        event match
-          case GameEvent.Checkmate =>
-            // Mate in 1 found — nothing can be better, accept immediately.
-            bestScore = INF
-            bestMoves = List((from, to, promo))
-            mateFound = true
-            aborted = true
-          case GameEvent.Stalemate =>
-            if 0 > bestScore then
-              bestScore = 0
-              bestMoves = List((from, to, promo))
-            else if 0 == bestScore then bestMoves = (from, to, promo) :: bestMoves
-          case _ =>
-            val (score, ab) =
-              alphaBeta(newBoard, depth - 1, -INF, INF, maximizing = false, color, deadline, rootPath)
-            if ab then aborted = true
-            else if score > bestScore then
-              bestScore = score
-              bestMoves = List((from, to, promo))
-            else if score == bestScore then bestMoves = (from, to, promo) :: bestMoves
-      }
+      val move = iter.next()
+      val (score, wasAborted, foundMate) = rootMoveScore(move, depth, color, deadline, rootPath)
+      if foundMate then
+        bestScore = INF
+        bestMoves = List(move.asTuple)
+        mateFound = true
+        aborted = true
+      else if wasAborted then aborted = true
+      else
+        val updated = SearchSupport.updateBestMoves(bestScore, bestMoves, move, score)
+        bestScore = updated._1
+        bestMoves = updated._2
 
-    val result =
-      if bestMoves.isEmpty then None
-      else Some(bestMoves(Random.nextInt(bestMoves.length)))
+    val result = SearchSupport.chooseRandom(bestMoves)
     (result, aborted && !mateFound)
+
+  private def rootMoveScore(
+      move: SearchSupport.SearchMove,
+      depth: Int,
+      color: Color,
+      deadline: Long,
+      rootPath: Set[NodeKey]
+  ): (Int, Boolean, Boolean) =
+    move.event match
+      case GameEvent.Checkmate => (INF, false, true)
+      case GameEvent.Stalemate => (0, false, false)
+      case _ =>
+        val (score, aborted) =
+          alphaBeta(move.board, depth - 1, -INF, INF, SearchMode.Minimize, color, deadline, rootPath)
+        (score, aborted, false)
 
   private def alphaBeta(
       board: Board,
       depth: Int,
       alpha: Int,
       beta: Int,
-      maximizing: Boolean,
+      mode: SearchMode,
       rootColor: Color,
       deadline: Long,
       seenInPath: Set[NodeKey]
@@ -107,65 +105,34 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
     if System.currentTimeMillis() >= deadline then return (0, true)
 
     // Detect repetition within the search path: this line is a draw.
-    val key = nodeKey(board, maximizing)
+    val key = nodeKey(board, mode == SearchMode.Maximize)
     if seenInPath.contains(key) then return (0, false)
 
     if depth == 0 then return (Evaluator.evaluate(board, rootColor), false)
 
-    val currentColor = if maximizing then rootColor else rootColor.opposite
-    val moves = board.legalMoves(currentColor)
-
-    if moves.isEmpty then
-      val score =
-        if board.isInCheck(currentColor) then if maximizing then -INF + (depth * 100) else INF - (depth * 100)
-        else 0
-      return (score, false)
-
-    val nextSeen = seenInPath + key
-
-    if maximizing then
-      var best = -INF
-      var a = alpha
-      var done = false
-      var aborted = false
-      val iter = moves.iterator
-      while !done && !aborted && iter.hasNext do
-        val (from, to) = iter.next()
-        val promo = MoveStrategy.promotionFor(board, from, to, currentColor)
-        board.move(from, to, promo).movedOption.foreach { (newBoard, event) =>
-          val score = event match
-            case GameEvent.Checkmate => INF - (depth * 100)
-            case GameEvent.Stalemate => 0
-            case _ =>
-              val (s, ab) =
-                alphaBeta(newBoard, depth - 1, a, beta, maximizing = false, rootColor, deadline, nextSeen)
-              if ab then aborted = true
-              s
-          if score > best then best = score
-          if best > a then a = best
-          if a >= beta then done = true
+    val currentColor = mode.currentColor(rootColor)
+    SearchSupport
+      .terminalScore(board, currentColor, mode, depth, INF)
+      .map((_, false))
+      .getOrElse {
+        val nextSeen = seenInPath + key
+        val moves = SearchSupport.legalSearchMoves(board, currentColor)
+        SearchSupport.searchChildrenUntilDeadline(moves, mode, alpha, beta, INF) { (move, currentAlpha, currentBeta) =>
+          childScore(move, depth, mode, currentAlpha, currentBeta, rootColor, deadline, nextSeen)
         }
-      (best, aborted)
-    else
-      var best = INF
-      var b = beta
-      var done = false
-      var aborted = false
-      val iter = moves.iterator
-      while !done && !aborted && iter.hasNext do
-        val (from, to) = iter.next()
-        val promo = MoveStrategy.promotionFor(board, from, to, currentColor)
-        board.move(from, to, promo).movedOption.foreach { (newBoard, event) =>
-          val score = event match
-            case GameEvent.Checkmate => -INF + (depth * 100)
-            case GameEvent.Stalemate => 0
-            case _ =>
-              val (s, ab) =
-                alphaBeta(newBoard, depth - 1, alpha, b, maximizing = true, rootColor, deadline, nextSeen)
-              if ab then aborted = true
-              s
-          if score < best then best = score
-          if best < b then b = best
-          if b <= alpha then done = true
-        }
-      (best, aborted)
+      }
+
+  private def childScore(
+      move: SearchSupport.SearchMove,
+      depth: Int,
+      mode: SearchMode,
+      alpha: Int,
+      beta: Int,
+      rootColor: Color,
+      deadline: Long,
+      nextSeen: Set[NodeKey]
+  ): (Int, Boolean) =
+    move.event match
+      case GameEvent.Checkmate => (mode.childCheckmateScore(INF, depth), false)
+      case GameEvent.Stalemate => (0, false)
+      case _                   => alphaBeta(move.board, depth - 1, alpha, beta, mode.next, rootColor, deadline, nextSeen)

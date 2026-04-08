@@ -1,8 +1,8 @@
 package chess.controller.strategy
 
 import chess.controller.MoveStrategy
-import chess.model.{Board, Color, Square, Role, PromotableRole, MoveResult}
-import scala.util.Random
+import chess.model.{Board, Color, Square, PromotableRole, MoveResult}
+import SearchSupport.SearchMode
 
 /** Minimax with alpha-beta pruning extended by a quiescence search at the leaves.
   *
@@ -21,124 +21,63 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
   private val INF = Int.MaxValue / 2
 
   def selectMove(board: Board, color: Color): Option[(Square, Square, Option[PromotableRole])] =
-    val moves = board.legalMoves(color)
+    val moves = SearchSupport.legalSearchMoves(board, color)
     if moves.isEmpty then return None
 
-    var bestScore = -INF
-    var bestMoves = List.empty[(Square, Square, Option[PromotableRole])]
-
-    for (from, to) <- moves do
-      val promo = MoveStrategy.promotionFor(board, from, to, color)
-      board.move(from, to, promo) match
-        case MoveResult.Moved(newBoard, _) =>
-          val score = alphaBeta(newBoard, depth - 1, -INF, INF, maximizing = false, rootColor = color)
-          if score > bestScore then
-            bestScore = score
-            bestMoves = List((from, to, promo))
-          else if score == bestScore then bestMoves = (from, to, promo) :: bestMoves
-        case _ => ()
-
-    if bestMoves.isEmpty then None
-    else Some(bestMoves(Random.nextInt(bestMoves.length)))
+    val (_, bestMoves) =
+      moves.foldLeft((-INF, List.empty[(Square, Square, Option[PromotableRole])])) { case ((bestScore, bestMoves), move) =>
+        val score = alphaBeta(move.board, depth - 1, -INF, INF, SearchMode.Minimize, color)
+        SearchSupport.updateBestMoves(bestScore, bestMoves, move, score)
+      }
+    SearchSupport.chooseRandom(bestMoves)
 
   private def alphaBeta(
       board: Board,
       depth: Int,
       alpha: Int,
       beta: Int,
-      maximizing: Boolean,
+      mode: SearchMode,
       rootColor: Color
   ): Int =
-    if depth == 0 then return quiescence(board, alpha, beta, maximizing, rootColor, qDepth)
+    if depth == 0 then return quiescence(board, alpha, beta, mode, rootColor, qDepth)
 
-    val currentColor = if maximizing then rootColor else rootColor.opposite
-    val moves = board.legalMoves(currentColor)
-
-    if moves.isEmpty then
-      return if board.isInCheck(currentColor) then if maximizing then -INF + (depth * 100) else INF - (depth * 100)
-      else 0
-
-    if maximizing then
-      var best = -INF
-      var a = alpha
-      var done = false
-      val iter = moves.iterator
-      while !done && iter.hasNext do
-        val (from, to) = iter.next()
-        val promo = MoveStrategy.promotionFor(board, from, to, currentColor)
-        board.move(from, to, promo) match
-          case MoveResult.Moved(newBoard, _) =>
-            val score = alphaBeta(newBoard, depth - 1, a, beta, maximizing = false, rootColor)
-            if score > best then best = score
-            if best > a then a = best
-            if a >= beta then done = true
-          case _ => ()
-      best
-    else
-      var best = INF
-      var b = beta
-      var done = false
-      val iter = moves.iterator
-      while !done && iter.hasNext do
-        val (from, to) = iter.next()
-        val promo = MoveStrategy.promotionFor(board, from, to, currentColor)
-        board.move(from, to, promo) match
-          case MoveResult.Moved(newBoard, _) =>
-            val score = alphaBeta(newBoard, depth - 1, alpha, b, maximizing = true, rootColor)
-            if score < best then best = score
-            if best < b then b = best
-            if b <= alpha then done = true
-          case _ => ()
-      best
+    val currentColor = mode.currentColor(rootColor)
+    SearchSupport
+      .terminalScore(board, currentColor, mode, depth, INF)
+      .getOrElse {
+        val moves = SearchSupport.legalSearchMoves(board, currentColor)
+        SearchSupport.searchChildren(moves, mode, alpha, beta, INF) { (move, currentAlpha, currentBeta) =>
+          alphaBeta(move.board, depth - 1, currentAlpha, currentBeta, mode.next, rootColor)
+        }
+      }
 
   /** Search captures only until quiet, to avoid the horizon effect. */
   private def quiescence(
       board: Board,
       alpha: Int,
       beta: Int,
-      maximizing: Boolean,
+      mode: SearchMode,
       rootColor: Color,
       remaining: Int
   ): Int =
     val standPat = Evaluator.evaluate(board, rootColor)
 
-    if maximizing then
+    if mode == SearchMode.Maximize then
       if standPat >= beta then return beta
       if remaining == 0 then return standPat
-      var a = alpha.max(standPat)
-      val currentColor = rootColor
-      val captures = board
-        .legalMoves(currentColor)
-        .filter((_, to) => board.pieceAt(to).isDefined)
-      var done = false
-      val iter = captures.iterator
-      while !done && iter.hasNext do
-        val (from, to) = iter.next()
-        val promo = MoveStrategy.promotionFor(board, from, to, currentColor)
-        board.move(from, to, promo) match
-          case MoveResult.Moved(newBoard, _) =>
-            val score = quiescence(newBoard, a, beta, maximizing = false, rootColor, remaining - 1)
-            if score > a then a = score
-            if a >= beta then done = true
-          case _ => ()
-      a
+      val captures = captureMoves(board, rootColor)
+      if captures.isEmpty then return alpha.max(standPat)
+      SearchSupport.searchChildren(captures, SearchMode.Maximize, alpha.max(standPat), beta, INF) { (move, currentAlpha, currentBeta) =>
+        quiescence(move.board, currentAlpha, currentBeta, SearchMode.Minimize, rootColor, remaining - 1)
+      }
     else
       if standPat <= alpha then return alpha
       if remaining == 0 then return standPat
-      var b = beta.min(standPat)
-      val currentColor = rootColor.opposite
-      val captures = board
-        .legalMoves(currentColor)
-        .filter((_, to) => board.pieceAt(to).isDefined)
-      var done = false
-      val iter = captures.iterator
-      while !done && iter.hasNext do
-        val (from, to) = iter.next()
-        val promo = MoveStrategy.promotionFor(board, from, to, currentColor)
-        board.move(from, to, promo) match
-          case MoveResult.Moved(newBoard, _) =>
-            val score = quiescence(newBoard, alpha, b, maximizing = true, rootColor, remaining - 1)
-            if score < b then b = score
-            if b <= alpha then done = true
-          case _ => ()
-      b
+      val captures = captureMoves(board, rootColor.opposite)
+      if captures.isEmpty then return beta.min(standPat)
+      SearchSupport.searchChildren(captures, SearchMode.Minimize, alpha, beta.min(standPat), INF) { (move, currentAlpha, currentBeta) =>
+        quiescence(move.board, currentAlpha, currentBeta, SearchMode.Maximize, rootColor, remaining - 1)
+      }
+
+  private def captureMoves(board: Board, color: Color): Vector[SearchSupport.SearchMove] =
+    SearchSupport.legalSearchMoves(board, color).filter(move => board.pieceAt(move.to).isDefined)
