@@ -123,6 +123,37 @@ chess/
 sbt test
 ```
 
+## Quality Checks
+
+The project is set up to support automated quality checks from the start:
+
+- **GitHub Actions** for build and test automation
+- **scoverage** for Scala coverage reports
+- **Coveralls** for coverage history and pull request visibility
+- **SonarQube** for static analysis and maintainability review
+
+Useful local commands:
+
+```bash
+# Compile and run tests
+sbt clean compile test
+
+# Generate aggregated coverage reports
+sbt clean coverage test coverageAggregate
+```
+
+GitHub Actions uses:
+
+- [.github/workflows/ci.yml](/Users/markoboger/workspace/chess/.github/workflows/ci.yml)
+- [sonar-project.properties](/Users/markoboger/workspace/chess/sonar-project.properties)
+
+Required GitHub secrets for SonarQube:
+
+- `SONAR_TOKEN`
+- `SONAR_HOST_URL`
+
+Coveralls is uploaded through `sbt-coveralls` in CI.
+
 **Expected Output:**
 ```
 [info] Total number of tests run: 93

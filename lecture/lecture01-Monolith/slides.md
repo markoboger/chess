@@ -238,6 +238,95 @@ Then verify the answers in the actual code.
 
 ---
 
+# Quality From Day One
+
+Even in Lecture 01, the project should start with a clean engineering setup:
+
+- automated build on every push
+- automated test execution
+- coverage reporting
+- static quality analysis
+
+Why so early?
+
+- AI can generate code quickly
+- quality tooling tells us when it generated nonsense quickly
+
+---
+
+# Tooling Reminder
+
+For this project, students should set up:
+
+- **GitHub Actions**
+  to run build and tests automatically
+- **Coveralls**
+  to visualize code coverage over time
+- **SonarQube**
+  to inspect code quality, smells, and maintainability risks
+
+These tools do not replace tests.
+They reinforce discipline.
+
+---
+
+# Suggested Pipeline
+
+```text
+git push / pull request
+        │
+        ▼
+GitHub Actions
+        │
+        ├── sbt compile
+        ├── sbt test
+        ├── scoverage report
+        ├── Coveralls upload
+        └── SonarQube scan
+```
+
+This is one of the earliest examples of architecture beyond code.
+
+---
+
+# Why Students Need This Reminder
+
+- teams forget CI until it hurts
+- coverage is easy to postpone
+- SonarQube is valuable only if it starts early
+- project hygiene is part of architecture, not admin work
+
+The earlier the feedback loop starts, the more useful it is.
+
+---
+
+# Lecture 01 Task Extension
+
+## Set up project quality automation
+
+Each team should:
+
+1. create a GitHub Actions workflow for build and test
+2. enable `scoverage`
+3. connect the repository to Coveralls
+4. configure a SonarQube scan
+5. verify that one push produces all reports successfully
+
+---
+
+# Deliverables for the Setup Task
+
+- one GitHub Actions workflow file
+- one successful CI run
+- coverage visible in Coveralls
+- SonarQube scan visible for the repository
+- a short note describing:
+  - which command CI runs
+  - where the secrets are configured
+  - which failures should block a merge
+
+---
+
 # Key Message
 
 ## We are not replacing software architecture with AI
@@ -263,10 +352,3 @@ The monolith is our control group for the rest of the course.
 - using AI to propose abstractions without losing clarity
 
 ---
-
-# Feedback I Need From You
-
-- Is this close enough to your speaking style?
-- Should Lecture 01 be more technical or more motivational?
-- Do you want more diagrams or more concrete repo screenshots?
-- Should I build in speaker notes next?
