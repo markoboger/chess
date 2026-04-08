@@ -78,6 +78,9 @@ jobs:
       - name: Run coverage
         run: sbt clean coverage test coverageAggregate
 
+      - name: Convert JUnit XML reports to Sonar generic test execution
+        run: python3 .sonar/convert_junit_to_sonar.py
+
       - name: Upload coverage report to Coveralls
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -94,6 +97,7 @@ jobs:
             app/target/scala-3.5.0/scoverage-report
             data/target/scala-3.5.0/scoverage-report
             realtime/target/scala-3.5.0/scoverage-report
+            .sonar/test-exec.xml
           if-no-files-found: warn
 
       - name: SonarQube Scan
@@ -102,4 +106,3 @@ jobs:
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
-

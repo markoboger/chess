@@ -1,5 +1,8 @@
 # Chess Application
 
+[![CI](https://github.com/markoboger/chess/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/markoboger/chess/actions/workflows/ci.yml)
+[![Coverage Status](https://coveralls.io/repos/github/markoboger/chess/badge.svg?branch=main)](https://coveralls.io/github/markoboger/chess?branch=main)
+
 A complete, production-ready chess application built in Scala with **multiple user interfaces** (ScalaFX GUI, Console, Dual UI), comprehensive move validation, en passant support, and full PGN/FEN notation support.
 
 ## Quick Start
@@ -146,6 +149,9 @@ GitHub Actions uses:
 
 - [.github/workflows/ci.yml](/Users/markoboger/workspace/chess/.github/workflows/ci.yml)
 - [sonar-project.properties](/Users/markoboger/workspace/chess/sonar-project.properties)
+
+The live SonarQube badge URL depends on the concrete Sonar host and project endpoint.
+Add that badge once the public Sonar dashboard URL is known for this repository.
 
 Required GitHub secrets for SonarQube:
 
