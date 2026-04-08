@@ -1,23 +1,21 @@
 package chess
 
+import chess.AppBindings.given
+import chess.aview.ChessGUI
+import chess.aview.ConsoleView
+import chess.aview.richTui.TuiShell
 import chess.controller.GameController
 import chess.model.Board
-import chess.aview.{ConsoleView, ChessGUI}
-import chess.AppBindings.given
 
-object ChessApp:
-  def main(args: Array[String]): Unit = {
-    println(welcomeBanner())
+object ChessGuiApp:
+  def main(args: Array[String]): Unit =
+    ChessGUI.main(args)
+
+object ChessTuiApp:
+  def main(args: Array[String]): Unit =
+    TuiShell.run()
+
+object ChessConsoleApp:
+  def main(args: Array[String]): Unit =
     val controller = new GameController(Board.initial)
-    ChessGUI.startInBackground(controller)
     new ConsoleView(controller).run()
-  }
-
-  private def welcomeBanner(): String = {
-    val separator = "=" * 60
-    s"""$separator
-       |Chess Game - Dual UI Mode
-       |Starting both ScalaFX GUI and Console...
-       |$separator
-       |""".stripMargin
-  }
