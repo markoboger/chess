@@ -48,3 +48,4 @@ scoverage-report/
 metals.sbt
 project/metals.sbt
 frontend/.vite/
+.sonar/test-exec.xml
