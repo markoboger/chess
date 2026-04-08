@@ -185,3 +185,4 @@ Marp config:
 - the desktop app still provides the most direct way to explore the chess logic
 - the web app and service stack reflect the later lecture stages
 - coverage exclusions intentionally leave out bootstrap-heavy classes such as GUI startup and server wrappers so the report focuses on meaningful behavior
+- CI publishes coverage to Coveralls and static-analysis results to SonarCloud
