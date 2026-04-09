@@ -105,8 +105,10 @@ const CHECK_COLOR = '#e74c3c'
 const CHECKMATE_COLOR = '#c0392b'
 
 function isLight(square: string): boolean {
-  const f = square.charCodeAt(0) - 'a'.charCodeAt(0)
-  const r = parseInt(square[1])
+  const fileCode = square.codePointAt(0) ?? 0
+  const aCode = 'a'.codePointAt(0) ?? 0
+  const f = fileCode - aCode
+  const r = Number.parseInt(square[1] ?? '0', 10)
   return (f + r) % 2 === 0
 }
 

@@ -28,7 +28,7 @@ async function loadAllPuzzles(): Promise<PuzzleData[]> {
     const id = parts[0].trim()
     const fen = parts[1].trim()
     const solution = parts[2].trim().split(' ').filter(m => m.length > 0)
-    const rating = parseInt(parts[3]) || 1500
+    const rating = Number.parseInt(parts[3] ?? '', 10) || 1500
     const themes = (parts[7] ?? '').trim().split(' ').filter(t => t.length > 0)
 
     if (!id || !fen || solution.length < 2) continue
