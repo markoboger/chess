@@ -150,25 +150,43 @@ object PGNParser {
       boardBefore: Board,
       boardAfter: Board,
       isWhite: Boolean
-  ): String = {
+  ): String =
     val piece = boardBefore.pieceAt(from).get
     val opponent = if (isWhite) Color.Black else Color.White
-    val isCapture = boardBefore.pieceAt(to).isDefined ||
-      (piece.role == Role.Pawn && from.file != to.file) // en passant
-
-    // Castling
-    if (piece.role == Role.King && (to.file - from.file).abs == 2) {
-      val base = if (to.file.index > from.file.index) "O-O" else "O-O-O"
-      val suffix =
-        if (boardAfter.isCheckmate(opponent)) "#"
-        else if (boardAfter.isInCheck(opponent)) "+"
-        else ""
-      return base + suffix
+    val isCapture = isCaptureMove(piece, from, to, boardBefore)
+    val suffix = checkSuffix(boardAfter, opponent)
+    castleNotation(piece, from, to, suffix).getOrElse {
+      val sb = new StringBuilder
+      appendPiecePrefix(sb, piece.role, from, isCapture)
+      appendDisambiguation(sb, piece, from, to, boardBefore)
+      if (isCapture) sb.append("x")
+      sb.append(to.toString)
+      appendPromotion(sb, piece.role, to, boardAfter)
+      sb.append(suffix)
+      sb.toString
     }
 
-    val sb = new StringBuilder
+  private def isCaptureMove(piece: chess.model.Piece, from: Square, to: Square, boardBefore: Board): Boolean =
+    boardBefore.pieceAt(to).isDefined || (piece.role == Role.Pawn && from.file != to.file)
 
-    piece.role match {
+  private def castleNotation(
+      piece: chess.model.Piece,
+      from: Square,
+      to: Square,
+      suffix: String
+  ): Option[String] =
+    Option.when(piece.role == Role.King && (to.file - from.file).abs == 2) {
+      val base = if (to.file.index > from.file.index) "O-O" else "O-O-O"
+      base + suffix
+    }
+
+  private def checkSuffix(boardAfter: Board, opponent: Color): String =
+    if (boardAfter.isCheckmate(opponent)) "#"
+    else if (boardAfter.isInCheck(opponent)) "+"
+    else ""
+
+  private def appendPiecePrefix(sb: StringBuilder, role: Role, from: Square, isCapture: Boolean): Unit =
+    role match
       case Role.Pawn =>
         if (isCapture) sb.append(from.file.letter)
       case Role.Knight => sb.append("N")
@@ -176,48 +194,61 @@ object PGNParser {
       case Role.Rook   => sb.append("R")
       case Role.Queen  => sb.append("Q")
       case Role.King   => sb.append("K")
-    }
 
-    // Disambiguation for non-pawn pieces
-    if (piece.role != Role.Pawn && piece.role != Role.King) {
-      val others = Square.all.filter { sq =>
-        sq != from &&
-        boardBefore
-          .pieceAt(sq)
-          .exists(p => p.role == piece.role && p.color == piece.color) &&
-        boardBefore.canMoveIgnoringCheck(sq, to)
-      }
-      if (others.nonEmpty) {
+  private def appendDisambiguation(
+      sb: StringBuilder,
+      piece: chess.model.Piece,
+      from: Square,
+      to: Square,
+      boardBefore: Board
+  ): Unit =
+    if piece.role != Role.Pawn && piece.role != Role.King then
+      val others = competingPieces(piece, from, to, boardBefore)
+      if others.nonEmpty then
         val sameFile = others.exists(_.file == from.file)
         val sameRank = others.exists(_.rank == from.rank)
         if (!sameFile) sb.append(from.file.letter)
         else if (!sameRank) sb.append(from.rank.index)
-        else { sb.append(from.file.letter); sb.append(from.rank.index) }
-      }
+        else
+          sb.append(from.file.letter)
+          sb.append(from.rank.index)
+
+  private def competingPieces(
+      piece: chess.model.Piece,
+      from: Square,
+      to: Square,
+      boardBefore: Board
+  ): Vector[Square] =
+    Square.all.filter { sq =>
+      sq != from &&
+      boardBefore
+        .pieceAt(sq)
+        .exists(p => p.role == piece.role && p.color == piece.color) &&
+      boardBefore.canMoveIgnoringCheck(sq, to)
     }
 
-    if (isCapture) sb.append("x")
-    sb.append(to.toString)
-
-    // Pawn promotion
-    if piece.role == Role.Pawn then
-      boardAfter.pieceAt(to).foreach { arrived =>
-        if arrived.role != Role.Pawn then
-          sb.append("=")
-          sb.append(arrived.role match {
-            case Role.Queen  => "Q"
-            case Role.Rook   => "R"
-            case Role.Bishop => "B"
-            case Role.Knight => "N"
-            case _           => ""
-          })
+  private def appendPromotion(
+      sb: StringBuilder,
+      role: Role,
+      to: Square,
+      boardAfter: Board
+  ): Unit =
+    if role == Role.Pawn then
+      promotedPieceAt(to, boardAfter).foreach { promoted =>
+        sb.append("=")
+        sb.append(promoted)
       }
 
-    // Check / checkmate
-    if (boardAfter.isCheckmate(opponent)) sb.append("#")
-    else if (boardAfter.isInCheck(opponent)) sb.append("+")
-
-    sb.toString
-  }
+  private def promotedPieceAt(to: Square, boardAfter: Board): Option[String] =
+    boardAfter.pieceAt(to).flatMap { arrived =>
+      Option.when(arrived.role != Role.Pawn) {
+        arrived.role match
+          case Role.Queen  => "Q"
+          case Role.Rook   => "R"
+          case Role.Bishop => "B"
+          case Role.Knight => "N"
+          case _           => ""
+      }.filter(_.nonEmpty)
+    }
 
 }

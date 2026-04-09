@@ -60,70 +60,17 @@ final case class Board(
     !(applyMoveUnchecked(from, to) eq this)
 
   private[model] def applyMoveUnchecked(from: Square, to: Square, promotion: Option[PromotableRole] = None): Board =
-    // Check if source square has a piece
     pieceAt(from) match
       case None        => this
       case Some(piece) =>
-        // Check if destination is occupied by own piece, or if a king would capture a king
-        // (kings can never capture kings — the capturing king would have had to step into
-        // an attacked square, which is illegal and must be caught here before the enemy
-        // king is removed from the board and can no longer threaten the destination).
-        pieceAt(to) match
-          case Some(targetPiece) if targetPiece.color == piece.color => return this
-          case Some(targetPiece) if targetPiece.role == Role.King    => return this
-          case _                                                     => ()
-
-        // Validate move based on piece type
-        val isValid = piece.role match
-          case Role.Pawn   => isValidPawnMove(from, to, piece.color)
-          case Role.Knight => isValidKnightMove(from, to)
-          case Role.Bishop => isValidBishopMove(from, to)
-          case Role.Rook   => isValidRookMove(from, to)
-          case Role.Queen  => isValidQueenMove(from, to)
-          case Role.King   => isValidKingMove(from, to) || isValidCastling(from, to, piece.color)
-
-        if !isValid then return this
-
-        // Apply the move
-        def updateSquare(
-            fs: Vector[Vector[Option[Piece]]],
-            sq: Square,
-            value: Option[Piece]
-        ) =
-          val rowIndex = 8 - sq.rank.index
-          val colIndex = sq.file.index - 1
-          val row = fs(rowIndex).updated(colIndex, value)
-          fs.updated(rowIndex, row)
-
-        var finalSquares = updateSquare(squares, from, None)
-        finalSquares = updateSquare(finalSquares, to, Some(piece))
-
-        // Handle en passant capture
-        if piece.role == Role.Pawn && isEnPassantCapture(from, to, piece.color) then
-          val capturedSquare = Square(to.file, from.rank)
-          finalSquares = updateSquare(finalSquares, capturedSquare, None)
-
-        // Handle pawn promotion — default to Queen when no piece specified (for legality checks)
-        if piece.role == Role.Pawn && isPromotionSquare(piece, to) then
-          val promotedRole = promotion.getOrElse(PromotableRole.Queen).toRole
-          finalSquares = updateSquare(finalSquares, to, Some(Piece(promotedRole, piece.color)))
-
-        // Handle castling — relocate the rook
-        if piece.role == Role.King && (to.file - from.file).abs == 2 then
-          val isKingside = to.file.index > from.file.index
-          val rookFromFile = if isKingside then File.H else File.A
-          val rookToFile = if isKingside then File.F else File.D
-          val rookFrom = Square(rookFromFile, from.rank)
-          val rookTo = Square(rookToFile, from.rank)
-          finalSquares = updateSquare(finalSquares, rookFrom, None)
-          finalSquares = updateSquare(finalSquares, rookTo, Some(Piece(Role.Rook, piece.color)))
-
-        val newCastlingRights = piece.role match
-          case Role.King => castlingRights.revokeKing(piece.color)
-          case Role.Rook => castlingRights.revokeRook(from)
-          case _         => castlingRights
-
-        copy(squares = finalSquares, lastMove = Some((from, to)), castlingRights = newCastlingRights)
+        if invalidDestination(piece, to) || !isValidMoveFor(piece, from, to) then this
+        else
+          val movedSquares = applyPieceMove(piece, from, to, promotion)
+          copy(
+            squares = movedSquares,
+            lastMove = Some((from, to)),
+            castlingRights = updatedCastlingRights(piece, from)
+          )
 
   private def isValidPawnMove(
       from: Square,
@@ -132,36 +79,12 @@ final case class Board(
   ): Boolean =
     val direction = if color == Color.White then 1 else -1
     val startRank = if color == Color.White then Rank._2 else Rank._7
-
-    // Pawn can only move forward
     val rankDiff = to.rank - from.rank
     val fileDiff = (to.file - from.file).abs
-
-    // Check if moving forward in correct direction
     if rankDiff * direction <= 0 then return false
-
-    // Single square forward (must be empty)
-    if rankDiff * direction == 1 && fileDiff == 0 then return pieceAt(to).isEmpty
-
-    // Two squares forward from starting position (must be empty)
-    if rankDiff * direction == 2 && fileDiff == 0 && from.rank == startRank then
-      val middleSquare =
-        from.rank.offset(direction).map(r => Square(to.file, r))
-      return middleSquare.exists(sq => pieceAt(sq).isEmpty) && pieceAt(
-        to
-      ).isEmpty
-
-    // Diagonal capture (one square diagonally forward, must have opponent piece or en passant)
-    if rankDiff * direction == 1 && fileDiff == 1 then
-      // Regular capture
-      pieceAt(to) match
-        case Some(targetPiece) if targetPiece.color != color => return true
-        case _                                               => ()
-
-      // En passant capture
-      if isEnPassantCapture(from, to, color) then return true
-
-    false
+    isSinglePawnAdvance(rankDiff, direction, fileDiff, to) ||
+    isDoublePawnAdvance(from, to, rankDiff, fileDiff, direction, startRank) ||
+    isPawnCapture(from, to, rankDiff, fileDiff, direction, color)
 
   private def isEnPassantCapture(
       from: Square,
@@ -185,28 +108,130 @@ final case class Board(
     // Check if last move was opponent pawn moving 2 squares to the side
     lastMove match
       case Some((lastFrom, lastTo)) =>
-        // Last move must be a pawn moving 2 squares
         val lastDirection = if color == Color.White then -1 else 1
         val lastStartRank =
           if color == Color.White then Rank._7 else Rank._2
         val lastRankDiff = lastTo.rank - lastFrom.rank
-
-        // Check if opponent pawn moved 2 squares from starting position
-        if lastFrom.rank != lastStartRank then return false
-        if lastRankDiff != 2 * lastDirection then return false
-
-        // After verifying a 2-square move from starting rank, the pawn
-        // always lands on the same rank as the capturing pawn, so only
-        // the file adjacency needs checking.
-        if lastTo.file != to.file then return false
-
-        // Verify there's an opponent pawn at the captured square
-        val capturedSquare = Square(to.file, from.rank)
-        pieceAt(capturedSquare) match
-          case Some(capturedPiece) if capturedPiece.role == Role.Pawn && capturedPiece.color != color =>
-            true
-          case _ => false
+        isMatchingDoubleStep(lastFrom, lastTo, lastStartRank, lastDirection) &&
+        lastTo.file == to.file &&
+        hasCapturablePawnAt(Square(to.file, from.rank), color)
       case None => false
+
+  private def invalidDestination(piece: Piece, to: Square): Boolean =
+    pieceAt(to).exists(target => target.color == piece.color || target.role == Role.King)
+
+  private def isValidMoveFor(piece: Piece, from: Square, to: Square): Boolean =
+    piece.role match
+      case Role.Pawn   => isValidPawnMove(from, to, piece.color)
+      case Role.Knight => isValidKnightMove(from, to)
+      case Role.Bishop => isValidBishopMove(from, to)
+      case Role.Rook   => isValidRookMove(from, to)
+      case Role.Queen  => isValidQueenMove(from, to)
+      case Role.King   => isValidKingMove(from, to) || isValidCastling(from, to, piece.color)
+
+  private def updateSquare(
+      fs: Vector[Vector[Option[Piece]]],
+      sq: Square,
+      value: Option[Piece]
+  ): Vector[Vector[Option[Piece]]] =
+    val rowIndex = 8 - sq.rank.index
+    val colIndex = sq.file.index - 1
+    val row = fs(rowIndex).updated(colIndex, value)
+    fs.updated(rowIndex, row)
+
+  private def applyPieceMove(
+      piece: Piece,
+      from: Square,
+      to: Square,
+      promotion: Option[PromotableRole]
+  ): Vector[Vector[Option[Piece]]] =
+    val baseSquares = updateSquare(updateSquare(squares, from, None), to, Some(piece))
+    val afterEnPassant = applyEnPassantIfNeeded(baseSquares, piece, from, to)
+    val afterPromotion = applyPromotionIfNeeded(afterEnPassant, piece, to, promotion)
+    applyCastlingRookMoveIfNeeded(afterPromotion, piece, from, to)
+
+  private def applyEnPassantIfNeeded(
+      currentSquares: Vector[Vector[Option[Piece]]],
+      piece: Piece,
+      from: Square,
+      to: Square
+  ): Vector[Vector[Option[Piece]]] =
+    if piece.role == Role.Pawn && isEnPassantCapture(from, to, piece.color) then
+      updateSquare(currentSquares, Square(to.file, from.rank), None)
+    else currentSquares
+
+  private def applyPromotionIfNeeded(
+      currentSquares: Vector[Vector[Option[Piece]]],
+      piece: Piece,
+      to: Square,
+      promotion: Option[PromotableRole]
+  ): Vector[Vector[Option[Piece]]] =
+    if piece.role == Role.Pawn && isPromotionSquare(piece, to) then
+      val promotedRole = promotion.getOrElse(PromotableRole.Queen).toRole
+      updateSquare(currentSquares, to, Some(Piece(promotedRole, piece.color)))
+    else currentSquares
+
+  private def applyCastlingRookMoveIfNeeded(
+      currentSquares: Vector[Vector[Option[Piece]]],
+      piece: Piece,
+      from: Square,
+      to: Square
+  ): Vector[Vector[Option[Piece]]] =
+    if piece.role == Role.King && (to.file - from.file).abs == 2 then
+      val isKingside = to.file.index > from.file.index
+      val rookFrom = Square(if isKingside then File.H else File.A, from.rank)
+      val rookTo = Square(if isKingside then File.F else File.D, from.rank)
+      updateSquare(updateSquare(currentSquares, rookFrom, None), rookTo, Some(Piece(Role.Rook, piece.color)))
+    else currentSquares
+
+  private def updatedCastlingRights(piece: Piece, from: Square): CastlingRights =
+    piece.role match
+      case Role.King => castlingRights.revokeKing(piece.color)
+      case Role.Rook => castlingRights.revokeRook(from)
+      case _         => castlingRights
+
+  private def isSinglePawnAdvance(rankDiff: Int, direction: Int, fileDiff: Int, to: Square): Boolean =
+    rankDiff * direction == 1 && fileDiff == 0 && pieceAt(to).isEmpty
+
+  private def isDoublePawnAdvance(
+      from: Square,
+      to: Square,
+      rankDiff: Int,
+      fileDiff: Int,
+      direction: Int,
+      startRank: Rank
+  ): Boolean =
+    rankDiff * direction == 2 &&
+    fileDiff == 0 &&
+    from.rank == startRank &&
+    from.rank.offset(direction).exists(r => pieceAt(Square(to.file, r)).isEmpty) &&
+    pieceAt(to).isEmpty
+
+  private def isPawnCapture(
+      from: Square,
+      to: Square,
+      rankDiff: Int,
+      fileDiff: Int,
+      direction: Int,
+      color: Color
+  ): Boolean =
+    rankDiff * direction == 1 &&
+    fileDiff == 1 &&
+    (hasOpponentPieceAt(to, color) || isEnPassantCapture(from, to, color))
+
+  private def hasOpponentPieceAt(square: Square, color: Color): Boolean =
+    pieceAt(square).exists(_.color != color)
+
+  private def isMatchingDoubleStep(
+      lastFrom: Square,
+      lastTo: Square,
+      lastStartRank: Rank,
+      lastDirection: Int
+  ): Boolean =
+    lastFrom.rank == lastStartRank && (lastTo.rank - lastFrom.rank) == 2 * lastDirection
+
+  private def hasCapturablePawnAt(square: Square, color: Color): Boolean =
+    pieceAt(square).exists(piece => piece.role == Role.Pawn && piece.color != color)
 
   private def isValidKnightMove(from: Square, to: Square): Boolean =
     val fileDiff = (to.file - from.file).abs

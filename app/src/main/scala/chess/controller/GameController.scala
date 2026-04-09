@@ -256,47 +256,76 @@ final class GameController(initialBoard: Board)(using
     if !isAtLatest then return MoveResult.Failed(board, MoveError.InvalidMove)
     val boardBefore = board
     val wasWhite = _isWhiteToMove
-    val movingPiece = board.pieceAt(from)
-    val isPawnMove = movingPiece.exists(_.role == Role.Pawn)
-    val isEnPassantCapture =
-      movingPiece.exists(_.role == Role.Pawn) && from.file != to.file && board.pieceAt(to).isEmpty
-    val isCapture = board.pieceAt(to).isDefined || isEnPassantCapture
-    val result = board.pieceAt(from) match
-      case Some(piece) if piece.color == activeColor =>
+    val moveFacts = MoveFacts.from(boardBefore, from, to)
+    val result = validateActivePiece(from) match
+      case Left(error) => MoveResult.Failed(board, error)
+      case Right(_) =>
         board.move(from, to, promotion) match
           case moved: MoveResult.Moved =>
-            val pgn = PGNParser.toAlgebraic(
-              from,
-              to,
-              boardBefore,
-              moved.board,
-              wasWhite
-            )
-            currentBoard = moved.board
-            _isWhiteToMove = !_isWhiteToMove
-            _halfmoveClock = if isPawnMove || isCapture then 0 else _halfmoveClock + 1
-            _fullmoveNumber = if wasWhite then _fullmoveNumber else _fullmoveNumber + 1
-            _history = _history :+ HistoryState(
-              board = moved.board,
-              whiteToMove = _isWhiteToMove,
-              halfmoveClock = _halfmoveClock,
-              fullmoveNumber = _fullmoveNumber
-            )
-            _pgnMoves = _pgnMoves :+ pgn
-            _currentIndex = _history.length - 1
-            _redoHistory = Vector.empty
-            _redoMoves = Vector.empty
-            val key = positionKey(moved.board, _isWhiteToMove)
-            val count = positionCounts.getOrElse(key, 0) + 1
-            positionCounts = positionCounts.updated(key, count)
-            if count >= 3 then MoveResult.Moved(moved.board, GameEvent.ThreefoldRepetition)
-            else moved
+            finalizeSuccessfulMove(from, to, boardBefore, wasWhite, moveFacts, moved)
           case failed: MoveResult.Failed =>
             failed
-      case Some(_) => MoveResult.Failed(board, MoveError.WrongColor)
-      case None    => MoveResult.Failed(board, MoveError.NoPiece)
     notifyObservers(result)
     result
+
+  private def validateActivePiece(from: Square): Either[MoveError, Piece] =
+    board.pieceAt(from) match
+      case Some(piece) if piece.color == activeColor => Right(piece)
+      case Some(_)                                   => Left(MoveError.WrongColor)
+      case None                                      => Left(MoveError.NoPiece)
+
+  private def finalizeSuccessfulMove(
+      from: Square,
+      to: Square,
+      boardBefore: Board,
+      wasWhite: Boolean,
+      moveFacts: MoveFacts,
+      moved: MoveResult.Moved
+  ): MoveResult =
+    val pgn = PGNParser.toAlgebraic(from, to, boardBefore, moved.board, wasWhite)
+    currentBoard = moved.board
+    _isWhiteToMove = !_isWhiteToMove
+    _halfmoveClock = nextHalfmoveClock(moveFacts)
+    _fullmoveNumber = nextFullmoveNumber(wasWhite)
+    appendHistory(moved.board, pgn)
+    val repetitionCount = updatePositionCount(moved.board, _isWhiteToMove)
+    if repetitionCount >= 3 then MoveResult.Moved(moved.board, GameEvent.ThreefoldRepetition)
+    else moved
+
+  private def nextHalfmoveClock(moveFacts: MoveFacts): Int =
+    if moveFacts.isPawnMove || moveFacts.isCapture then 0 else _halfmoveClock + 1
+
+  private def nextFullmoveNumber(wasWhite: Boolean): Int =
+    if wasWhite then _fullmoveNumber else _fullmoveNumber + 1
+
+  private def appendHistory(nextBoard: Board, pgn: String): Unit =
+    _history = _history :+ HistoryState(
+      board = nextBoard,
+      whiteToMove = _isWhiteToMove,
+      halfmoveClock = _halfmoveClock,
+      fullmoveNumber = _fullmoveNumber
+    )
+    _pgnMoves = _pgnMoves :+ pgn
+    _currentIndex = _history.length - 1
+    _redoHistory = Vector.empty
+    _redoMoves = Vector.empty
+
+  private def updatePositionCount(board: Board, whiteToMove: Boolean): Int =
+    val key = positionKey(board, whiteToMove)
+    val count = positionCounts.getOrElse(key, 0) + 1
+    positionCounts = positionCounts.updated(key, count)
+    count
+
+  private case class MoveFacts(isPawnMove: Boolean, isCapture: Boolean)
+
+  private object MoveFacts:
+    def from(board: Board, from: Square, to: Square): MoveFacts =
+      val movingPiece = board.pieceAt(from)
+      val isPawnMove = movingPiece.exists(_.role == Role.Pawn)
+      val isEnPassantCapture =
+        isPawnMove && from.file != to.file && board.pieceAt(to).isEmpty
+      val isCapture = board.pieceAt(to).isDefined || isEnPassantCapture
+      MoveFacts(isPawnMove, isCapture)
 
   /** Load a game from PGN move text (e.g. "1. e4 e5 2. Nf3 Nc6"). Resets to the initial board and applies all moves in
     * sequence.
