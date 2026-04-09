@@ -3,10 +3,15 @@ marp: true
 title: "Lecture 04: HTTP Interface"
 description: "Expose the monolithic chess application through a REST API"
 paginate: true
+themeSet: "../themes/htwg.css"
 theme: htwg
+footer: "![](../themes/htwgin40.png)&nbsp;&nbsp;Prof. Dr. Marko Boger"
 ---
 
 <!-- _class: title -->
+<!-- _footer: "" -->
+<!-- _paginate: false -->
+![bg](../themes/htwgin-titel.png)
 # Lecture 04
 ## HTTP Interface for the Monolith
 

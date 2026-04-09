@@ -3,10 +3,15 @@ marp: true
 title: "Lecture 07: Persistence"
 description: "Persistence Layer, PostgreSQL, Slick, MongoDB, and Polyglot Persistence"
 paginate: true
+themeSet: "../themes/htwg.css"
 theme: htwg
+footer: "![](../themes/htwgin40.png)&nbsp;&nbsp;Prof. Dr. Marko Boger"
 ---
 
 <!-- _class: title -->
+<!-- _footer: "" -->
+<!-- _paginate: false -->
+![bg](../themes/htwgin-titel.png)
 # Lecture 07
 ## Persistence Layer
 

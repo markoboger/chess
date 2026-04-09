@@ -3,10 +3,15 @@ marp: true
 title: "Lecture 03: Import and Export"
 description: "Parsers, Grammars, JSON, FEN, PGN, and Dependency Injection"
 paginate: true
+themeSet: "../themes/htwg.css"
 theme: htwg
+footer: "![](../themes/htwgin40.png)&nbsp;&nbsp;Prof. Dr. Marko Boger"
 ---
 
 <!-- _class: title -->
+<!-- _footer: "" -->
+<!-- _paginate: false -->
+![bg](../themes/htwgin-titel.png)
 # Lecture 03
 ## Import and Export
 
@@ -493,11 +498,11 @@ That makes it much easier to explain than a giant regular expression.
 
 # Tradeoffs Between the Three
 
-| Approach | Strength | Weakness |
-|---|---|---|
-| Regex | fast, small, simple for small formats | poor maintainability |
-| Combinators | readable, close to grammar | can be slower |
-| FastParse | readable and performant | extra dependency, different style |
+| Approach    | Strength                              | Weakness                          |
+| ----------- | ------------------------------------- | --------------------------------- |
+| Regex       | fast, small, simple for small formats | poor maintainability              |
+| Combinators | readable, close to grammar            | can be slower                     |
+| FastParse   | readable and performant               | extra dependency, different style |
 
 The right choice depends on:
 
