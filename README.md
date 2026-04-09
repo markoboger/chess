@@ -56,6 +56,30 @@ The compose setup includes:
 
 See [docker-compose.yml](/Users/markoboger/workspace/chess/docker-compose.yml).
 
+### Local Secrets
+
+For local database-backed tools such as the seeder:
+
+1. copy `.env.example` to `.env`
+2. fill in your real credentials
+3. export the variables into your shell before running the app
+
+Example:
+
+```bash
+set -a
+source .env
+set +a
+```
+
+Then run the seeder or other database-backed tools normally.
+
+Docker Compose also reads `.env` automatically for variable substitution in
+[docker-compose.yml](/Users/markoboger/workspace/chess/docker-compose.yml), so the
+same local secret file can be used for both:
+- local command-line tools
+- the compose stack
+
 ## Architecture
 
 The codebase is split into a few clear modules:
@@ -161,7 +185,26 @@ CI configuration:
 
 Required GitHub secrets for SonarQube:
 - `SONAR_TOKEN`
-- `SONAR_HOST_URL`
+
+Recommended GitHub secrets for database-backed workflows:
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `MONGO_USER`
+- `MONGO_PASSWORD`
+- optionally `MONGO_URI`
+
+GitHub setup:
+1. open the repository on GitHub
+2. go to `Settings`
+3. go to `Secrets and variables` -> `Actions`
+4. add each secret as a `Repository secret`
+
+Important:
+- real secrets should not be committed to git
+- `.env` is ignored locally
+- `.env.example` is the safe template to commit
+- in GitHub Actions, use `${{ secrets.NAME }}` to pass secrets into workflow steps
+- GitHub secrets are not read automatically by local `docker compose`; local compose uses `.env`
 
 ## Persistence and Data
 
@@ -172,6 +215,9 @@ The repo contains both raw and analytical persistence flows:
 - seed/import utilities under [seeder](/Users/markoboger/workspace/chess/seeder)
 
 The data-ingestion flow is described in [docs/data-ingestion-flow.md](/Users/markoboger/workspace/chess/docs/data-ingestion-flow.md).
+
+Seeder credentials:
+- [seeder/src/main/scala/chess/seeder/SeedOpeningsApp.scala](/Users/markoboger/workspace/chess/seeder/src/main/scala/chess/seeder/SeedOpeningsApp.scala) now reads database credentials from environment variables rather than hard-coded values
 
 ## Teaching Material
 

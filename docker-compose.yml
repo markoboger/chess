@@ -7,15 +7,15 @@ services:
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: chess
-      MONGO_INITDB_ROOT_PASSWORD: chess123
-      MONGO_INITDB_DATABASE: chess
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-chess}
     volumes:
       - mongodb_data:/data/db
     networks:
       - chess-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/chess --quiet
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/${MONGO_DATABASE:-chess} --quiet
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,15 +26,15 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: chess
-      POSTGRES_PASSWORD: chess123
-      POSTGRES_DB: chess
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DATABASE:-chess}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - chess-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U chess"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,13 +49,13 @@ services:
     environment:
       - PORT=8081
       - CHESS_DB=mongodb
-      - MONGO_URI=mongodb://chess:chess123@mongodb:27017
-      - MONGO_DATABASE=chess
+      - MONGO_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017
+      - MONGO_DATABASE=${MONGO_DATABASE:-chess}
       - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DATABASE=chess
-      - POSTGRES_USER=chess
-      - POSTGRES_PASSWORD=chess123
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE:-chess}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     depends_on:
       mongodb:
         condition: service_healthy

@@ -118,7 +118,19 @@ object SeedOpeningsApp extends IOApp:
   private def pgUrl =
     s"jdbc:postgresql://${sys.env.getOrElse("POSTGRES_HOST", "localhost")}:${sys.env.getOrElse("POSTGRES_PORT", "5432")}/${sys.env
         .getOrElse("POSTGRES_DATABASE", "chess")}"
-  private def pgUser = sys.env.getOrElse("POSTGRES_USER", "chess")
-  private def pgPass = sys.env.getOrElse("POSTGRES_PASSWORD", "chess123")
-  private def mongoUri = sys.env.getOrElse("MONGO_URI", "mongodb://chess:chess123@localhost:27017")
+  private def pgUser = requiredEnv("POSTGRES_USER")
+  private def pgPass = requiredEnv("POSTGRES_PASSWORD")
+  private def mongoUri =
+    sys.env.get("MONGO_URI").getOrElse {
+      val host = sys.env.getOrElse("MONGO_HOST", "localhost")
+      val port = sys.env.getOrElse("MONGO_PORT", "27017")
+      val user = requiredEnv("MONGO_USER")
+      val pass = requiredEnv("MONGO_PASSWORD")
+      s"mongodb://$user:$pass@$host:$port"
+    }
   private def mongoDb = sys.env.getOrElse("MONGO_DATABASE", "chess")
+
+  private def requiredEnv(name: String): String =
+    sys.env.get(name).filter(_.nonEmpty).getOrElse {
+      throw new IllegalStateException(s"Missing required environment variable: $name")
+    }
