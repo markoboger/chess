@@ -187,12 +187,12 @@ body {
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  background: rgba(181, 136, 99, 0.15);
-  border: 1px solid rgba(181, 136, 99, 0.4);
+  background: #f2e3d5;
+  border: 1px solid #c49772;
   border-radius: 20px;
   font-size: 12.5px;
   font-weight: 600;
-  color: #7a4e2d;
+  color: #5f3516;
 }
 
 /* ── Sidebar ──────────────────────────────────────────────────────── */

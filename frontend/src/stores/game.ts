@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { Chess } from 'chess.js'
+import type { Move, PieceSymbol, Square } from 'chess.js'
 import type { GameStatus, Turn } from '../types/game'
 import type { GameSettings } from '../types/api'
 import { useOpeningStore } from './opening'
@@ -19,6 +20,16 @@ function formatClockTime(ms: number): string {
 export interface ClockModeTimed { kind: 'timed'; initialMs: number; incrementMs: number; label: string }
 export interface ClockModeNone { kind: 'none' }
 export type ClockMode = ClockModeTimed | ClockModeNone
+type VerboseMove = Move
+type ChessSquare = Square
+type PromotionRole = Exclude<PieceSymbol, 'k' | 'p'>
+type GameStateResponse = Awaited<ReturnType<typeof gameApi.getGameState>>
+type MoveAppliedMessage = {
+  eventType?: string
+  fen?: string
+  move?: string
+  pgn?: string
+}
 
 export const CLOCK_PRESETS: { label: string; mode: ClockMode }[] = [
   { label: 'No Limit', mode: { kind: 'none' } },
@@ -56,6 +67,76 @@ export const COMPUTER_STRATEGIES: { id: ComputerStrategyId; label: string }[] = 
   { id: 'quiescence', label: 'Minimax+QSearch (d=3)' },
   { id: 'iterative-deepening', label: 'Iterative Deepening' },
 ]
+
+const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
+function deriveGameMode(whiteIsHuman: boolean, blackIsHuman: boolean): GameMode {
+  if (whiteIsHuman && blackIsHuman) return 'hvh'
+  if (!whiteIsHuman && !blackIsHuman) return 'cvc'
+  return 'hvc'
+}
+
+function defaultStrategy(strategy?: string | null): ComputerStrategyId {
+  return (strategy as ComputerStrategyId) || 'opening-continuation'
+}
+
+function clockModeFromSettings(settings?: GameSettings): ClockMode {
+  if (!settings?.clockInitialMs) return { kind: 'none' }
+  return {
+    kind: 'timed',
+    initialMs: settings.clockInitialMs,
+    incrementMs: settings.clockIncrementMs ?? 0,
+    label: '',
+  }
+}
+
+function replayStatesFromMoves(parsedMoves: string[]): string[] {
+  const states: string[] = [INITIAL_FEN]
+  const replay = new Chess()
+  for (const san of parsedMoves) {
+    try {
+      replay.move(san)
+      states.push(replay.fen())
+    } catch {
+      break
+    }
+  }
+  return states
+}
+
+function parsePgnMovesSafe(pgn: string): string[] {
+  if (!pgn.trim()) return []
+  try {
+    const tempChess = new Chess()
+    tempChess.loadPgn(pgn)
+    return tempChess.history()
+  } catch {
+    return []
+  }
+}
+
+function fenSignature(fen: string): string {
+  return fen.split(' ').slice(0, 2).join(' ')
+}
+
+function isTimeoutError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const candidate = err as { code?: string; message?: string }
+  return candidate.code === 'ECONNABORTED' || candidate.message?.includes('timeout') === true
+}
+
+function errorStatus(err: unknown): number | undefined {
+  if (!err || typeof err !== 'object') return undefined
+  return (err as { response?: { status?: number } }).response?.status
+}
+
+function backendMoveErrorMessage(err: unknown): string {
+  if (!err || typeof err !== 'object') return 'Move rejected by backend.'
+  return (
+    (err as { response?: { data?: { error?: string } } }).response?.data?.error ||
+    'Move rejected by backend.'
+  )
+}
 
 export const useGameStore = defineStore('game', () => {
   // ── Core chess engine (always the "latest" position) ─────────────────
@@ -212,7 +293,7 @@ export const useGameStore = defineStore('game', () => {
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 8; c++) {
         const sq = board[r][c]
-        if (sq && sq.type === 'k' && sq.color === kingColor) {
+        if (sq?.type === 'k' && sq.color === kingColor) {
           const file = String.fromCodePoint(('a'.codePointAt(0) ?? 97) + c)
           const rank = String(8 - r)
           return `${file}${rank}`
@@ -238,22 +319,31 @@ export const useGameStore = defineStore('game', () => {
       const delta = now - lastTickTime
       lastTickTime = now
 
-      if (latestTurn.value === 'w') {
-        if (clockMode.value.kind === 'timed') {
-          whiteTimeMs.value = Math.max(0, whiteTimeMs.value - delta)
-          if (whiteTimeMs.value <= 0) handleTimeout('w')
-        } else {
-          whiteTimeMs.value += delta
-        }
-      } else {
-        if (clockMode.value.kind === 'timed') {
-          blackTimeMs.value = Math.max(0, blackTimeMs.value - delta)
-          if (blackTimeMs.value <= 0) handleTimeout('b')
-        } else {
-          blackTimeMs.value += delta
-        }
-      }
+      updateActiveClock(delta)
     }, 100)
+  }
+
+  function updateActiveClock(delta: number) {
+    if (latestTurn.value === 'w') {
+      updateClockForSide('w', delta)
+      return
+    }
+    updateClockForSide('b', delta)
+  }
+
+  function updateClockForSide(color: Turn, delta: number) {
+    if (clockMode.value.kind === 'timed') {
+      if (color === 'w') {
+        whiteTimeMs.value = Math.max(0, whiteTimeMs.value - delta)
+        if (whiteTimeMs.value <= 0) handleTimeout('w')
+        return
+      }
+      blackTimeMs.value = Math.max(0, blackTimeMs.value - delta)
+      if (blackTimeMs.value <= 0) handleTimeout('b')
+      return
+    }
+    if (color === 'w') whiteTimeMs.value += delta
+    else blackTimeMs.value += delta
   }
 
   function stopClock() {
@@ -320,45 +410,25 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  function applySettingsToStore(settings?: GameSettings) {
+    whiteIsHuman.value = settings?.whiteIsHuman ?? true
+    blackIsHuman.value = settings?.blackIsHuman ?? true
+    gameMode.value = deriveGameMode(whiteIsHuman.value, blackIsHuman.value)
+    if (!settings) return
+    whiteComputerStrategy.value = defaultStrategy(settings.whiteStrategy)
+    blackComputerStrategy.value = defaultStrategy(settings.blackStrategy)
+    clockMode.value = clockModeFromSettings(settings)
+  }
+
   function syncFromGameState(
-    response: Awaited<ReturnType<typeof gameApi.getGameState>>,
+    response: GameStateResponse,
     options: { resetClockState?: boolean } = {}
   ) {
     chess.value = new Chess(response.fen)
+    applySettingsToStore(response.settings)
 
-    const s = response.settings
-    whiteIsHuman.value = s?.whiteIsHuman ?? true
-    blackIsHuman.value = s?.blackIsHuman ?? true
-    const isHvH = whiteIsHuman.value && blackIsHuman.value
-    const isCvC = !whiteIsHuman.value && !blackIsHuman.value
-    let nextGameMode: 'hvh' | 'hvc' | 'cvc' = 'hvc'
-    if (isHvH) nextGameMode = 'hvh'
-    else if (isCvC) nextGameMode = 'cvc'
-    gameMode.value = nextGameMode
-    if (s) {
-      whiteComputerStrategy.value = (s.whiteStrategy as ComputerStrategyId) || 'opening-continuation'
-      blackComputerStrategy.value = (s.blackStrategy as ComputerStrategyId) || 'opening-continuation'
-      if (s.clockInitialMs) {
-        clockMode.value = { kind: 'timed', initialMs: s.clockInitialMs, incrementMs: s.clockIncrementMs ?? 0, label: '' }
-      } else {
-        clockMode.value = { kind: 'none' }
-      }
-    }
-
-    const parsedMoves: string[] = []
-    if (response.pgn.trim()) {
-      try {
-        const tempChess = new Chess()
-        tempChess.loadPgn(response.pgn)
-        parsedMoves.push(...tempChess.history())
-      } catch { /* ignore */ }
-    }
-
-    const states: string[] = ['rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1']
-    const replay = new Chess()
-    for (const san of parsedMoves) {
-      try { replay.move(san); states.push(replay.fen()) } catch { break }
-    }
+    const parsedMoves = parsePgnMovesSafe(response.pgn)
+    const states = replayStatesFromMoves(parsedMoves)
 
     boardStates.value = states
     pgnMoves.value = parsedMoves
@@ -410,48 +480,9 @@ export const useGameStore = defineStore('game', () => {
     }
     ws.onmessage = (ev) => {
       try {
-        const msg = JSON.parse(ev.data as string)
-        if (msg.eventType === 'heartbeat') return
-        if (msg.eventType !== 'move_applied') return
-        const newFen: string = msg.fen
-        console.log('[WS] move_applied received', { move: msg.move, pgn: msg.pgn, fen: newFen, currentPgnLen: pgnMoves.value.length, moveInFlight: moveInFlight.value })
-        // Compare only piece-placement + active-color (first two FEN fields) because chess.js
-        // strips en passant squares that have no capturing pawn, producing a different string
-        // than the backend FEN even for the same board state.
-        const fenSig = (f: string) => f.split(' ').slice(0, 2).join(' ')
-        if (!newFen || fenSig(newFen) === fenSig(chess.value.fen())) { console.log('[WS] skipped: fenSig match'); return }
-        // Parse PGN before modifying state so we can detect stale events
-        const parsedMoves: string[] = []
-        if (msg.pgn?.trim()) {
-          try { const t = new Chess(); t.loadPgn(msg.pgn); parsedMoves.push(...t.history()) } catch { /* ignore */ }
-        }
-        // Reject stale WS events that would revert to an earlier position.
-        // This happens when a delayed event for an older move arrives after the
-        // frontend has already advanced further (via HTTP response or a newer WS event).
-        if (parsedMoves.length > 0 && parsedMoves.length < pgnMoves.value.length) { console.log('[WS] skipped: stale event', parsedMoves.length, '<', pgnMoves.value.length); return }
-        console.log('[WS] APPLYING move', { parsedMoves, gameMode: gameMode.value })
-        // Apply the move
-        chess.value = new Chess(newFen)
-        if (parsedMoves.length > 0) {
-          const states: string[] = ['rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1']
-          const r = new Chess()
-          for (const san of parsedMoves) { try { r.move(san); states.push(r.fen()) } catch { break } }
-          boardStates.value = states
-          pgnMoves.value = parsedMoves
-        } else {
-          const moveSan: string = msg.move ?? ''
-          boardStates.value = [...boardStates.value, newFen]
-          if (moveSan) pgnMoves.value = [...pgnMoves.value, moveSan]
-        }
-        redoStates.value = []
-        redoMoves.value = []
-        currentIndex.value = boardStates.value.length - 1
-        selectedSquare.value = null
-        legalMoves.value = []
-        updateLastMoveFromIndex()
-        syncStatusFromChess()
-        switchClock()
-        triggerComputerMoveIfNeeded()
+        const msg = JSON.parse(ev.data as string) as MoveAppliedMessage
+        if (msg.eventType === 'heartbeat' || msg.eventType !== 'move_applied') return
+        applyRemoteMove(msg)
       } catch { /* ignore malformed messages */ }
     }
     ws.onerror = () => { /* silent — server may not be running */ }
@@ -476,30 +507,64 @@ export const useGameStore = defineStore('game', () => {
     return latestTurn.value === 'w' ? whiteComputerStrategy.value : blackComputerStrategy.value
   }
 
+  function applyRemoteMove(msg: MoveAppliedMessage) {
+    const newFen = msg.fen
+    console.log('[WS] move_applied received', { move: msg.move, pgn: msg.pgn, fen: newFen, currentPgnLen: pgnMoves.value.length, moveInFlight: moveInFlight.value })
+    if (!newFen || fenSignature(newFen) === fenSignature(chess.value.fen())) {
+      console.log('[WS] skipped: fenSig match')
+      return
+    }
+
+    const parsedMoves = parsePgnMovesSafe(msg.pgn ?? '')
+    if (parsedMoves.length > 0 && parsedMoves.length < pgnMoves.value.length) {
+      console.log('[WS] skipped: stale event', parsedMoves.length, '<', pgnMoves.value.length)
+      return
+    }
+
+    console.log('[WS] APPLYING move', { parsedMoves, gameMode: gameMode.value })
+    chess.value = new Chess(newFen)
+    if (parsedMoves.length > 0) {
+      boardStates.value = replayStatesFromMoves(parsedMoves)
+      pgnMoves.value = parsedMoves
+    } else {
+      boardStates.value = [...boardStates.value, newFen]
+      if (msg.move) pgnMoves.value = [...pgnMoves.value, msg.move]
+    }
+    redoStates.value = []
+    redoMoves.value = []
+    currentIndex.value = boardStates.value.length - 1
+    selectedSquare.value = null
+    legalMoves.value = []
+    updateLastMoveFromIndex()
+    syncStatusFromChess()
+    switchClock()
+    triggerComputerMoveIfNeeded()
+  }
+
   function setComputerStrategy(side: ComputerSide, strategy: ComputerStrategyId) {
     if (side === 'white') whiteComputerStrategy.value = strategy
     else blackComputerStrategy.value = strategy
     triggerComputerMoveIfNeeded()
   }
 
-  function chooseGreedyMove(moves: any[]): any {
-    const captures = moves.filter((m: any) => m.captured)
+  function chooseGreedyMove(moves: VerboseMove[]): VerboseMove {
+    const captures = moves.filter((m) => m.captured)
     if (captures.length > 0) {
       const vals: Record<string, number> = { q: 9, r: 5, b: 3, n: 3, p: 1 }
-      captures.sort((a: any, b: any) => (vals[b.captured] || 0) - (vals[a.captured] || 0))
+      captures.sort((a, b) => (vals[b.captured ?? ''] || 0) - (vals[a.captured ?? ''] || 0))
       return captures[0]
     }
     return moves[Math.floor(Math.random() * moves.length)]
   }
 
-  async function chooseOpeningContinuationMove(): Promise<any | null> {
+  async function chooseOpeningContinuationMove(): Promise<VerboseMove | null> {
     const openingStore = useOpeningStore()
     const candidate = await openingStore.bestContinuationForFen(chess.value.fen())
     if (!candidate) return null
 
     try {
       const clone = new Chess(chess.value.fen())
-      const result = clone.move(candidate.san as any)
+      const result = clone.move(candidate.san)
       return result || null
     } catch {
       return null
@@ -519,6 +584,26 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  async function applyBackendComputerMove(strategy: ComputerStrategyId): Promise<boolean> {
+    const san = await chooseBackendMove(strategy)
+    if (!san) return false
+    const parsed = new Chess(chess.value.fen()).move(san)
+    if (!parsed) return false
+    return applyMove(parsed.from, parsed.to, parsed.promotion)
+  }
+
+  async function chooseClientSideMove(
+    strategy: ComputerStrategyId,
+    moves: VerboseMove[]
+  ): Promise<VerboseMove> {
+    if (strategy === 'opening-continuation') {
+      const openingMove = await chooseOpeningContinuationMove()
+      if (openingMove) return openingMove
+    }
+    if (strategy === 'random') return moves[Math.floor(Math.random() * moves.length)]
+    return chooseGreedyMove(moves)
+  }
+
   function makeComputerMove() {
     if (computerScheduled.value || paused.value || isGameOver.value) return
     if (!isComputerTurn()) return
@@ -534,30 +619,15 @@ export const useGameStore = defineStore('game', () => {
       if (paused.value || isGameOver.value || !isComputerTurn() || !isAtLatest.value) return
 
       const strategy = currentComputerStrategy()
-      const moves = chess.value.moves({ verbose: true })
+      const moves = chess.value.moves({ verbose: true }) as VerboseMove[]
       if (moves.length === 0) return
 
       if (!CLIENT_SIDE_STRATEGIES.has(strategy)) {
-        // Delegate to the backend strategy engine
-        const san = await chooseBackendMove(strategy)
-        if (san) {
-          const parsed = new Chess(chess.value.fen()).move(san as any)
-          if (parsed) {
-            const ok = await applyMove(parsed.from, parsed.to, parsed.promotion)
-            if (ok) triggerComputerMoveIfNeeded()
-          }
-        }
+        if (await applyBackendComputerMove(strategy)) triggerComputerMoveIfNeeded()
         return
       }
 
-      let chosen: any
-      if (strategy === 'opening-continuation') {
-        chosen = await chooseOpeningContinuationMove()
-      }
-      if (!chosen && strategy === 'random') {
-        chosen = moves[Math.floor(Math.random() * moves.length)]
-      }
-      if (!chosen) chosen = chooseGreedyMove(moves)
+      const chosen = await chooseClientSideMove(strategy, moves)
 
       const promo = chosen.promotion || undefined
       const ok = await applyMove(chosen.from, chosen.to, promo)
@@ -583,9 +653,8 @@ export const useGameStore = defineStore('game', () => {
     moveInFlight.value = false
     disconnectWebSocket()
     try {
-      const response = await gameApi.createGame(
-        (startFen || settings) ? { startFen, settings } : undefined
-      )
+      const createPayload = startFen || settings ? { startFen, settings } : undefined
+      const response = await gameApi.createGame(createPayload)
       chess.value = new Chess(response.fen)
       gameId.value = response.gameId
       gameOverByTimeout.value = false
@@ -597,19 +666,8 @@ export const useGameStore = defineStore('game', () => {
       const effectiveBlackHuman = s?.blackIsHuman ?? true
       whiteIsHuman.value = effectiveWhiteHuman
       blackIsHuman.value = effectiveBlackHuman
-      const isHvH = effectiveWhiteHuman && effectiveBlackHuman
-      const isCvC = !effectiveWhiteHuman && !effectiveBlackHuman
-      gameMode.value = isHvH ? 'hvh' : isCvC ? 'cvc' : 'hvc'
-
-      if (s) {
-        whiteComputerStrategy.value = (s.whiteStrategy as ComputerStrategyId) || 'opening-continuation'
-        blackComputerStrategy.value = (s.blackStrategy as ComputerStrategyId) || 'opening-continuation'
-        if (s.clockInitialMs) {
-          clockMode.value = { kind: 'timed', initialMs: s.clockInitialMs, incrementMs: s.clockIncrementMs ?? 0, label: '' }
-        } else {
-          clockMode.value = { kind: 'none' }
-        }
-      }
+      gameMode.value = deriveGameMode(effectiveWhiteHuman, effectiveBlackHuman)
+      if (s) applySettingsToStore(s)
 
       // Determine which side the local player controls.
       // For a local HvH game the creator plays both sides freely (spectator = no restriction).
@@ -617,7 +675,10 @@ export const useGameStore = defineStore('game', () => {
       // Move restrictions only apply to the remote joiner (set in joinGame).
       if (!effectiveWhiteHuman || !effectiveBlackHuman) {
         // Has a computer side: the human player needs a specific color
-        myColor.value = playAs ?? (effectiveWhiteHuman ? 'white' : effectiveBlackHuman ? 'black' : 'spectator')
+        if (playAs) myColor.value = playAs
+        else if (effectiveWhiteHuman) myColor.value = 'white'
+        else if (effectiveBlackHuman) myColor.value = 'black'
+        else myColor.value = 'spectator'
         boardFlipped.value = myColor.value === 'black'
       } else {
         // Local HvH: no move restriction; flip board to match the chosen starting side
@@ -668,10 +729,10 @@ export const useGameStore = defineStore('game', () => {
       triggerComputerMoveIfNeeded()
       connectWebSocket(sessionId)
       return true
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
+    } catch (err: unknown) {
+      if (errorStatus(err) === 404) {
         error.value = 'Game not found. The session may have expired (server was restarted).'
-      } else if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+      } else if (isTimeoutError(err)) {
         error.value = 'Connection timed out. Check that the game service is running.'
       } else {
         error.value = 'Could not join game. Check that all services are running.'
@@ -722,8 +783,11 @@ export const useGameStore = defineStore('game', () => {
     }
 
     const probe = new Chess(chess.value.fen())
-    const moveObj: any = { from, to }
-    if (promotion) moveObj.promotion = promotion
+    const moveObj: { from: ChessSquare; to: ChessSquare; promotion?: PromotionRole } = {
+      from: from as ChessSquare,
+      to: to as ChessSquare,
+    }
+    if (promotion) moveObj.promotion = promotion as PromotionRole
 
     const result = probe.move(moveObj)
     if (!result) {
@@ -753,8 +817,8 @@ export const useGameStore = defineStore('game', () => {
       selectedSquare.value = null
       legalMoves.value = []
       return true
-    } catch (err: any) {
-      error.value = err?.response?.data?.error || 'Move rejected by backend.'
+    } catch (err: unknown) {
+      error.value = backendMoveErrorMessage(err)
       return false
     } finally {
       moveInFlight.value = false
@@ -772,7 +836,7 @@ export const useGameStore = defineStore('game', () => {
     // Block when it's the remote opponent's turn in a session
     if (!puzzleMode.value && myColor.value !== 'spectator' && !isMyTurn()) return
 
-    const piece = viewChess.value.get(square as any)
+    const piece = viewChess.value.get(square as ChessSquare)
     const currentTurn = viewChess.value.turn()
 
     if (selectedSquare.value && legalMoves.value.includes(square)) {
@@ -783,7 +847,7 @@ export const useGameStore = defineStore('game', () => {
         legalMoves.value = []
         return
       }
-      const fromPiece = viewChess.value.get(selectedSquare.value as any)
+      const fromPiece = viewChess.value.get(selectedSquare.value as ChessSquare)
       if (fromPiece?.type === 'p') {
         const toRank = square[1]
         if ((fromPiece.color === 'w' && toRank === '8') || (fromPiece.color === 'b' && toRank === '1')) {
@@ -797,8 +861,8 @@ export const useGameStore = defineStore('game', () => {
     } else if (piece && piece.color === currentTurn) {
       selectedSquare.value = square
       if (showLegalMoves.value) {
-        const moves = viewChess.value.moves({ square: square as any, verbose: true })
-        legalMoves.value = moves.map((m: any) => m.to)
+        const moves = viewChess.value.moves({ square: square as ChessSquare, verbose: true }) as VerboseMove[]
+        legalMoves.value = moves.map((m) => m.to)
       } else {
         legalMoves.value = []
       }

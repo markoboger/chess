@@ -245,14 +245,14 @@ watch(() => gameStore.currentIndex, async () => {
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  background: #1f8a4c;
+  background: #16653a;
   color: white;
   transition: all 0.15s;
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
-.btn-run:hover { background: #219a52; transform: scale(1.02); }
+.btn-run:hover { background: #1c7442; transform: scale(1.02); }
 
 .btn-pause {
   padding: 8px 16px;
@@ -261,14 +261,14 @@ watch(() => gameStore.currentIndex, async () => {
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  background: #b85f14;
+  background: #8f470f;
   color: white;
   transition: all 0.15s;
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
-.btn-pause:hover { background: #cf6d17; transform: scale(1.02); }
+.btn-pause:hover { background: #a35312; transform: scale(1.02); }
 
 /* Tool row (Undo / Redo / Flip) */
 .tool-row {
