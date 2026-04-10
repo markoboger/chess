@@ -14,6 +14,17 @@ import java.nio.file.{Files, Path}
 import scala.io.StdIn
 import scala.util.Try
 
+final case class TuiShellSnapshot(
+    activeGameId: Option[String],
+    flipped: Boolean,
+    running: Boolean,
+    statusMessage: String,
+    jsonFlavor: String,
+    activeMenuTitle: Option[String],
+    pendingPromptTitle: Option[String],
+    infoOverlayTitle: Option[String]
+)
+
 final class TuiShell:
   private val AnsiPattern = raw"\u001B\[[;\d]*m".r
   private val SidebarValueLimit = 44
@@ -39,6 +50,24 @@ final class TuiShell:
   private var activeMenu: Option[TuiMenu] = None
   private var pendingPrompt: Option[PendingPrompt] = None
   private var infoOverlay: Option[InfoOverlay] = None
+
+  private[richTui] def snapshot: TuiShellSnapshot =
+    TuiShellSnapshot(
+      activeGameId = activeGameId,
+      flipped = flipped,
+      running = running,
+      statusMessage = statusMessage,
+      jsonFlavor = jsonFlavor,
+      activeMenuTitle = activeMenu.map(_.title),
+      pendingPromptTitle = pendingPrompt.map(_.title),
+      infoOverlayTitle = infoOverlay.map(_.title)
+    )
+
+  private[richTui] def ensureInitialSessionForTest(): Unit =
+    ensureInitialSession()
+
+  private[richTui] def processInputForTest(input: String): Unit =
+    processMainInput(input)
 
   def run(): Unit =
     ensureInitialSession()
