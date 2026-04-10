@@ -19,6 +19,20 @@ val javafxClassifier = {
   s"$os$arch"
 }
 
+val windowsTestcontainersSettings =
+  if sys.props("os.name").toLowerCase.contains("windows") then
+    Seq(
+      Test / fork := true,
+      Test / envVars ++= Map(
+        "DOCKER_HOST" -> "npipe:////./pipe/docker_engine"
+      ),
+      Test / javaOptions ++= Seq(
+        "-Ddocker.host=npipe:////./pipe/docker_engine",
+        "-Ddocker.client.strategy=org.testcontainers.dockerclient.NpipeSocketClientProviderStrategy"
+      )
+    )
+  else Seq.empty
+
 lazy val Seeder = project
   .in(file("seeder"))
   .dependsOn(Chess)
@@ -117,6 +131,7 @@ lazy val Data = project
     Test / unmanagedResourceDirectories += baseDirectory.value.getParentFile / "src" / "test" / "resources",
     publish / skip := true
   )
+  .settings(windowsTestcontainersSettings)
 
 lazy val Chess = project
   .in(file("."))

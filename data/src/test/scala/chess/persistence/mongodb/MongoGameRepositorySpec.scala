@@ -2,6 +2,7 @@ package chess.persistence.mongodb
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
+import chess.persistence.TestcontainersSupport
 import chess.model.PersistedGame
 import io.circe.generic.auto.*
 import mongo4cats.circe.*
@@ -21,6 +22,7 @@ class MongoGameRepositorySpec extends AnyWordSpec with Matchers with BeforeAndAf
   private var closeMongo: IO[Unit] = IO.unit
 
   override def beforeAll(): Unit = {
+    TestcontainersSupport.configureDockerDesktopIfNeeded()
     container.start()
     val resource = MongoClient
       .fromConnectionString[IO](container.getConnectionString)

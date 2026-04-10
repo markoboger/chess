@@ -3,6 +3,7 @@ package chess.persistence.postgres
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import chess.model.PersistedGame
+import chess.persistence.TestcontainersSupport
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
 import org.scalatest.BeforeAndAfterAll
@@ -19,6 +20,7 @@ class PostgresGameRepositorySpec extends AnyWordSpec with Matchers with BeforeAn
   private var closePg: IO[Unit]            = IO.unit
 
   override def beforeAll(): Unit = {
+    TestcontainersSupport.configureDockerDesktopIfNeeded()
     container.start()
     val resource = for {
       ce <- ExecutionContexts.fixedThreadPool[IO](2)

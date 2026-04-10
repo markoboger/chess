@@ -3,6 +3,7 @@ package chess.persistence.postgres
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import chess.controller.strategy.OpeningContinuationStrategy
+import chess.persistence.TestcontainersSupport
 import chess.model.Opening
 import chess.model.{Color, Square}
 import doobie.hikari.HikariTransactor
@@ -24,6 +25,7 @@ class PostgresOpeningRepositorySpec extends AnyWordSpec with Matchers with Befor
     Opening.unsafe(eco, name, moves, "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR", moveCount)
 
   override def beforeAll(): Unit = {
+    TestcontainersSupport.configureDockerDesktopIfNeeded()
     container.start()
     val resource = for {
       ce <- ExecutionContexts.fixedThreadPool[IO](2)
