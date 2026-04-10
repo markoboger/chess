@@ -20,7 +20,7 @@ val javafxClassifier = {
 }
 
 val windowsTestcontainersSettings =
-  if sys.props("os.name").toLowerCase.contains("windows") then
+  if (sys.props("os.name").toLowerCase.contains("windows")) {
     Seq(
       Test / fork := true,
       Test / envVars ++= Map(
@@ -31,7 +31,7 @@ val windowsTestcontainersSettings =
         "-Ddocker.client.strategy=org.testcontainers.dockerclient.NpipeSocketClientProviderStrategy"
       )
     )
-  else Seq.empty
+  } else Seq.empty
 
 lazy val Seeder = project
   .in(file("seeder"))
