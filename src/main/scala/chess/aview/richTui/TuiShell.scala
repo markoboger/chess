@@ -815,6 +815,7 @@ final class TuiShell:
 
 object TuiShell:
   def run(): Unit =
+    ConsoleEncoding.enableUtf8IfNeeded()
     new TuiShell().run()
 
 private final case class PendingPrompt(

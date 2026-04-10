@@ -1,5 +1,6 @@
 package chess.aview
 
+import chess.aview.richTui.ConsoleEncoding
 import chess.controller.GameController
 import chess.model.{Board, Piece, Color, PromotableRole, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.util.Observer
@@ -12,6 +13,7 @@ import scala.io.StdIn
   */
 class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
   controller.add(this)
+  private val useUnicodePieces = ConsoleEncoding.preferUnicodeConsolePieces()
 
   override def update(event: MoveResult): Unit = event match {
     case MoveResult.Moved(board, gameEvent) =>
@@ -33,7 +35,7 @@ class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
         val rankLine = File.all
           .map { file =>
             board.pieceAt(Square(file, rank)) match {
-              case Some(piece) => piece.toString
+              case Some(piece) => renderPiece(piece)
               case None        => "."
             }
           }
@@ -44,6 +46,29 @@ class ConsoleView(val controller: GameController) extends Observer[MoveResult] {
 
     "    a b c d e f g h\n" + ranks
   }
+
+  private def renderPiece(piece: Piece): String =
+    if useUnicodePieces then piece.toString
+    else
+      piece.color match
+        case Color.White => whiteAscii(piece.role)
+        case Color.Black => blackAscii(piece.role)
+
+  private def whiteAscii(role: chess.model.Role): String = role match
+    case chess.model.Role.King   => "K"
+    case chess.model.Role.Queen  => "Q"
+    case chess.model.Role.Rook   => "R"
+    case chess.model.Role.Bishop => "B"
+    case chess.model.Role.Knight => "N"
+    case chess.model.Role.Pawn   => "P"
+
+  private def blackAscii(role: chess.model.Role): String = role match
+    case chess.model.Role.King   => "k"
+    case chess.model.Role.Queen  => "q"
+    case chess.model.Role.Rook   => "r"
+    case chess.model.Role.Bishop => "b"
+    case chess.model.Role.Knight => "n"
+    case chess.model.Role.Pawn   => "p"
 
   def promptForMove(): String = {
     val player = if (controller.isWhiteToMove) "White" else "Black"
