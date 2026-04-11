@@ -199,6 +199,38 @@ class GameRoutesSpec extends AnyWordSpec with Matchers {
     }
   }
 
+  "POST /games/:id/pgn" should {
+    "replay a valid PGN and return 200 with move count" in {
+      val createResp = run(
+        Request[IO](Method.POST, uri"/games").withEntity(CreateGameRequest(None))
+      ).as[CreateGameResponse].unsafeRunSync()
+
+      val req = Request[IO](Method.POST, Uri.unsafeFromString(s"/games/${createResp.gameId}/pgn"))
+        .withEntity(LoadPgnRequest("1. e4 e5 2. Nf3 Nc6"))
+      val resp = run(req)
+      resp.status shouldBe Status.Ok
+      val body = resp.as[LoadPgnResponse].unsafeRunSync()
+      body.success shouldBe true
+      body.moves   shouldBe 4
+    }
+
+    "return 400 for an invalid PGN" in {
+      val createResp = run(
+        Request[IO](Method.POST, uri"/games").withEntity(CreateGameRequest(None))
+      ).as[CreateGameResponse].unsafeRunSync()
+
+      val req = Request[IO](Method.POST, Uri.unsafeFromString(s"/games/${createResp.gameId}/pgn"))
+        .withEntity(LoadPgnRequest("not valid pgn !! @@"))
+      run(req).status shouldBe Status.BadRequest
+    }
+
+    "return 400 for unknown game" in {
+      val req = Request[IO](Method.POST, uri"/games/no-such-id/pgn")
+        .withEntity(LoadPgnRequest("1. e4"))
+      run(req).status shouldBe Status.BadRequest
+    }
+  }
+
   "GET /openings/lookup" should {
     "return an opening for a known FEN" in {
       val knownFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR"

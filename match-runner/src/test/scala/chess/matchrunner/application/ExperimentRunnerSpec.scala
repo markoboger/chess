@@ -82,6 +82,82 @@ final class ExperimentRunnerSpec extends AnyWordSpec with Matchers:
       runs should have size 1
       runs.head.errorMessage shouldBe Some("backend unavailable")
     }
+
+    "classify a black-wins-by-checkmate result" in {
+      val repo   = new InMemoryMatchRunnerRepository
+      val client = new StubChessApiClient(
+        createResponses = List(Right(CreateGameResponse("g1", "fen", GameSettings(whiteIsHuman = false, blackIsHuman = false, backendAutoplay = true)))),
+        gameStates = Map("g1" -> List(Right(GameStateResponse("g1", "fen-f", "1. e4 e5", "Checkmate! Black wins!", GameSettings()))))
+      )
+      val runner = new ExperimentRunner(client, repo, config = MatchRunnerConfig(8084, "http://game-service:8081", 0L, 100L, "postgres", 5432, "chess", "user", "pass"))
+      val experiment = runner.runExperiment(ExperimentRequest("bk", None, "random", "random", 1)).unsafeRunSync()
+      val runs = repo.listRuns(experiment.id).unsafeRunSync()
+      runs.head.result.map(_.toString) shouldBe Some("BlackWin")
+      runs.head.winner shouldBe Some("black")
+    }
+
+    "classify a white-wins-on-time (flag) result" in {
+      val repo   = new InMemoryMatchRunnerRepository
+      val client = new StubChessApiClient(
+        createResponses = List(Right(CreateGameResponse("g2", "fen", GameSettings(whiteIsHuman = false, blackIsHuman = false, backendAutoplay = true)))),
+        gameStates = Map("g2" -> List(Right(GameStateResponse("g2", "fen-f", "", "White wins on time!", GameSettings()))))
+      )
+      val runner = new ExperimentRunner(client, repo, config = MatchRunnerConfig(8084, "http://game-service:8081", 0L, 100L, "postgres", 5432, "chess", "user", "pass"))
+      val experiment = runner.runExperiment(ExperimentRequest("wt", None, "random", "random", 1)).unsafeRunSync()
+      val runs = repo.listRuns(experiment.id).unsafeRunSync()
+      runs.head.result.map(_.toString) shouldBe Some("WhiteWin")
+      runs.head.winner shouldBe Some("white-flag")
+    }
+
+    "classify a black-wins-on-time (flag) result" in {
+      val repo   = new InMemoryMatchRunnerRepository
+      val client = new StubChessApiClient(
+        createResponses = List(Right(CreateGameResponse("g3", "fen", GameSettings(whiteIsHuman = false, blackIsHuman = false, backendAutoplay = true)))),
+        gameStates = Map("g3" -> List(Right(GameStateResponse("g3", "fen-f", "", "Black wins on time!", GameSettings()))))
+      )
+      val runner = new ExperimentRunner(client, repo, config = MatchRunnerConfig(8084, "http://game-service:8081", 0L, 100L, "postgres", 5432, "chess", "user", "pass"))
+      val experiment = runner.runExperiment(ExperimentRequest("bt", None, "random", "random", 1)).unsafeRunSync()
+      val runs = repo.listRuns(experiment.id).unsafeRunSync()
+      runs.head.result.map(_.toString) shouldBe Some("BlackWin")
+      runs.head.winner shouldBe Some("black-flag")
+    }
+
+    "classify a draw-by-threefold-repetition result" in {
+      val repo   = new InMemoryMatchRunnerRepository
+      val client = new StubChessApiClient(
+        createResponses = List(Right(CreateGameResponse("g4", "fen", GameSettings(whiteIsHuman = false, blackIsHuman = false, backendAutoplay = true)))),
+        gameStates = Map("g4" -> List(Right(GameStateResponse("g4", "fen-f", "", "Draw by threefold repetition.", GameSettings()))))
+      )
+      val runner = new ExperimentRunner(client, repo, config = MatchRunnerConfig(8084, "http://game-service:8081", 0L, 100L, "postgres", 5432, "chess", "user", "pass"))
+      val experiment = runner.runExperiment(ExperimentRequest("rep", None, "random", "random", 1)).unsafeRunSync()
+      val runs = repo.listRuns(experiment.id).unsafeRunSync()
+      runs.head.result.map(_.toString) shouldBe Some("Draw")
+    }
+
+    "record a timeout as an error when the backend is too slow" in {
+      val repo   = new InMemoryMatchRunnerRepository
+      val client = new StubChessApiClient(
+        createResponses = List(Right(CreateGameResponse("g5", "fen", GameSettings(whiteIsHuman = false, blackIsHuman = false, backendAutoplay = true)))),
+        gameStates = Map("g5" -> List(Right(GameStateResponse("g5", "fen-f", "", "timeout", GameSettings()))))
+      )
+      val runner = new ExperimentRunner(client, repo, config = MatchRunnerConfig(8084, "http://game-service:8081", 0L, 100L, "postgres", 5432, "chess", "user", "pass"))
+      val experiment = runner.runExperiment(ExperimentRequest("to", None, "random", "random", 1)).unsafeRunSync()
+      val runs = repo.listRuns(experiment.id).unsafeRunSync()
+      runs.head.errorMessage shouldBe Some("Timed out while waiting for backend game completion")
+    }
+
+    "record an error: prefixed status as an error message" in {
+      val repo   = new InMemoryMatchRunnerRepository
+      val client = new StubChessApiClient(
+        createResponses = List(Right(CreateGameResponse("g6", "fen", GameSettings(whiteIsHuman = false, blackIsHuman = false, backendAutoplay = true)))),
+        gameStates = Map("g6" -> List(Right(GameStateResponse("g6", "fen-f", "", "error:engine crashed", GameSettings()))))
+      )
+      val runner = new ExperimentRunner(client, repo, config = MatchRunnerConfig(8084, "http://game-service:8081", 0L, 100L, "postgres", 5432, "chess", "user", "pass"))
+      val experiment = runner.runExperiment(ExperimentRequest("err", None, "random", "random", 1)).unsafeRunSync()
+      val runs = repo.listRuns(experiment.id).unsafeRunSync()
+      runs.head.errorMessage shouldBe Some("engine crashed")
+    }
+
   }
 
   private final class InMemoryMatchRunnerRepository extends MatchRunnerRepository[IO]:

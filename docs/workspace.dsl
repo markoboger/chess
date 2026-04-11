@@ -35,6 +35,8 @@ workspace "Chess Application" "Chess platform with a docker-compose runtime, ses
             desktopApp = container "Chess Desktop App" "Local JVM desktop application for GUI/console play. It can also join backend game sessions, publish moves over HTTP, and subscribe to live updates over WebSocket. Part of the repository, but not part of docker-compose." "Scala 3 / ScalaFX / local JVM" "Application"
 
             seeder = container "Seeder" "One-shot CLI that loads opening data into the databases. Part of the repository, but not part of docker-compose." "Scala 3 / Cats Effect / local CLI" "Application"
+
+            matchRunner = container "Match Runner" "Automated experiment harness that runs batches of computer-vs-computer games, records results in PostgreSQL, and exposes a REST API plus an interactive TUI for analysis. Not part of docker-compose." "Scala 3 / Cats Effect / http4s Ember / Doobie" "Microservice"
         }
 
         player -> chessSystem "Uses"
@@ -62,6 +64,11 @@ workspace "Chess Application" "Chess platform with a docker-compose runtime, ses
         seeder -> postgres "Seeds openings" "JDBC / Doobie"
         seeder -> mongodb "Seeds openings" "MongoDB driver / mongo4cats"
         seeder -> lichessOpenings "Reads bundled opening data" "Classpath resources"
+
+        matchRunner -> gameService "Creates CvC game sessions, polls state, and loads PGN replays" "HTTP/JSON"
+        matchRunner -> postgres "Stores experiment and match-run records" "JDBC / Doobie"
+        developer -> matchRunner "Launches experiments and browses results via TUI"
+        desktopApp -> matchRunner "Fetches experiment and run lists for in-GUI game browser" "HTTP/JSON :8084"
 
         srcModule -> appModule "Invokes application services and controllers" "In-process calls"
         srcModule -> dataModule "Wires repository implementations through AppBindings" "In-process calls"
@@ -161,6 +168,7 @@ workspace "Chess Application" "Chess platform with a docker-compose runtime, ses
             include desktopApp
             include realtimeService
             include seeder
+            include matchRunner
             include postgres
             include mongodb
             include lichessOpenings

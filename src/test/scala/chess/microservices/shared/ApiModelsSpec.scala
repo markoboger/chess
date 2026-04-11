@@ -159,4 +159,18 @@ class ApiModelsSpec extends AnyWordSpec with Matchers {
       decode[HealthResponse](resp.asJson.noSpaces) shouldBe Right(resp)
     }
   }
+
+  "LoadPgnRequest" should {
+    "round-trip through JSON" in {
+      val req = LoadPgnRequest("1. e4 e5 2. Nf3 Nc6")
+      decode[LoadPgnRequest](req.asJson.noSpaces) shouldBe Right(req)
+    }
+  }
+
+  "LoadPgnResponse" should {
+    "round-trip through JSON" in {
+      val resp = LoadPgnResponse(success = true, fen = "some-fen", moves = 4)
+      decode[LoadPgnResponse](resp.asJson.noSpaces) shouldBe Right(resp)
+    }
+  }
 }

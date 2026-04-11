@@ -2,7 +2,7 @@ ThisBuild / organization := "com.example"
 ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := "3.5.0"
 ThisBuild / coverageExcludedFiles :=
-  ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*;.*GameServer.*;.*GatewayServer.*;.*UIServer.*;.*GameEventServer.*"
+  ".*aview/ChessGUI.*;.*aview/FENExample.*;.*aview/PGNExample.*;.*ChessApp.*;.*AppBindings.*;.*ClockActor.*;.*FastParseFenParser.*;.*FastParsePgnParser.*;.*GameServer.*;.*GatewayServer.*;.*UIServer.*;.*GameEventServer.*;.*richTui/TuiShell.*;.*richTui/ConsoleEncoding.*;.*MatchRunnerTuiMain.*;.*MatchRunnerServer.*;.*MatchRunnerDemoApp.*;.*MatchRunnerConfig.*"
 
 // Determine the JavaFX platform classifier for this OS/arch
 val javafxClassifier = {

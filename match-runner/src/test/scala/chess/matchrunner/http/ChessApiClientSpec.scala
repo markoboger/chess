@@ -110,4 +110,33 @@ class ChessApiClientSpec extends AnyWordSpec with Matchers:
         )
       ))
     }
+
+    "load a PGN into an existing game session" in {
+      val pgn = "1. e4 e5 2. Nf3 Nc6"
+      val backend = org.http4s.HttpRoutes.of[IO] {
+        case req @ POST -> Root / "games" / "game-42" / "pgn" =>
+          req.as[LoadPgnRequest].flatMap { body =>
+            body.pgn shouldBe pgn
+            Ok(LoadPgnResponse(success = true, fen = "some-fen", moves = 4).asJson)
+          }
+      }.orNotFound
+
+      val client = ChessApiClient.http(baseUri, Client.fromHttpApp(backend))
+      val result = client.loadPgn("game-42", pgn).unsafeRunSync()
+
+      result shouldBe Right(LoadPgnResponse(success = true, fen = "some-fen", moves = 4))
+    }
+
+    "return an error when the PGN endpoint returns non-2xx" in {
+      val backend = org.http4s.HttpRoutes.of[IO] {
+        case POST -> Root / "games" / _ / "pgn" =>
+          BadRequest(ErrorResponse("invalid pgn", None).asJson)
+      }.orNotFound
+
+      val client = ChessApiClient.http(baseUri, Client.fromHttpApp(backend))
+      val result = client.loadPgn("game-99", "garbage pgn").unsafeRunSync()
+
+      result.isLeft shouldBe true
+      result.left.get.message should include("invalid pgn")
+    }
   }
