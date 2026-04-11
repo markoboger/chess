@@ -25,7 +25,7 @@ object Experiment:
       id = UUID.randomUUID(),
       name = name,
       description = description,
-      createdAt = Instant.now(),
+      createdAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS),
       status = status,
       requestedGames = requestedGames
     )

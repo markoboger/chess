@@ -33,7 +33,7 @@ object MatchRun:
       chessGameId = chessGameId,
       whiteStrategy = whiteStrategy,
       blackStrategy = blackStrategy,
-      startedAt = Instant.now(),
+      startedAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS),
       finishedAt = None,
       result = None,
       winner = None,
