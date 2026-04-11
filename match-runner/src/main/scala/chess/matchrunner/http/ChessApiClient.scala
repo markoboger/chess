@@ -14,6 +14,7 @@ trait ChessApiClient:
       clockIncrementMs: Option[Long] = None
   ): IO[Either[ChessApiClient.ChessApiError, CreateGameResponse]]
   def getGameState(gameId: String): IO[Either[ChessApiClient.ChessApiError, GameStateResponse]]
+  def loadPgn(gameId: String, pgn: String): IO[Either[ChessApiClient.ChessApiError, LoadPgnResponse]]
 
 object ChessApiClient:
 

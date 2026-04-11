@@ -150,6 +150,17 @@ class GameSessionService(
   def getFen(gameId: String): IO[Option[String]] =
     getGame(gameId).map(_.map(_.getBoardAsFEN))
 
+  def loadPgn(gameId: String, pgn: String): IO[Either[String, (String, Int)]] =
+    getGame(gameId).flatMap {
+      case None => IO.pure(Left(GameNotFound))
+      case Some(controller) =>
+        controller.loadPgnMoves(pgn) match
+          case Right(_) =>
+            publishSnapshot("pgn_loaded", gameId, controller)
+              .as(Right((controller.getBoardAsFEN, controller.pgnMoves.size)))
+          case Left(error) => IO.pure(Left(error))
+    }
+
   def loadFen(gameId: String, fen: String): IO[Either[String, String]] =
     getGame(gameId).flatMap {
       case None => IO.pure(Left(GameNotFound))
