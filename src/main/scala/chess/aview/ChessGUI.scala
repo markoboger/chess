@@ -125,7 +125,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private[aview] var initialized: Boolean = false
 
   // ── Session / backend integration ───────────────────────────────────────────
-  private val backendUrl = sys.env.getOrElse("CHESS_API_URL", "http://localhost:8081")
+  private val backendUrl     = sys.env.getOrElse("CHESS_API_URL",      "http://localhost:8081")
+  private val matchRunnerUrl = sys.env.getOrElse("MATCH_RUNNER_URL",   "http://localhost:8084")
   private val wsBaseUrl  = sys.env.getOrElse("CHESS_WS_URL",  "ws://localhost:8083")
   private val httpClient: java.net.http.HttpClient = java.net.http.HttpClient.newHttpClient()
   @volatile private var currentSessionId: Option[String] = None
@@ -716,6 +717,185 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     root.setPadding(new javafx.geometry.Insets(20)); root.setPrefWidth(440)
     root.getChildren.addAll(hdr, listView, new javafx.scene.control.Separator(), idLbl, idField, new javafx.scene.control.Separator(), btnRow)
     dlg.setScene(new javafx.scene.Scene(root))
+    dlg.showAndWait()
+  }
+
+  // ── Browse Games dialog ───────────────────────────────────────────────────
+  // Lists experiments from the match-runner, lets the user pick a run, then
+  // replays the stored PGN into a fresh game session.
+
+  private[aview] def showBrowseGamesDialog(): Unit = {
+    val dlg = new javafx.stage.Stage()
+    dlg.initOwner(primaryStage.delegate)
+    dlg.initModality(javafx.stage.Modality.WINDOW_MODAL)
+    dlg.setTitle("Browse Experiment Games"); dlg.setResizable(true)
+
+    // ── left panel: experiment list ──────────────────────────────────────
+    case class ExpEntry(id: String, name: String, status: String, games: Int)
+    case class RunEntry(id: String, chessGameId: String, result: String, winner: String, moves: String, pgn: String)
+
+    val expListView = new javafx.scene.control.ListView[String]()
+    expListView.setPrefWidth(260); expListView.setPrefHeight(340)
+
+    val runListView = new javafx.scene.control.ListView[String]()
+    runListView.setPrefWidth(340); runListView.setPrefHeight(340)
+
+    var experiments: Vector[ExpEntry] = Vector.empty
+    var runs: Vector[RunEntry]        = Vector.empty
+
+    val statusLbl = new javafx.scene.control.Label("Loading experiments…")
+    statusLbl.setStyle("-fx-font-size:11px; -fx-text-fill:#888;")
+
+    def parseExperiments(json: String): Vector[ExpEntry] = {
+      val idRx     = """"id"\s*:\s*"([^"]+)"""".r
+      val nameRx   = """"name"\s*:\s*"([^"]+)"""".r
+      val statusRx = """"status"\s*:\s*"([^"]+)"""".r
+      val gamesRx  = """"games"\s*:\s*(\d+)""".r
+      val ids      = idRx.findAllMatchIn(json).map(_.group(1)).toVector
+      val names    = nameRx.findAllMatchIn(json).map(_.group(1)).toVector
+      val statuses = statusRx.findAllMatchIn(json).map(_.group(1)).toVector
+      val gameNums = gamesRx.findAllMatchIn(json).map(_.group(1).toInt).toVector
+      ids.zipWithIndex.map { case (id, i) =>
+        ExpEntry(id, names.applyOrElse(i, _ => id.take(8)), statuses.applyOrElse(i, _ => ""), gameNums.applyOrElse(i, _ => 0))
+      }
+    }
+
+    def parseRuns(json: String): Vector[RunEntry] = {
+      // Runs come as an array; parse field by field using index alignment
+      val idRx      = """"id"\s*:\s*"([^"]+)"""".r
+      val cgIdRx    = """"chessGameId"\s*:\s*"([^"]+)"""".r
+      val resultRx  = """"result"\s*:\s*"([^"]+)"""".r
+      val winnerRx  = """"winner"\s*:\s*"([^"]+)"""".r
+      val movesRx   = """"moveCount"\s*:\s*(\d+)""".r
+      val pgnRx     = """"pgn"\s*:\s*"((?:[^"\\]|\\.)*)"""".r
+      val ids     = idRx.findAllMatchIn(json).map(_.group(1)).toVector
+      val cgIds   = cgIdRx.findAllMatchIn(json).map(_.group(1)).toVector
+      val results = resultRx.findAllMatchIn(json).map(_.group(1)).toVector
+      val winners = winnerRx.findAllMatchIn(json).map(_.group(1)).toVector
+      val moveCts = movesRx.findAllMatchIn(json).map(_.group(1)).toVector
+      val pgns    = pgnRx.findAllMatchIn(json).map(_.group(1)).toVector
+      ids.zipWithIndex.map { case (id, i) =>
+        RunEntry(
+          id       = id,
+          chessGameId = cgIds.applyOrElse(i, _ => ""),
+          result   = results.applyOrElse(i, _ => "?"),
+          winner   = winners.applyOrElse(i, _ => "-"),
+          moves    = moveCts.applyOrElse(i, _ => "?"),
+          pgn      = pgns.applyOrElse(i, _ => "").replace("\\n", "\n").replace("\\\"", "\"")
+        )
+      }
+    }
+
+    def loadExperiments(): Unit = {
+      val t = new Thread(() => {
+        val result = httpGet(s"$matchRunnerUrl/experiments")
+        Platform.runLater(() => {
+          result match {
+            case None =>
+              statusLbl.setText(s"Could not reach match runner at $matchRunnerUrl")
+            case Some(json) =>
+              experiments = parseExperiments(json)
+              expListView.getItems.clear()
+              experiments.foreach { e =>
+                expListView.getItems.add(s"${e.name}  [${e.status}]  (${e.games} games)")
+              }
+              if (experiments.isEmpty) statusLbl.setText("No experiments found.")
+              else statusLbl.setText(s"${experiments.size} experiment(s)")
+          }
+        })
+      }, "browse-experiments")
+      t.setDaemon(true); t.start()
+    }
+
+    def loadRuns(expId: String): Unit = {
+      runs = Vector.empty
+      runListView.getItems.clear()
+      val t = new Thread(() => {
+        val result = httpGet(s"$matchRunnerUrl/experiments/$expId/runs")
+        Platform.runLater(() => {
+          result match {
+            case None => statusLbl.setText("Could not load runs.")
+            case Some(json) =>
+              runs = parseRuns(json)
+              runListView.getItems.clear()
+              runs.foreach { r =>
+                val res = if (r.result.isEmpty || r.result == "?") "?" else r.result
+                runListView.getItems.add(s"${r.moves} moves  $res  [${r.winner}]  ${r.chessGameId.take(8)}…")
+              }
+              if (runs.isEmpty) statusLbl.setText("No runs for this experiment.")
+              else statusLbl.setText(s"${runs.size} game(s) — select one to replay")
+          }
+        })
+      }, "browse-runs")
+      t.setDaemon(true); t.start()
+    }
+
+    expListView.getSelectionModel.selectedIndexProperty().addListener((_, _, idx) => {
+      val i = idx.intValue()
+      if (i >= 0 && i < experiments.size) loadRuns(experiments(i).id)
+    })
+
+    val refreshBtn = new javafx.scene.control.Button("↻ Refresh")
+    refreshBtn.setOnAction(_ => loadExperiments())
+
+    val expLbl = new javafx.scene.control.Label("Experiments")
+    expLbl.setStyle("-fx-font-weight:bold; -fx-font-size:12px;")
+    val runLbl = new javafx.scene.control.Label("Games")
+    runLbl.setStyle("-fx-font-weight:bold; -fx-font-size:12px;")
+
+    val expHdr = new javafx.scene.layout.HBox(6, expLbl, refreshBtn)
+    expHdr.setAlignment(javafx.geometry.Pos.CENTER_LEFT)
+    val expPanel = new javafx.scene.layout.VBox(6, expHdr, expListView)
+    val runPanel = new javafx.scene.layout.VBox(6, runLbl, runListView)
+    val listsRow = new javafx.scene.layout.HBox(12, expPanel, runPanel)
+
+    val cancelBtn = new javafx.scene.control.Button("Cancel")
+    cancelBtn.setOnAction(_ => dlg.close())
+
+    val replayBtn = new javafx.scene.control.Button("Replay Game")
+    replayBtn.setDefaultButton(true)
+    replayBtn.setStyle("-fx-background-color:#629924; -fx-text-fill:white; -fx-font-weight:bold;")
+    replayBtn.setDisable(true)
+    runListView.getSelectionModel.selectedIndexProperty().addListener((_, _, idx) => {
+      replayBtn.setDisable(idx.intValue() < 0 || idx.intValue() >= runs.size)
+    })
+
+    replayBtn.setOnAction(_ => {
+      val idx = runListView.getSelectionModel.getSelectedIndex
+      if (idx >= 0 && idx < runs.size) {
+        val run = runs(idx)
+        dlg.close()
+        // Load PGN directly into the local controller — no game service required
+        Platform.runLater(() => {
+          if (run.pgn.trim.isEmpty) {
+            showAlert("Browse Error", "No PGN stored for this game.")
+          } else {
+            paused = false; gameOverByTimeout = false; lastPgnLength = 0; selectedSquare = None
+            gameMode = GameMode.ComputerVsComputer
+            mySessionColor = 'x'; boardFlipped = false
+            disconnectWebSocket()
+            currentSessionId = None; updateSessionBar()
+            controller.announceInitial(chess.model.Board.initial)
+            controller.loadPgnMoves(run.pgn) match {
+              case Left(err) => showAlert("Browse Error", s"PGN replay failed: $err")
+              case Right(_)  =>
+            }
+            updateBoard(); updatePauseButtonVisibility()
+            if (pgnDisplay != null) pgnDisplay.children.clear()
+          }
+        })
+      }
+    })
+
+    val btnRow = new javafx.scene.layout.HBox(8, cancelBtn, replayBtn)
+    btnRow.setAlignment(javafx.geometry.Pos.CENTER_RIGHT)
+
+    val root = new javafx.scene.layout.VBox(10)
+    root.setPadding(new javafx.geometry.Insets(20)); root.setPrefWidth(640)
+    root.getChildren.addAll(listsRow, statusLbl, new javafx.scene.control.Separator(), btnRow)
+
+    dlg.setScene(new javafx.scene.Scene(root))
+    loadExperiments()
     dlg.showAndWait()
   }
 
@@ -1979,8 +2159,14 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       items = openingFamilyMenus
     }
 
+    val experimentsMenu = new Menu("Experiments") {
+      items = Seq(new MenuItem("Browse Games…") {
+        onAction = _ => showBrowseGamesDialog()
+      })
+    }
+
     new MenuBar {
-      menus = Seq(fileMenu, gameMenu, strategyMenu, clockMenu, viewMenu, openingsMenu, puzzlesMenu)
+      menus = Seq(fileMenu, gameMenu, strategyMenu, clockMenu, viewMenu, openingsMenu, puzzlesMenu, experimentsMenu)
     }
   }
 
