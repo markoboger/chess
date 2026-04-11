@@ -35,6 +35,6 @@ object MatchRunnerTuiMain:
     resources.use { case (httpClient, repository) =>
       val chessClient = ChessApiClient.http(Uri.unsafeFromString(config.chessApiUrl), httpClient)
       val runner = new ExperimentRunner(chessClient, repository, config)
-      val shell = new MatchRunnerShell(runner, repository)
+      val shell = new MatchRunnerShell(runner, repository, chessClient)
       shell.run
     }

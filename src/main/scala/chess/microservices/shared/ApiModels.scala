@@ -143,6 +143,24 @@ object OpeningLookupResponse:
   given Decoder[OpeningLookupResponse] = deriveDecoder
   given Encoder[OpeningLookupResponse] = deriveEncoder
 
+/** Request to load a game from PGN move text into an existing session. */
+case class LoadPgnRequest(pgn: String)
+
+object LoadPgnRequest:
+  given Decoder[LoadPgnRequest] = deriveDecoder
+  given Encoder[LoadPgnRequest] = deriveEncoder
+
+/** Response after loading a PGN into a session.
+  * @param success Whether loading was successful
+  * @param fen     The final position after replaying all moves
+  * @param moves   Number of half-moves loaded
+  */
+case class LoadPgnResponse(success: Boolean, fen: String, moves: Int)
+
+object LoadPgnResponse:
+  given Decoder[LoadPgnResponse] = deriveDecoder
+  given Encoder[LoadPgnResponse] = deriveEncoder
+
 /** Request to compute an AI move for the current position.
   * @param strategy
   *   Strategy identifier: "random", "greedy", "material-balance", "piece-square", "minimax",

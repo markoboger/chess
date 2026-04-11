@@ -57,3 +57,15 @@ final case class ErrorResponse(error: String, details: Option[String] = None)
 object ErrorResponse:
   given Encoder[ErrorResponse] = deriveEncoder
   given Decoder[ErrorResponse] = deriveDecoder
+
+final case class LoadPgnRequest(pgn: String)
+
+object LoadPgnRequest:
+  given Encoder[LoadPgnRequest] = deriveEncoder
+  given Decoder[LoadPgnRequest] = deriveDecoder
+
+final case class LoadPgnResponse(success: Boolean, fen: String, moves: Int)
+
+object LoadPgnResponse:
+  given Encoder[LoadPgnResponse] = deriveEncoder
+  given Decoder[LoadPgnResponse] = deriveDecoder

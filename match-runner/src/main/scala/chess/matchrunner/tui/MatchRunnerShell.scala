@@ -5,10 +5,12 @@ import chess.matchrunner.application.{DirectionStats, ExperimentRequest, Experim
 import chess.matchrunner.data.MatchRunnerRepository
 import chess.matchrunner.domain.{Experiment, MatchRun}
 import chess.matchrunner.csv.CsvExporter
+import chess.matchrunner.http.ChessApiClient
 
 final class MatchRunnerShell(
     runner: ExperimentRunner,
     repository: MatchRunnerRepository[IO],
+    client: ChessApiClient,
     readLine: String => IO[String] = MatchRunnerShell.defaultReadLine,
     writeLine: String => IO[Unit] = line => IO.println(line)
 ):
@@ -22,6 +24,7 @@ final class MatchRunnerShell(
       case "1" | "run"      => launchExperiment *> loop
       case "2" | "vs-all"   => launchVsAll *> loop
       case "3" | "list"     => listExperiments *> loop
+      case "4" | "browse"   => browseGames *> loop
       case "0" | "quit" | "exit" => writeLine("Bye.")
       case "help" | ":help" => printHelp *> loop
       case other            => writeLine(s"Unknown command: $other") *> printHelp *> loop
@@ -36,6 +39,7 @@ final class MatchRunnerShell(
     writeLine("[1] run     Launch a single experiment (one strategy pair)") *>
       writeLine("[2] vs-all  Run a strategy against all others") *>
       writeLine("[3] list    List persisted experiments") *>
+      writeLine("[4] browse  Browse and replay stored games") *>
       writeLine("[0] quit    Exit the TUI")
 
   // ── Single experiment ──────────────────────────────────────────────────────
@@ -139,6 +143,67 @@ final class MatchRunnerShell(
             }.mkString("\n")
           )
     }
+
+  // ── Browse / replay ───────────────────────────────────────────────────────
+
+  private def browseGames: IO[Unit] =
+    repository.listExperiments().flatMap { experiments =>
+      if experiments.isEmpty then writeLine("No experiments stored yet.")
+      else
+        val indexed = experiments.zipWithIndex
+        writeLine("") *>
+          writeLine(indexed.map { case (e, i) =>
+            val dur = e.totalDurationMs.map(ms => s"  ${MatchRunnerShell.formatDuration(ms)}").getOrElse("")
+            s"  [${i + 1}] ${e.name} | ${e.status} | games=${e.requestedGames}$dur"
+          }.mkString("\n")) *>
+          readLine("Select experiment (number or enter to cancel): ").flatMap { input =>
+            val trimmed = Option(input).map(_.trim).getOrElse("")
+            trimmed.toIntOption.flatMap(n => indexed.find(_._2 == n - 1).map(_._1)) match
+              case None => writeLine("Cancelled.")
+              case Some(experiment) =>
+                repository.listRuns(experiment.id).flatMap { runs =>
+                  if runs.isEmpty then writeLine("No runs stored for this experiment.")
+                  else
+                    val withPgn = runs.zipWithIndex.filter(_._1.pgn.nonEmpty)
+                    if withPgn.isEmpty then writeLine("No games with PGN stored in this experiment.")
+                    else
+                      writeLine("") *>
+                        writeLine(withPgn.map { case (r, i) =>
+                          val result = r.result.map(_.toString).getOrElse("?")
+                          val flag   = if r.winner.exists(_.endsWith("-flag")) then " [flag]" else ""
+                          val moves  = r.moveCount.map(n => s"  $n ply").getOrElse("")
+                          val dur    = r.durationMs.map(ms => s"  ${MatchRunnerShell.formatDuration(ms)}").getOrElse("")
+                          s"  [${i + 1}] $result$flag$moves$dur  ${r.whiteStrategy} (W) vs ${r.blackStrategy} (B)"
+                        }.mkString("\n")) *>
+                        readLine("Select game to replay (number or enter to cancel): ").flatMap { gameInput =>
+                          val trimmedGame = Option(gameInput).map(_.trim).getOrElse("")
+                          trimmedGame.toIntOption.flatMap(n => withPgn.find(_._2 == n - 1).map(_._1)) match
+                            case None => writeLine("Cancelled.")
+                            case Some(run) => replayGame(run)
+                        }
+                }
+          }
+    }
+
+  private def replayGame(run: MatchRun): IO[Unit] =
+    run.pgn match
+      case None => writeLine("No PGN available for this game.")
+      case Some(pgn) =>
+        client.createGame(startFen = None, settings = chess.model.GameSettings()).flatMap {
+          case Left(err) => writeLine(s"Could not create session: ${err.message}")
+          case Right(created) =>
+            client.loadPgn(created.gameId, pgn).flatMap {
+              case Left(err) => writeLine(s"Could not load PGN: ${err.message}")
+              case Right(loaded) =>
+                writeLine("") *>
+                  writeLine(s"Game loaded into session: ${created.gameId}") *>
+                  writeLine(s"  ${run.whiteStrategy} (W) vs ${run.blackStrategy} (B)") *>
+                  writeLine(s"  Result: ${run.result.map(_.toString).getOrElse("?")}  ${loaded.moves} moves  Final FEN: ${loaded.fen}") *>
+                  writeLine(s"  Open in web UI: /game/${created.gameId}") *>
+                  writeLine(s"  PGN:") *>
+                  writeLine(pgn)
+            }
+        }
 
   // ── Per-run callback ──────────────────────────────────────────────────────
 

@@ -44,6 +44,11 @@ private final class HttpChessApiClient(baseUri: Uri, client: Client[IO]) extends
     val uri = baseUri / "games" / gameId
     runRequest[GameStateResponse](Request[IO](method = Method.GET, uri = uri))
 
+  override def loadPgn(gameId: String, pgn: String): IO[Either[ChessApiError, LoadPgnResponse]] =
+    val uri = baseUri / "games" / gameId / "pgn"
+    val httpRequest = Request[IO](method = Method.POST, uri = uri).withEntity(LoadPgnRequest(pgn))
+    runRequest[LoadPgnResponse](httpRequest)
+
   private def runRequest[A: Decoder](request: org.http4s.Request[IO]): IO[Either[ChessApiError, A]] =
     client.run(request).use { response =>
       response.bodyText.compile.string.map { body =>

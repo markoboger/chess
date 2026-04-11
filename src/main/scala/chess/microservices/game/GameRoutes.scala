@@ -106,6 +106,17 @@ object GameRoutes:
             NotFound(ErrorResponse("Opening not found"))
         }
 
+      // POST /games/:id/pgn - Replay a full PGN into an existing session
+      case req @ POST -> Root / "games" / gameId / "pgn" =>
+        req.asJsonDecode[LoadPgnRequest].flatMap { request =>
+          gameSessions.loadPgn(gameId, request.pgn).flatMap {
+            case Right((fen, moves)) =>
+              Ok(LoadPgnResponse(success = true, fen, moves))
+            case Left(error) =>
+              BadRequest(ErrorResponse(error))
+          }
+        }
+
       // POST /games/:id/fen - Load position from FEN
       case req @ POST -> Root / "games" / gameId / "fen" =>
         req.asJsonDecode[LoadFenRequest].flatMap { request =>

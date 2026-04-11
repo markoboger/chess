@@ -168,3 +168,6 @@ final class ExperimentRunnerSpec extends AnyWordSpec with Matchers:
         stateIndices = stateIndices.updated(gameId, currentIndex + 1)
         response
       }
+
+    override def loadPgn(gameId: String, pgn: String) =
+      IO.pure(Right(chess.matchrunner.http.LoadPgnResponse(success = true, fen = "", moves = 0)))
