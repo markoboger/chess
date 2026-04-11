@@ -104,6 +104,34 @@ services:
     networks:
       - chess-network
 
+  match-runner-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.match-runner-service
+    container_name: chess-match-runner-service
+    ports:
+      - "8084:8084"
+    environment:
+      - PORT=8084
+      - CHESS_API_URL=http://game-service:8081
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE:-chess}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      game-service:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - chess-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 networks:
   chess-network:
     driver: bridge

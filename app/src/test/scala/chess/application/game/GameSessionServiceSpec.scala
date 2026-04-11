@@ -40,6 +40,23 @@ class GameSessionServiceSpec extends AnyWordSpec with Matchers {
       val id2 = svc.createGame().unsafeRunSync().toOption.get._1
       id1 should not be id2
     }
+
+    "autonomously advance a CvC game when backendAutoplay is enabled" in {
+      val svc = service
+      val settings = chess.model.GameSettings(
+        whiteIsHuman = false,
+        blackIsHuman = false,
+        whiteStrategy = "random",
+        blackStrategy = "random",
+        backendAutoplay = true
+      )
+      val (gameId, _) = svc.createGame(settings = settings).unsafeRunSync().toOption.get
+
+      Thread.sleep(300)
+
+      val history = svc.getMoveHistory(gameId).unsafeRunSync().get
+      history should not be empty
+    }
   }
 
   "getGame" should {
@@ -197,6 +214,23 @@ class GameSessionServiceSpec extends AnyWordSpec with Matchers {
       val result = svc.makeMove(gameId, "Kh1").unsafeRunSync()
       result.toOption.map(_._2) shouldBe Some(Some("threefold_repetition"))
     }
+
+    "autonomously reply for the AI side when backendAutoplay is enabled" in {
+      val svc = service
+      val settings = chess.model.GameSettings(
+        whiteIsHuman = true,
+        blackIsHuman = false,
+        blackStrategy = "random",
+        backendAutoplay = true
+      )
+      val (gameId, _) = svc.createGame(settings = settings).unsafeRunSync().toOption.get
+
+      svc.makeMove(gameId, "e4").unsafeRunSync() shouldBe a[Right[?, ?]]
+      Thread.sleep(300)
+
+      val history = svc.getMoveHistory(gameId).unsafeRunSync().get
+      history.length should be >= 2
+    }
   }
 
   "getMoveHistory" should {
@@ -248,6 +282,24 @@ class GameSessionServiceSpec extends AnyWordSpec with Matchers {
 
     "return Left for unknown game" in {
       service.loadFen("no-such-id", "anything").unsafeRunSync() shouldBe Left(GameSessionService.GameNotFound)
+    }
+
+    "autonomously continue from a loaded CvC position when backendAutoplay is enabled" in {
+      val svc = service
+      val settings = chess.model.GameSettings(
+        whiteIsHuman = false,
+        blackIsHuman = false,
+        whiteStrategy = "random",
+        blackStrategy = "random",
+        backendAutoplay = true
+      )
+      val (gameId, _) = svc.createGame(settings = settings).unsafeRunSync().toOption.get
+
+      svc.loadFen(gameId, validFen).unsafeRunSync() shouldBe a[Right[?, ?]]
+      Thread.sleep(300)
+
+      val history = svc.getMoveHistory(gameId).unsafeRunSync().get
+      history should not be empty
     }
   }
 

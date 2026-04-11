@@ -1,0 +1,35 @@
+# Dockerfile for Match Runner Service
+FROM sbtscala/scala-sbt:eclipse-temurin-jammy-21.0.5_11_1.10.6_3.5.2 AS builder
+
+WORKDIR /app
+
+# Copy build files
+COPY build.sbt .
+COPY project project/
+
+# Download dependencies
+RUN sbt update
+
+# Copy source code
+COPY match-runner match-runner/
+
+# Build the application
+RUN sbt "MatchRunner/compile" "MatchRunner/stage"
+
+# Runtime image
+FROM eclipse-temurin:21-jre-jammy
+
+WORKDIR /app
+
+# Copy built application from builder
+COPY --from=builder /app/match-runner/target/universal/stage /app
+
+# Expose Match Runner port
+EXPOSE 8084
+
+# Set environment
+ENV PORT=8084
+ENV CHESS_API_URL=http://game-service:8081
+
+# Run the Match Runner Service
+CMD ["/app/bin/chess-match-runner", "-main", "chess.matchrunner.MatchRunnerServer"]

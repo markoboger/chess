@@ -14,6 +14,8 @@ package chess.model
   *   Optional initial clock time per player in milliseconds
   * @param clockIncrementMs
   *   Optional clock increment per move in milliseconds
+  * @param backendAutoplay
+  *   Whether the backend service should autonomously continue non-human turns after create/move/load
   */
 case class GameSettings(
     whiteIsHuman: Boolean = true,
@@ -21,5 +23,6 @@ case class GameSettings(
     whiteStrategy: String = "opening-continuation",
     blackStrategy: String = "opening-continuation",
     clockInitialMs: Option[Long] = None,
-    clockIncrementMs: Option[Long] = None
+    clockIncrementMs: Option[Long] = None,
+    backendAutoplay: Boolean = false
 )

@@ -20,6 +20,7 @@ class GameSessionService(
     publisher: GameEventPublisher = GameEventPublisher.noop
 )(using fenIO: FenIO, pgnIO: PgnIO):
   private val games: Ref[IO, Map[String, (GameController, GameSettings)]] = Ref.unsafe(Map.empty)
+  private val autoplayRunning: Ref[IO, Set[String]] = Ref.unsafe(Set.empty)
 
   def createGame(
       startFen: Option[String] = None,
@@ -35,6 +36,7 @@ class GameSessionService(
             games
               .update(_.updated(gameId, (controller, settings)))
               .flatMap(_ => publishSnapshot("game_created", gameId, controller))
+              .flatTap(_ => ensureAutoplay(gameId))
               .as(Right((gameId, fenStr)))
           case scala.util.Failure(e) =>
             IO.pure(Left(s"Invalid FEN: ${e.getMessage}"))
@@ -45,13 +47,14 @@ class GameSessionService(
         games
           .update(_.updated(gameId, (controller, settings)))
           .flatMap(_ => publishSnapshot("game_created", gameId, controller))
+          .flatTap(_ => ensureAutoplay(gameId))
           .as(Right((gameId, fen)))
 
   def listGames: IO[List[(String, String, chess.model.GameSettings)]] =
     games.get.map(_.toList.map { case (id, (ctrl, settings)) => (id, ctrl.gameStatus, settings) })
 
   def deleteAllGames: IO[Unit] =
-    games.set(Map.empty)
+    games.set(Map.empty) >> autoplayRunning.set(Set.empty)
 
   def getGame(gameId: String): IO[Option[GameController]] =
     games.get.map(_.get(gameId).map(_._1))
@@ -77,6 +80,8 @@ class GameSessionService(
         )
       )
       else IO.unit
+    }.flatMap { deleted =>
+      autoplayRunning.update(_ - gameId).as(deleted)
     }
 
   def getGameState(gameId: String): IO[Option[(String, String, String, GameSettings)]] =
@@ -101,6 +106,7 @@ class GameSessionService(
               case chess.model.GameEvent.ThreefoldRepetition => Some("threefold_repetition")
               case _                                         => None
             publishSnapshot("move_applied", gameId, controller, move = Some(move), gameEvent = eventStr)
+              .flatTap(_ => ensureAutoplay(gameId))
               .as(Right((fen, eventStr)))
           case MoveResult.Failed(_, error) =>
             publisher.publish(
@@ -129,7 +135,9 @@ class GameSessionService(
       case Some(controller) =>
         controller.loadFromFEN(fen) match
           case Right(_) =>
-            publishSnapshot("fen_loaded", gameId, controller).as(Right(controller.getBoardAsFEN))
+            publishSnapshot("fen_loaded", gameId, controller)
+              .flatTap(_ => ensureAutoplay(gameId))
+              .as(Right(controller.getBoardAsFEN))
           case Left(error) => IO.pure(Left(error))
     }
 
@@ -176,6 +184,49 @@ class GameSessionService(
         occurredAt = Instant.now()
       )
     )
+
+  private def getSession(gameId: String): IO[Option[(GameController, GameSettings)]] =
+    games.get.map(_.get(gameId))
+
+  private def ensureAutoplay(gameId: String): IO[Unit] =
+    getSession(gameId).flatMap {
+      case Some((controller, settings))
+          if settings.backendAutoplay && isAiTurn(settings, controller) && !isTerminal(controller) =>
+        autoplayRunning.modify { running =>
+          if running.contains(gameId) then (running, false)
+          else (running + gameId, true)
+        }.flatMap { shouldStart =>
+          if shouldStart then
+            runAutoplay(gameId).guarantee(autoplayRunning.update(_ - gameId)).start.void
+          else IO.unit
+        }
+      case _ =>
+        IO.unit
+    }
+
+  private def runAutoplay(gameId: String): IO[Unit] =
+    getSession(gameId).flatMap {
+      case Some((controller, settings))
+          if settings.backendAutoplay && isAiTurn(settings, controller) && !isTerminal(controller) =>
+        val strategyId = activeStrategy(settings, controller)
+        computeAiMove(gameId, strategyId).flatMap {
+          case Right(Some(move)) =>
+            makeMove(gameId, move).flatMap(_ => runAutoplay(gameId))
+          case _ =>
+            IO.unit
+        }
+      case _ =>
+        IO.unit
+    }
+
+  private def activeStrategy(settings: GameSettings, controller: GameController): String =
+    if controller.isWhiteToMove then settings.whiteStrategy else settings.blackStrategy
+
+  private def isAiTurn(settings: GameSettings, controller: GameController): Boolean =
+    if controller.isWhiteToMove then !settings.whiteIsHuman else !settings.blackIsHuman
+
+  private def isTerminal(controller: GameController): Boolean =
+    controller.isCheckmate || controller.isStalemate || controller.isThreefoldRepetition
 
 object GameSessionService:
   val GameNotFound = "Game not found"

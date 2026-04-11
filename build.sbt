@@ -104,6 +104,37 @@ lazy val Realtime = project
     publish / skip := true
   )
 
+lazy val MatchRunner = project
+  .in(file("match-runner"))
+  .enablePlugins(JavaAppPackaging)
+  .dependsOn(Core)
+  .settings(
+    name := "Chess-Match-Runner",
+    scalaVersion := "3.5.0",
+    Compile / mainClass := Some("chess.matchrunner.MatchRunnerServer"),
+    libraryDependencies ++= Seq(
+      "org.scalatest" %% "scalatest" % "3.2.19" % Test,
+      "org.typelevel" %% "cats-effect" % "3.5.4",
+      "io.circe" %% "circe-core" % "0.14.10",
+      "io.circe" %% "circe-generic" % "0.14.10",
+      "io.circe" %% "circe-parser" % "0.14.10",
+      "org.tpolecat" %% "doobie-core" % "1.0.0-RC5",
+      "org.tpolecat" %% "doobie-hikari" % "1.0.0-RC5",
+      "org.tpolecat" %% "doobie-postgres" % "1.0.0-RC5",
+      "org.postgresql" % "postgresql" % "42.7.3",
+      "com.zaxxer" % "HikariCP" % "5.1.0",
+      "org.http4s" %% "http4s-client" % "0.23.30",
+      "org.http4s" %% "http4s-dsl" % "0.23.30",
+      "org.http4s" %% "http4s-circe" % "0.23.30",
+      "org.http4s" %% "http4s-ember-client" % "0.23.30",
+      "org.http4s" %% "http4s-ember-server" % "0.23.30",
+      "org.testcontainers" % "testcontainers" % "1.19.8" % Test,
+      "org.testcontainers" % "postgresql" % "1.19.8" % Test
+    ),
+    publish / skip := true
+  )
+  .settings(windowsTestcontainersSettings)
+
 lazy val Data = project
   .in(file("data"))
   .dependsOn(Core, App)
@@ -135,8 +166,8 @@ lazy val Data = project
 
 lazy val Chess = project
   .in(file("."))
-  .aggregate(Core, App, Realtime, Data)
-  .dependsOn(Core, App, Realtime, Data)
+  .aggregate(Core, App, Realtime, MatchRunner, Data)
+  .dependsOn(Core, App, Realtime, MatchRunner, Data)
   .settings(
     name := "Chess",
     Compile / mainClass := Some("chess.ChessApp"),
