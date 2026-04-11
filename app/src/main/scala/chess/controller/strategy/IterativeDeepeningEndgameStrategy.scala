@@ -1,25 +1,28 @@
 package chess.controller.strategy
 
 import chess.controller.MoveStrategy
-import chess.model.{Board, Color, Square, PromotableRole, MoveResult, GameEvent, CastlingRights, Piece}
+import chess.model.{Board, Color, Square, PromotableRole, GameEvent, CastlingRights, Piece}
 import SearchSupport.SearchMode
 
-/** Alpha-beta minimax with iterative deepening and a wall-clock time budget.
+/** Iterative deepening with quiescence search at the leaves and the full phase-aware endgame
+  * evaluator.
   *
-  * Searches depth 1, 2, 3, … until `timeLimitMs` milliseconds have elapsed. When the clock expires mid-search, the last
-  * *fully completed* depth's best move is returned, so the answer is always sound.
+  * Combines the strengths of three existing strategies:
+  * - [[IterativeDeepeningStrategy]]: searches deeper within a wall-clock budget, always returning
+  *   the best fully-completed depth result.
+  * - [[QuiescenceStrategy]]: extends leaf nodes with capture/check/promotion sequences to avoid the
+  *   horizon effect.
+  * - [[EndgameMinimaxStrategy]]: phase-aware evaluation with endgame king activity, passed-pawn
+  *   bonuses, conversion heuristics, and draw avoidance when ahead.
   *
-  * `timeLimitMs` is a `var` so the caller (e.g. the GUI) can adjust it per-move based on remaining game-clock time
-  * before calling [[chess.controller.ComputerPlayer.move]].
+  * `timeLimitMs` is a `var` so callers can adjust it per-move based on remaining game-clock time.
   */
-class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStrategy:
+class IterativeDeepeningEndgameStrategy(var timeLimitMs: Long = 2000L, val qDepth: Int = 6) extends MoveStrategy:
 
-  val name = "Iterative Deepening"
+  val name = "ID+Endgame"
 
   private val INF = Int.MaxValue / 2
 
-  // Position key for repetition detection within the search path.
-  // Includes castling rights and whose turn it is (maximizing).
   private type NodeKey = (Vector[Vector[Option[Piece]]], CastlingRights, Boolean)
   private def nodeKey(board: Board, maximizing: Boolean): NodeKey =
     (board.squares, board.castlingRights, maximizing)
@@ -29,8 +32,6 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
     if moves.isEmpty then return None
 
     val deadline = System.currentTimeMillis() + timeLimitMs
-
-    // Depth-0 fallback: use the first legal move so we always have a result.
     var bestMove: Option[(Square, Square, Option[PromotableRole])] = moves.headOption.map(_.asTuple)
 
     var depth = 1
@@ -44,7 +45,6 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
 
     bestMove
 
-  /** One full alpha-beta pass at `depth`. Returns (best-move, was-aborted). */
   private def searchAtDepth(
       board: Board,
       color: Color,
@@ -53,8 +53,6 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
   ): (Option[(Square, Square, Option[PromotableRole])], Boolean) =
     var aborted = false
     var mateFound = false
-
-    // Seed the path with the root position (maximizing = true at root).
     val rootPath: Set[NodeKey] = Set(nodeKey(board, maximizing = true))
 
     var bestScore = -INF
@@ -104,11 +102,10 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
   ): (Int, Boolean) =
     if System.currentTimeMillis() >= deadline then return (0, true)
 
-    // Detect repetition within the search path: this line is a draw.
     val key = nodeKey(board, mode == SearchMode.Maximize)
     if seenInPath.contains(key) then return (DrawPolicy.repetitionScore(board, rootColor), false)
 
-    if depth == 0 then return (Evaluator.evaluate(board, rootColor), false)
+    if depth == 0 then return (quiescence(board, alpha, beta, mode, rootColor, qDepth), false)
 
     val currentColor = mode.currentColor(rootColor)
     SearchSupport
@@ -136,3 +133,29 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
       case GameEvent.Checkmate => (mode.childCheckmateScore(INF, depth), false)
       case GameEvent.Stalemate => (DrawPolicy.drawScore(move.board, rootColor), false)
       case _                   => alphaBeta(move.board, depth - 1, alpha, beta, mode.next, rootColor, deadline, nextSeen)
+
+  private def quiescence(
+      board: Board,
+      alpha: Int,
+      beta: Int,
+      mode: SearchMode,
+      rootColor: Color,
+      remaining: Int
+  ): Int =
+    val standPat = Evaluator.evaluate(board, rootColor)
+    if mode == SearchMode.Maximize then
+      if standPat >= beta then return beta
+      if remaining == 0 then return standPat
+      val tacticalMoves = SearchSupport.legalSearchMoves(board, rootColor).filter(m => QuiescenceStrategy.isTacticalMove(board, m))
+      if tacticalMoves.isEmpty then return alpha.max(standPat)
+      SearchSupport.searchChildren(tacticalMoves, SearchMode.Maximize, alpha.max(standPat), beta, INF) { (move, a, b) =>
+        quiescence(move.board, a, b, SearchMode.Minimize, rootColor, remaining - 1)
+      }
+    else
+      if standPat <= alpha then return alpha
+      if remaining == 0 then return standPat
+      val tacticalMoves = SearchSupport.legalSearchMoves(board, rootColor.opposite).filter(m => QuiescenceStrategy.isTacticalMove(board, m))
+      if tacticalMoves.isEmpty then return beta.min(standPat)
+      SearchSupport.searchChildren(tacticalMoves, SearchMode.Minimize, alpha, beta.min(standPat), INF) { (move, a, b) =>
+        quiescence(move.board, a, b, SearchMode.Maximize, rootColor, remaining - 1)
+      }

@@ -26,7 +26,9 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
 
     val (_, bestMoves) =
       moves.foldLeft((-INF, List.empty[(Square, Square, Option[PromotableRole])])) { case ((bestScore, bestMoves), move) =>
-        val score = alphaBeta(move.board, depth - 1, -INF, INF, SearchMode.Minimize, color)
+        val score = move.event match
+          case chess.model.GameEvent.Stalemate => DrawPolicy.drawScore(move.board, color)
+          case _                               => alphaBeta(move.board, depth - 1, -INF, INF, SearchMode.Minimize, color)
         SearchSupport.updateBestMoves(bestScore, bestMoves, move, score)
       }
     SearchSupport.chooseRandom(bestMoves)
@@ -43,7 +45,7 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
 
     val currentColor = mode.currentColor(rootColor)
     SearchSupport
-      .terminalScore(board, currentColor, mode, depth, INF)
+      .terminalScore(board, currentColor, mode, depth, INF, rootColor)
       .getOrElse {
         val moves = SearchSupport.legalSearchMoves(board, currentColor)
         SearchSupport.searchChildren(moves, mode, alpha, beta, INF) { (move, currentAlpha, currentBeta) =>
@@ -65,19 +67,29 @@ class QuiescenceStrategy(val depth: Int = 3, val qDepth: Int = 6) extends MoveSt
     if mode == SearchMode.Maximize then
       if standPat >= beta then return beta
       if remaining == 0 then return standPat
-      val captures = captureMoves(board, rootColor)
-      if captures.isEmpty then return alpha.max(standPat)
-      SearchSupport.searchChildren(captures, SearchMode.Maximize, alpha.max(standPat), beta, INF) { (move, currentAlpha, currentBeta) =>
+      val tacticalMoves = quiescenceMoves(board, rootColor)
+      if tacticalMoves.isEmpty then return alpha.max(standPat)
+      SearchSupport.searchChildren(tacticalMoves, SearchMode.Maximize, alpha.max(standPat), beta, INF) { (move, currentAlpha, currentBeta) =>
         quiescence(move.board, currentAlpha, currentBeta, SearchMode.Minimize, rootColor, remaining - 1)
       }
     else
       if standPat <= alpha then return alpha
       if remaining == 0 then return standPat
-      val captures = captureMoves(board, rootColor.opposite)
-      if captures.isEmpty then return beta.min(standPat)
-      SearchSupport.searchChildren(captures, SearchMode.Minimize, alpha, beta.min(standPat), INF) { (move, currentAlpha, currentBeta) =>
+      val tacticalMoves = quiescenceMoves(board, rootColor.opposite)
+      if tacticalMoves.isEmpty then return beta.min(standPat)
+      SearchSupport.searchChildren(tacticalMoves, SearchMode.Minimize, alpha, beta.min(standPat), INF) { (move, currentAlpha, currentBeta) =>
         quiescence(move.board, currentAlpha, currentBeta, SearchMode.Maximize, rootColor, remaining - 1)
       }
 
-  private def captureMoves(board: Board, color: Color): Vector[SearchSupport.SearchMove] =
-    SearchSupport.legalSearchMoves(board, color).filter(move => board.pieceAt(move.to).isDefined)
+  private[strategy] def quiescenceMoves(board: Board, color: Color): Vector[SearchSupport.SearchMove] =
+    SearchSupport.legalSearchMoves(board, color).filter(move => QuiescenceStrategy.isTacticalMove(board, move))
+
+object QuiescenceStrategy:
+  private[strategy] def isTacticalMove(
+      board: Board,
+      move: SearchSupport.SearchMove
+  ): Boolean =
+    board.pieceAt(move.to).isDefined ||
+      move.promotion.nonEmpty ||
+      move.event == chess.model.GameEvent.Check ||
+      move.event == chess.model.GameEvent.Checkmate

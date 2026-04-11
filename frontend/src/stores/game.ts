@@ -53,6 +53,7 @@ export type ComputerStrategyId =
   | 'material-balance'
   | 'piece-square'
   | 'minimax'
+  | 'endgame-minimax'
   | 'quiescence'
   | 'iterative-deepening'
   | 'opening-continuation'
@@ -64,6 +65,7 @@ export const COMPUTER_STRATEGIES: { id: ComputerStrategyId; label: string }[] = 
   { id: 'material-balance', label: 'Material Balance' },
   { id: 'piece-square', label: 'Piece-Square Tables' },
   { id: 'minimax', label: 'Minimax (d=3)' },
+  { id: 'endgame-minimax', label: 'Endgame Minimax (d=3)' },
   { id: 'quiescence', label: 'Minimax+QSearch (d=3)' },
   { id: 'iterative-deepening', label: 'Iterative Deepening' },
 ]

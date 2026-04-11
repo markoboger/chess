@@ -148,8 +148,9 @@ final class MatchRunnerShell(
       case Some(error) => s"error=$error"
       case None =>
         val result = run.result.map(_.toString).getOrElse("unknown")
+        val flag   = if run.winner.exists(_.endsWith("-flag")) then " [flag]" else ""
         val moves  = run.moveCount.map(_.toString).getOrElse("?")
-        s"result=$result moves=$moves"
+        s"result=$result$flag moves=$moves"
     writeLine(s"    game ${run.chessGameId}: $outcome$timing")
 
   // ── CSV export helpers ────────────────────────────────────────────────────
@@ -235,16 +236,24 @@ final class MatchRunnerShell(
   private def readClockMode: IO[MatchRunnerShell.ClockMode] =
     writeLine("Clock mode:") *>
       writeLine("  [1] none (no clock)") *>
-      writeLine("  [2] bullet  (1 min + 0s)") *>
-      writeLine("  [3] blitz   (3 min + 2s)") *>
-      writeLine("  [4] rapid   (10 min + 5s)") *>
-      writeLine("  [5] custom") *>
+      writeLine("  [2] 1 second per side") *>
+      writeLine("  [3] 2 seconds per side") *>
+      writeLine("  [4] 5 seconds per side") *>
+      writeLine("  [5] 10 seconds per side") *>
+      writeLine("  [6] 20 seconds per side") *>
+      writeLine("  [7] 1 minute per side") *>
+      writeLine("  [8] 5 minutes per side") *>
+      writeLine("  [9] custom") *>
       readLine("Clock mode [1]: ").flatMap { input =>
         Option(input).map(_.trim).getOrElse("1") match
-          case "2" => IO.pure(MatchRunnerShell.ClockMode(Some(60_000L),  Some(0L),     " [bullet 1+0]"))
-          case "3" => IO.pure(MatchRunnerShell.ClockMode(Some(180_000L), Some(2_000L), " [blitz 3+2]"))
-          case "4" => IO.pure(MatchRunnerShell.ClockMode(Some(600_000L), Some(5_000L), " [rapid 10+5]"))
-          case "5" =>
+          case "2" => IO.pure(MatchRunnerShell.ClockMode(Some(1_000L),   Some(0L), " [1s per side]"))
+          case "3" => IO.pure(MatchRunnerShell.ClockMode(Some(2_000L),   Some(0L), " [2s per side]"))
+          case "4" => IO.pure(MatchRunnerShell.ClockMode(Some(5_000L),   Some(0L), " [5s per side]"))
+          case "5" => IO.pure(MatchRunnerShell.ClockMode(Some(10_000L),  Some(0L), " [10s per side]"))
+          case "6" => IO.pure(MatchRunnerShell.ClockMode(Some(20_000L),  Some(0L), " [20s per side]"))
+          case "7" => IO.pure(MatchRunnerShell.ClockMode(Some(60_000L),  Some(0L), " [1 min per side]"))
+          case "8" => IO.pure(MatchRunnerShell.ClockMode(Some(300_000L), Some(0L), " [5 min per side]"))
+          case "9" =>
             for
               mins    <- readNonNegativeLong("  Initial time per player (minutes): ")
               secs    <- readNonNegativeLong("  Increment per move (seconds): ")
@@ -261,15 +270,11 @@ object MatchRunnerShell:
   final case class ClockMode(initialMs: Option[Long], incrementMs: Option[Long], label: String)
 
   val availableStrategies: Vector[String] = Vector(
-    "random",
     "greedy",
-    "material-balance",
-    "piece-square",
-    "minimax",
-    "quiescence",
-    "iterative-deepening",
-    "opening-continuation",
-    "opening-intelligence"
+    "endgame-minimax",
+    "iterative-deepening-endgame",
+    "opening-continuation-endgame",
+    "opening-intelligence-endgame"
   )
 
   val strategyMenu: String =
@@ -291,7 +296,8 @@ object MatchRunnerShell:
     val sb = new StringBuilder
     sb.append(s"Experiment: ${summary.experiment.name}\n")
     sb.append(s"Status:     ${summary.experiment.status}\n")
-    sb.append(s"Total runs: ${summary.completedRuns}/${summary.totalRuns}  errors=${summary.errors}\n")
+    val flagNote = if summary.flagWins > 0 then s"  flags=${summary.flagWins}" else ""
+    sb.append(s"Total runs: ${summary.completedRuns}/${summary.totalRuns}  errors=${summary.errors}$flagNote\n")
     sb.append(s"Avg game:   $avgGame  total: $total\n")
 
     if summary.directions.size > 1 then
@@ -350,12 +356,15 @@ object MatchRunnerShell:
     sb.toString
 
   private def formatDirectionTable(directions: List[DirectionStats]): String =
-    val header = f"  ${"White"}%-28s ${"Black"}%-28s ${"W"}%4s ${"D"}%4s ${"L"}%4s ${"avg ply"}%8s ${"avg time"}%10s\n"
-    val sep    = "  " + "-" * 94 + "\n"
-    val rows   = directions.map { d =>
+    val anyFlags = directions.exists(_.flagWins > 0)
+    val flagHdr  = if anyFlags then f" ${"flag"}%5s" else ""
+    val header   = f"  ${"White"}%-28s ${"Black"}%-28s ${"W"}%4s ${"D"}%4s ${"L"}%4s$flagHdr ${"avg ply"}%8s ${"avg time"}%10s\n"
+    val sep      = "  " + "-" * (94 + (if anyFlags then 6 else 0)) + "\n"
+    val rows     = directions.map { d =>
       val avgMoves = String.format(Locale.US, "%.1f", Double.box(d.averageMoves))
       val avgTime  = d.averageGameMs.map(ms => formatDuration(ms.toLong)).getOrElse("n/a")
-      f"  ${d.whiteStrategy}%-28s ${d.blackStrategy}%-28s ${d.whiteWins}%4d ${d.draws}%4d ${d.blackWins}%4d ${avgMoves}%8s ${avgTime}%10s\n"
+      val flagCol  = if anyFlags then f" ${d.flagWins}%5d" else ""
+      f"  ${d.whiteStrategy}%-28s ${d.blackStrategy}%-28s ${d.whiteWins}%4d ${d.draws}%4d ${d.blackWins}%4d$flagCol ${avgMoves}%8s ${avgTime}%10s\n"
     }
     header + sep + rows.mkString
 

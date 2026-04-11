@@ -35,6 +35,7 @@ final class TuiShell:
     "material-balance" -> "Material Balance",
     "piece-square" -> "Piece-Square",
     "minimax" -> "Minimax",
+    "endgame-minimax" -> "Endgame Minimax",
     "quiescence" -> "Quiescence",
     "iterative-deepening" -> "Iterative Deepening"
   )

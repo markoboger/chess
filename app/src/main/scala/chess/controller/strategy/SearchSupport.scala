@@ -62,10 +62,12 @@ private[strategy] object SearchSupport:
       currentColor: Color,
       mode: SearchMode,
       depth: Int,
-      inf: Int
+      inf: Int,
+      rootColor: Color
   ): Option[Int] =
     Option.when(board.legalMoves(currentColor).isEmpty) {
-      if board.isInCheck(currentColor) then mode.terminalMateScore(inf, depth) else 0
+      if board.isInCheck(currentColor) then mode.terminalMateScore(inf, depth)
+      else DrawPolicy.drawScore(board, rootColor)
     }
 
   def updateBestMoves(

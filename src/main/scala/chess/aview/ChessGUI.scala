@@ -25,9 +25,12 @@ import chess.controller.strategy.{
   MaterialBalanceStrategy,
   PieceSquareStrategy,
   MinimaxStrategy,
+  EndgameMinimaxStrategy,
   QuiescenceStrategy,
   IterativeDeepeningStrategy,
-  OpeningContinuationStrategy
+  IterativeDeepeningEndgameStrategy,
+  OpeningContinuationStrategy,
+  OpeningBookStrategy
 }
 import chess.model.{Board, Piece, PromotableRole, Role, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.model.{Color => ChessColor}
@@ -469,9 +472,15 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     case "material-balance"    => new MaterialBalanceStrategy()
     case "piece-square"        => new PieceSquareStrategy()
     case "minimax"             => new MinimaxStrategy(3)
+    case "endgame-minimax"     => new EndgameMinimaxStrategy(3)
     case "quiescence"          => new QuiescenceStrategy(3)
-    case "iterative-deepening" => new IterativeDeepeningStrategy()
-    case _                     => new OpeningContinuationStrategy(openings)
+    case "iterative-deepening"              => new IterativeDeepeningStrategy()
+    case "iterative-deepening-endgame"      => new IterativeDeepeningEndgameStrategy()
+    case "opening-continuation"             => new OpeningContinuationStrategy(openings)
+    case "opening-continuation-endgame"     => new OpeningContinuationStrategy(openings, new IterativeDeepeningEndgameStrategy())
+    case "opening-intelligence"             => new OpeningBookStrategy(openings)
+    case "opening-intelligence-endgame"     => new OpeningBookStrategy(openings, new IterativeDeepeningEndgameStrategy())
+    case _                                  => new OpeningContinuationStrategy(openings)
   }
 
   // ── New Game dialog ───────────────────────────────────────────────────────────
@@ -482,8 +491,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     var clockMs: Option[Long] = None; var incMs: Option[Long] = None
     var playAsWhite = true
 
-    val stratIds     = Array("opening-continuation","random","greedy","material-balance","piece-square","minimax","quiescence","iterative-deepening")
-    val stratLabels  = Array("Opening Continuation","Random","Greedy","Material Balance","Piece-Square","Minimax (d=3)","Quiescence (d=3)","Iterative Deepening")
+    val stratIds     = Array("opening-continuation","opening-continuation-endgame","opening-intelligence","opening-intelligence-endgame","random","greedy","material-balance","piece-square","minimax","endgame-minimax","quiescence","iterative-deepening","iterative-deepening-endgame")
+    val stratLabels  = Array("Opening Continuation","Opening Continuation+EG","Opening Intelligence","Opening Intelligence+EG","Random","Greedy","Material Balance","Piece-Square","Minimax (d=3)","Endgame Minimax (d=3)","Quiescence (d=3)","Iterative Deepening","ID+Endgame")
     val clockPresets = Array(
       ("No Limit", None, None), ("Bullet 1+0", Some(60_000L), Some(0L)),
       ("Blitz 3+0", Some(180_000L), Some(0L)), ("Blitz 5+0", Some(300_000L), Some(0L)),

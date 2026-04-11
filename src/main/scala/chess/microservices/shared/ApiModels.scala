@@ -146,7 +146,7 @@ object OpeningLookupResponse:
 /** Request to compute an AI move for the current position.
   * @param strategy
   *   Strategy identifier: "random", "greedy", "material-balance", "piece-square", "minimax",
-  *   "quiescence", or "iterative-deepening"
+  *   "endgame-minimax", "quiescence", or "iterative-deepening"
   */
 case class AiMoveRequest(strategy: String)
 

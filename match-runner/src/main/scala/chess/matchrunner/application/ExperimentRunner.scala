@@ -105,9 +105,13 @@ final class ExperimentRunner(
             blackStrategy = blackStrategy
           )
 
+          val gameTimeoutMs = request.clockInitialMs
+            .map(perSide => perSide * 2 + 3_000L)
+            .getOrElse(config.matchTimeoutMs)
+
           for
             _ <- repository.saveMatchRun(initialRun)
-            completed <- pollUntilFinished(created.gameId)
+            completed <- pollUntilFinished(created.gameId, gameTimeoutMs)
             finishedAt = Instant.now()
             completedRun = enrichRun(initialRun, completed, finishedAt)
             _ <- repository.saveMatchRun(completedRun)
@@ -130,10 +134,10 @@ final class ExperimentRunner(
           repository.saveMatchRun(failedRun) *> onRunFinished(failedRun).as(true)
       }
 
-  private def pollUntilFinished(gameId: String): IO[GameStateResponse] =
+  private def pollUntilFinished(gameId: String, timeoutMs: Long = config.matchTimeoutMs): IO[GameStateResponse] =
     Temporal[IO].timeoutTo(
       pollLoop(gameId),
-      config.matchTimeoutMs.millis,
+      timeoutMs.millis,
       IO.pure(
         GameStateResponse(
           gameId = gameId,
@@ -182,6 +186,7 @@ final class ExperimentRunner(
     normalized.contains("checkmate") ||
     normalized.contains("stalemate") ||
     normalized.contains("draw by threefold repetition") ||
+    normalized.contains("wins on time") ||
     normalized == "timeout" ||
     normalized.startsWith("error:")
 
@@ -191,6 +196,10 @@ final class ExperimentRunner(
       TerminalState(Some(MatchResult.WhiteWin), Some("white"), None)
     else if normalized.contains("checkmate") && normalized.contains("black wins") then
       TerminalState(Some(MatchResult.BlackWin), Some("black"), None)
+    else if normalized.contains("white wins on time") then
+      TerminalState(Some(MatchResult.WhiteWin), Some("white-flag"), None)
+    else if normalized.contains("black wins on time") then
+      TerminalState(Some(MatchResult.BlackWin), Some("black-flag"), None)
     else if normalized.contains("stalemate") || normalized.contains("draw by threefold repetition") then
       TerminalState(Some(MatchResult.Draw), None, None)
     else if normalized == "timeout" then

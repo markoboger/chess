@@ -23,8 +23,28 @@ final class StrategySpec extends AnyWordSpec with Matchers:
 
   /** White can mate but Black can also threaten; good for depth-3 traversal. */
   private val endgamePos = fen("6k1/5ppp/8/8/8/8/5PPP/R5K1")
+  private val pureKingEndgame = fen("4k3/8/8/8/8/8/8/4K3")
+  private val activeKingEndgame = fen("4k3/8/8/8/3K4/8/8/8")
+  private val passedPawnEndgame = fen("4k3/8/8/3P4/8/8/8/4K3")
+  private val blockedPawnEndgame = fen("4k3/8/3p4/3P4/8/8/8/4K3")
+  private val rookBehindPassedPawnEndgame = fen("4k3/8/8/3P4/8/8/3R4/4K3")
+  private val rookNotBehindPassedPawnEndgame = fen("4k3/8/3R4/3P4/8/8/8/4K3")
+  private val connectedPassersEndgame = fen("4k3/8/8/2PP4/8/8/8/4K3")
+  private val splitPassersEndgame = fen("4k3/8/8/P2P4/8/8/8/4K3")
+  private val checkingMovePos = fen("6k1/8/8/8/8/8/6Q1/6K1")
+  private val promotionRacePos = fen("6k1/4P3/8/8/8/8/8/6K1")
 
   // ── Evaluator ─────────────────────────────────────────────────────────────
+
+  "Evaluator.phase" should {
+    "detect the initial board as a middlegame" in {
+      Evaluator.phase(Board.initial) shouldBe Evaluator.GamePhase.Middlegame
+    }
+
+    "detect a king-only position as an endgame" in {
+      Evaluator.phase(pureKingEndgame) shouldBe Evaluator.GamePhase.Endgame
+    }
+  }
 
   "Evaluator.evaluate" should {
     "return 0 for the initial symmetric position" in {
@@ -39,6 +59,26 @@ final class StrategySpec extends AnyWordSpec with Matchers:
     "return positive score when White has extra material" in {
       // White has an extra queen hanging on d5
       Evaluator.evaluate(hangingQueenPos, Color.White) should be > 0
+    }
+
+    "reward an active king in the endgame" in {
+      Evaluator.evaluate(activeKingEndgame, Color.White) should be >
+        Evaluator.evaluate(pureKingEndgame, Color.White)
+    }
+
+    "reward a passed pawn more than a blocked pawn in the endgame" in {
+      Evaluator.evaluate(passedPawnEndgame, Color.White) should be >
+        Evaluator.evaluate(blockedPawnEndgame, Color.White)
+    }
+
+    "reward a rook behind a passed pawn in the endgame" in {
+      Evaluator.evaluate(rookBehindPassedPawnEndgame, Color.White) should be >
+        Evaluator.evaluate(rookNotBehindPassedPawnEndgame, Color.White)
+    }
+
+    "reward connected passed pawns in the endgame" in {
+      Evaluator.evaluate(connectedPassersEndgame, Color.White) should be >
+        Evaluator.evaluate(splitPassersEndgame, Color.White)
     }
   }
 
@@ -81,6 +121,12 @@ final class StrategySpec extends AnyWordSpec with Matchers:
       val sq = Square(File.G, Rank._1)
       Evaluator.pstBonus(Role.King, sq, Color.White) should be >= -50
     }
+
+    "use a more active king table in endgames" in {
+      val sq = Square(File.D, Rank._4)
+      Evaluator.kingBonus(sq, Color.White, Evaluator.GamePhase.Endgame) should be >
+        Evaluator.kingBonus(sq, Color.White, Evaluator.GamePhase.Middlegame)
+    }
   }
 
   "Evaluator.materialValue" should {
@@ -91,6 +137,20 @@ final class StrategySpec extends AnyWordSpec with Matchers:
       Evaluator.materialValue(Role.Rook) shouldBe 500
       Evaluator.materialValue(Role.Queen) shouldBe 900
       Evaluator.materialValue(Role.King) shouldBe 20000
+    }
+  }
+
+  "DrawPolicy.drawScore" should {
+    "penalize draws when the root side is clearly ahead" in {
+      DrawPolicy.drawScore(aheadBoard, Color.White) should be < 0
+    }
+
+    "reward draws when the root side is clearly behind" in {
+      DrawPolicy.drawScore(aheadBoard, Color.Black) should be > 0
+    }
+
+    "stay neutral in balanced positions" in {
+      DrawPolicy.drawScore(Board.initial, Color.White) shouldBe 0
     }
   }
 
@@ -365,6 +425,16 @@ final class StrategySpec extends AnyWordSpec with Matchers:
     }
   }
 
+  "EndgameMinimaxStrategy" should {
+    "have a distinct selectable name" in {
+      new EndgameMinimaxStrategy(3).name shouldBe "Endgame Minimax (d=3)"
+    }
+
+    "return a move from the initial position" in {
+      new EndgameMinimaxStrategy(2).selectMove(Board.initial, Color.White) shouldBe defined
+    }
+  }
+
   // ── QuiescenceStrategy ────────────────────────────────────────────────────
 
   "QuiescenceStrategy" should {
@@ -410,6 +480,24 @@ final class StrategySpec extends AnyWordSpec with Matchers:
     "cover maximizing=true recursive branch (depth 3)" in {
       val s = new QuiescenceStrategy(3, 4)
       s.selectMove(endgamePos, Color.White) shouldBe defined
+    }
+
+    "treat checking moves as tactical in quiescence" in {
+      val board = checkingMovePos
+      val move = SearchSupport
+        .legalSearchMoves(board, Color.White)
+        .find(_.event == chess.model.GameEvent.Check)
+      move shouldBe defined
+      QuiescenceStrategy.isTacticalMove(board, move.get) shouldBe true
+    }
+
+    "treat promotion moves as tactical in quiescence" in {
+      val board = promotionRacePos
+      val move = SearchSupport
+        .legalSearchMoves(board, Color.White)
+        .find(_.promotion.nonEmpty)
+      move shouldBe defined
+      QuiescenceStrategy.isTacticalMove(board, move.get) shouldBe true
     }
   }
 
