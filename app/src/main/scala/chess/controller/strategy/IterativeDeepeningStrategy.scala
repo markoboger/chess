@@ -86,7 +86,7 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
   ): (Int, Boolean, Boolean) =
     move.event match
       case GameEvent.Checkmate => (INF, false, true)
-      case GameEvent.Stalemate => (0, false, false)
+      case GameEvent.Stalemate => (DrawPolicy.drawScore(move.board, color), false, false)
       case _ =>
         val (score, aborted) =
           alphaBeta(move.board, depth - 1, -INF, INF, SearchMode.Minimize, color, deadline, rootPath)
@@ -106,13 +106,13 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
 
     // Detect repetition within the search path: this line is a draw.
     val key = nodeKey(board, mode == SearchMode.Maximize)
-    if seenInPath.contains(key) then return (0, false)
+    if seenInPath.contains(key) then return (DrawPolicy.repetitionScore(board, rootColor), false)
 
     if depth == 0 then return (Evaluator.evaluate(board, rootColor), false)
 
     val currentColor = mode.currentColor(rootColor)
     SearchSupport
-      .terminalScore(board, currentColor, mode, depth, INF)
+      .terminalScore(board, currentColor, mode, depth, INF, rootColor)
       .map((_, false))
       .getOrElse {
         val nextSeen = seenInPath + key
@@ -134,5 +134,5 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
   ): (Int, Boolean) =
     move.event match
       case GameEvent.Checkmate => (mode.childCheckmateScore(INF, depth), false)
-      case GameEvent.Stalemate => (0, false)
+      case GameEvent.Stalemate => (DrawPolicy.drawScore(move.board, rootColor), false)
       case _                   => alphaBeta(move.board, depth - 1, alpha, beta, mode.next, rootColor, deadline, nextSeen)

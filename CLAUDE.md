@@ -35,6 +35,11 @@ sbt "runMain chess.microservices.game.GameServer"           # Game service  :808
 sbt "runMain chess.microservices.gateway.GatewayServer"    # API Gateway   :8080
 sbt "Realtime/runMain chess.realtime.GameEventServer"      # WebSocket hub :8083
 cd frontend && npm run dev                                  # Vue dev server :5173
+
+# Match Runner TUI (interactive shell — requires Postgres + game service running)
+./match-runner/run-tui.sh                                  # sources .env automatically
+# or directly:
+sbt "MatchRunner/runMain chess.matchrunner.MatchRunnerTuiMain"
 ```
 
 ## Architecture

@@ -10,6 +10,7 @@ final case class DirectionStats(
     blackWins: Int,
     draws: Int,
     errors: Int,
+    flagWins: Int,
     averageMoves: Double,
     averageGameMs: Option[Double]
 )
@@ -22,6 +23,7 @@ final case class ExperimentSummary(
     blackWins: Int,
     draws: Int,
     errors: Int,
+    flagWins: Int,
     averageMoves: Double,
     averageGameMs: Option[Double],
     totalDurationMs: Option[Long],
@@ -33,8 +35,9 @@ object ExperimentSummary:
     val completed = runs.count(_.finishedAt.nonEmpty)
     val whiteWins = runs.count(_.result.contains(MatchResult.WhiteWin))
     val blackWins = runs.count(_.result.contains(MatchResult.BlackWin))
-    val draws = runs.count(_.result.contains(MatchResult.Draw))
-    val errors = runs.count(_.errorMessage.nonEmpty)
+    val draws     = runs.count(_.result.contains(MatchResult.Draw))
+    val errors    = runs.count(_.errorMessage.nonEmpty)
+    val flagWins  = runs.count(_.winner.exists(_.endsWith("-flag")))
     val moveCounts = runs.flatMap(_.moveCount)
     val averageMoves =
       if moveCounts.isEmpty then 0.0
@@ -61,26 +64,28 @@ object ExperimentSummary:
           DirectionStats(
             whiteStrategy = white,
             blackStrategy = black,
-            games = dirRuns.size,
+            games     = dirRuns.size,
             whiteWins = dirRuns.count(_.result.contains(MatchResult.WhiteWin)),
             blackWins = dirRuns.count(_.result.contains(MatchResult.BlackWin)),
-            draws = dirRuns.count(_.result.contains(MatchResult.Draw)),
-            errors = dirRuns.count(_.errorMessage.nonEmpty),
-            averageMoves = dAvgMoves,
+            draws     = dirRuns.count(_.result.contains(MatchResult.Draw)),
+            errors    = dirRuns.count(_.errorMessage.nonEmpty),
+            flagWins  = dirRuns.count(_.winner.exists(_.endsWith("-flag"))),
+            averageMoves  = dAvgMoves,
             averageGameMs = dAvgMs
           )
         }
 
     ExperimentSummary(
-      experiment = experiment,
-      totalRuns = runs.size,
+      experiment    = experiment,
+      totalRuns     = runs.size,
       completedRuns = completed,
-      whiteWins = whiteWins,
-      blackWins = blackWins,
-      draws = draws,
-      errors = errors,
-      averageMoves = averageMoves,
+      whiteWins     = whiteWins,
+      blackWins     = blackWins,
+      draws         = draws,
+      errors        = errors,
+      flagWins      = flagWins,
+      averageMoves  = averageMoves,
       averageGameMs = averageGameMs,
       totalDurationMs = experiment.totalDurationMs,
-      directions = directions
+      directions    = directions
     )

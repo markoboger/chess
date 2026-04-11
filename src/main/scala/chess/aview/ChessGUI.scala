@@ -469,6 +469,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     case "material-balance"    => new MaterialBalanceStrategy()
     case "piece-square"        => new PieceSquareStrategy()
     case "minimax"             => new MinimaxStrategy(3)
+    case "endgame-minimax"     => new EndgameMinimaxStrategy(3)
     case "quiescence"          => new QuiescenceStrategy(3)
     case "iterative-deepening" => new IterativeDeepeningStrategy()
     case _                     => new OpeningContinuationStrategy(openings)
@@ -482,8 +483,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     var clockMs: Option[Long] = None; var incMs: Option[Long] = None
     var playAsWhite = true
 
-    val stratIds     = Array("opening-continuation","random","greedy","material-balance","piece-square","minimax","quiescence","iterative-deepening")
-    val stratLabels  = Array("Opening Continuation","Random","Greedy","Material Balance","Piece-Square","Minimax (d=3)","Quiescence (d=3)","Iterative Deepening")
+    val stratIds     = Array("opening-continuation","random","greedy","material-balance","piece-square","minimax","endgame-minimax","quiescence","iterative-deepening")
+    val stratLabels  = Array("Opening Continuation","Random","Greedy","Material Balance","Piece-Square","Minimax (d=3)","Endgame Minimax (d=3)","Quiescence (d=3)","Iterative Deepening")
     val clockPresets = Array(
       ("No Limit", None, None), ("Bullet 1+0", Some(60_000L), Some(0L)),
       ("Blitz 3+0", Some(180_000L), Some(0L)), ("Blitz 5+0", Some(300_000L), Some(0L)),

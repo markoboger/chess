@@ -40,7 +40,7 @@ class MinimaxStrategy(val depth: Int = 3) extends MoveStrategy:
   ): Int =
     move.event match
       case GameEvent.Checkmate => INF
-      case GameEvent.Stalemate => 0
+      case GameEvent.Stalemate => DrawPolicy.drawScore(move.board, color)
       case _ =>
         alphaBeta(move.board, depth - 1, -INF, INF, SearchMode.Minimize, color, rootPath)
 
@@ -70,13 +70,13 @@ class MinimaxStrategy(val depth: Int = 3) extends MoveStrategy:
   ): Int =
     // Detect repetition within the search path: this line is a draw.
     val key = nodeKey(board, mode == SearchMode.Maximize)
-    if seenInPath.contains(key) then return 0
+    if seenInPath.contains(key) then return DrawPolicy.repetitionScore(board, rootColor)
 
     if depth == 0 then return Evaluator.evaluate(board, rootColor)
 
     val currentColor = mode.currentColor(rootColor)
     SearchSupport
-      .terminalScore(board, currentColor, mode, depth, INF)
+      .terminalScore(board, currentColor, mode, depth, INF, rootColor)
       .getOrElse {
         val nextSeen = seenInPath + key
         val moves = SearchSupport.legalSearchMoves(board, currentColor)
@@ -96,5 +96,5 @@ class MinimaxStrategy(val depth: Int = 3) extends MoveStrategy:
   ): Int =
     move.event match
       case GameEvent.Checkmate => mode.childCheckmateScore(INF, depth)
-      case GameEvent.Stalemate => 0
+      case GameEvent.Stalemate => DrawPolicy.drawScore(move.board, rootColor)
       case _                   => alphaBeta(move.board, depth - 1, alpha, beta, mode.next, rootColor, nextSeen)

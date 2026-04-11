@@ -1,6 +1,6 @@
 package chess.controller
 
-import chess.controller.strategy.{RandomStrategy, Evaluator}
+import chess.controller.strategy.{RandomStrategy, DrawPolicy, Evaluator}
 import chess.model.{Board, Color, Square, PromotableRole, MoveResult}
 
 /** Delegates move selection to the current [[MoveStrategy]]. The strategy can be swapped at any time (e.g., from the
@@ -9,8 +9,6 @@ import chess.model.{Board, Color, Square, PromotableRole, MoveResult}
 class ComputerPlayer(var strategy: MoveStrategy = new RandomStrategy):
 
   /** Centipawn lead required before the player actively avoids a draw by repetition. */
-  private val RepetitionAvoidanceThreshold = 150
-
   def move(
       board: Board,
       color: Color,
@@ -19,7 +17,7 @@ class ComputerPlayer(var strategy: MoveStrategy = new RandomStrategy):
     val candidate = strategy.selectMove(board, color)
 
     // Only try to avoid repetition when we have a meaningful material lead.
-    val ahead = Evaluator.evaluate(board, color) >= RepetitionAvoidanceThreshold
+    val ahead = DrawPolicy.drawScore(board, color) < 0
     if !ahead then return candidate
 
     // Check whether the candidate move leads to a repeated position.
