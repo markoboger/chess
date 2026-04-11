@@ -249,7 +249,7 @@ class GameSessionService(
               val remaining = if isWhite then cs.whiteRemainingMs else cs.blackRemainingMs
               val startMs = System.currentTimeMillis()
               IO.race(
-                computeAiMoveBlocking(board, color, strategyId),
+                computeAiMoveBlocking(board, color, strategyId, Some(remaining)),
                 Temporal[IO].sleep(remaining.millis)
               ).flatMap {
                 case Left(sanOpt) =>
@@ -279,9 +279,9 @@ class GameSessionService(
         case _ => IO.unit
     yield ()
 
-  private def computeAiMoveBlocking(board: Board, color: Color, strategyId: String): IO[Option[String]] =
+  private def computeAiMoveBlocking(board: Board, color: Color, strategyId: String, clockMs: Option[Long] = None): IO[Option[String]] =
     IO.blocking {
-      resolveStrategy(strategyId).selectMove(board, color).flatMap { case (from, to, promo) =>
+      resolveStrategy(strategyId, clockMs).selectMove(board, color).flatMap { case (from, to, promo) =>
         board.move(from, to, promo).toOption.map { boardAfter =>
           chess.controller.io.pgn.PGNParser.toAlgebraic(from, to, board, boardAfter, color == Color.White)
         }
@@ -303,15 +303,24 @@ class GameSessionService(
       )
     )
 
-  private def resolveStrategy(strategyId: String): MoveStrategy = strategyId match
-    case "random"              => new RandomStrategy
-    case "material-balance"    => new MaterialBalanceStrategy
-    case "piece-square"        => new PieceSquareStrategy
-    case "minimax"             => new MinimaxStrategy
-    case "endgame-minimax"     => new EndgameMinimaxStrategy
-    case "quiescence"          => new QuiescenceStrategy
-    case "iterative-deepening" => new IterativeDeepeningStrategy
-    case _                     => new GreedyStrategy
+  private def resolveStrategy(strategyId: String, clockMs: Option[Long] = None): MoveStrategy =
+    val idBudget: Long = clockMs match
+      case Some(remaining) => (remaining / 5).max(50L).min(2000L)
+      case None            => 2000L
+    strategyId match
+      case "random"              => new RandomStrategy
+      case "material-balance"    => new MaterialBalanceStrategy
+      case "piece-square"        => new PieceSquareStrategy
+      case "minimax"             => new MinimaxStrategy
+      case "endgame-minimax"     => new EndgameMinimaxStrategy
+      case "quiescence"          => new QuiescenceStrategy
+      case "iterative-deepening"         => new IterativeDeepeningStrategy(idBudget)
+      case "iterative-deepening-endgame" => new IterativeDeepeningEndgameStrategy(idBudget)
+      case "opening-continuation"         => new OpeningContinuationStrategy(fallback = new IterativeDeepeningStrategy(idBudget))
+      case "opening-continuation-endgame" => new OpeningContinuationStrategy(fallback = new IterativeDeepeningEndgameStrategy(idBudget))
+      case "opening-intelligence"         => new OpeningBookStrategy(fallback = new IterativeDeepeningStrategy(idBudget))
+      case "opening-intelligence-endgame" => new OpeningBookStrategy(fallback = new IterativeDeepeningEndgameStrategy(idBudget))
+      case _                              => new GreedyStrategy
 
   private def activeStrategy(settings: GameSettings, controller: GameController): String =
     if controller.isWhiteToMove then settings.whiteStrategy else settings.blackStrategy

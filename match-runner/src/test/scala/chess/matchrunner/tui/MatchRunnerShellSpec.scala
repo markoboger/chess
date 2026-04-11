@@ -11,9 +11,9 @@ final class MatchRunnerShellSpec extends AnyWordSpec with Matchers:
 
   "MatchRunnerShell" should {
     "resolve strategies by number and id" in {
-      MatchRunnerShell.resolveStrategy("1") shouldBe Some("random")
-      MatchRunnerShell.resolveStrategy("5") shouldBe Some("minimax")
-      MatchRunnerShell.resolveStrategy("opening-intelligence") shouldBe Some("opening-intelligence")
+      MatchRunnerShell.resolveStrategy("1") shouldBe Some("greedy")
+      MatchRunnerShell.resolveStrategy("2") shouldBe Some("endgame-minimax")
+      MatchRunnerShell.resolveStrategy("iterative-deepening-endgame") shouldBe Some("iterative-deepening-endgame")
       MatchRunnerShell.resolveStrategy("does-not-exist") shouldBe None
     }
 

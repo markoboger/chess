@@ -241,15 +241,19 @@ final class MatchRunnerShell(
       writeLine("  [4] 5 seconds per side") *>
       writeLine("  [5] 10 seconds per side") *>
       writeLine("  [6] 20 seconds per side") *>
-      writeLine("  [7] custom") *>
+      writeLine("  [7] 1 minute per side") *>
+      writeLine("  [8] 5 minutes per side") *>
+      writeLine("  [9] custom") *>
       readLine("Clock mode [1]: ").flatMap { input =>
         Option(input).map(_.trim).getOrElse("1") match
-          case "2" => IO.pure(MatchRunnerShell.ClockMode(Some(1_000L), Some(0L), " [1s per side]"))
-          case "3" => IO.pure(MatchRunnerShell.ClockMode(Some(2_000L), Some(0L), " [2s per side]"))
-          case "4" => IO.pure(MatchRunnerShell.ClockMode(Some(5_000L), Some(0L), " [5s per side]"))
-          case "5" => IO.pure(MatchRunnerShell.ClockMode(Some(10_000L), Some(0L), " [10s per side]"))
-          case "6" => IO.pure(MatchRunnerShell.ClockMode(Some(20_000L), Some(0L), " [20s per side]"))
-          case "7" =>
+          case "2" => IO.pure(MatchRunnerShell.ClockMode(Some(1_000L),   Some(0L), " [1s per side]"))
+          case "3" => IO.pure(MatchRunnerShell.ClockMode(Some(2_000L),   Some(0L), " [2s per side]"))
+          case "4" => IO.pure(MatchRunnerShell.ClockMode(Some(5_000L),   Some(0L), " [5s per side]"))
+          case "5" => IO.pure(MatchRunnerShell.ClockMode(Some(10_000L),  Some(0L), " [10s per side]"))
+          case "6" => IO.pure(MatchRunnerShell.ClockMode(Some(20_000L),  Some(0L), " [20s per side]"))
+          case "7" => IO.pure(MatchRunnerShell.ClockMode(Some(60_000L),  Some(0L), " [1 min per side]"))
+          case "8" => IO.pure(MatchRunnerShell.ClockMode(Some(300_000L), Some(0L), " [5 min per side]"))
+          case "9" =>
             for
               mins    <- readNonNegativeLong("  Initial time per player (minutes): ")
               secs    <- readNonNegativeLong("  Increment per move (seconds): ")
@@ -266,16 +270,11 @@ object MatchRunnerShell:
   final case class ClockMode(initialMs: Option[Long], incrementMs: Option[Long], label: String)
 
   val availableStrategies: Vector[String] = Vector(
-    "random",
     "greedy",
-    "material-balance",
-    "piece-square",
-    "minimax",
     "endgame-minimax",
-    "quiescence",
-    "iterative-deepening",
-    "opening-continuation",
-    "opening-intelligence"
+    "iterative-deepening-endgame",
+    "opening-continuation-endgame",
+    "opening-intelligence-endgame"
   )
 
   val strategyMenu: String =
