@@ -29,6 +29,11 @@ class GameSessionService(
   // Games ended by flag fall: maps gameId -> Color of the player who flagged
   private val clockLoss: Ref[IO, Map[String, Color]] = Ref.unsafe(Map.empty)
 
+  // Per-game strategy cache: gameId -> (strategyId -> strategy instance).
+  // Strategies with expensive constructors (opening book index) are cached here so the index is
+  // only built once per game rather than once per move.
+  private val strategyCache: Ref[IO, Map[String, Map[String, MoveStrategy]]] = Ref.unsafe(Map.empty)
+
   def createGame(
       startFen: Option[String] = None,
       settings: GameSettings = GameSettings()
@@ -66,7 +71,8 @@ class GameSessionService(
     games.set(Map.empty) >>
       autoplayRunning.set(Set.empty) >>
       clocks.set(Map.empty) >>
-      clockLoss.set(Map.empty)
+      clockLoss.set(Map.empty) >>
+      strategyCache.set(Map.empty)
 
   def getGame(gameId: String): IO[Option[GameController]] =
     games.get.map(_.get(gameId).map(_._1))
@@ -96,6 +102,7 @@ class GameSessionService(
       autoplayRunning.update(_ - gameId)
         .flatMap(_ => clocks.update(_ - gameId))
         .flatMap(_ => clockLoss.update(_ - gameId))
+        .flatMap(_ => strategyCache.update(_ - gameId))
         .as(deleted)
     }
 
@@ -174,19 +181,21 @@ class GameSessionService(
     }
 
   def computeAiMove(gameId: String, strategyId: String): IO[Either[String, Option[String]]] =
-    getGame(gameId).map {
-      case None => Left(GameNotFound)
+    getGame(gameId).flatMap {
+      case None => IO.pure(Left(GameNotFound))
       case Some(controller) =>
         val color = if controller.isWhiteToMove then Color.White else Color.Black
-        val moveOpt = resolveStrategy(strategyId).selectMove(controller.board, color)
-        val san = moveOpt.flatMap { case (from, to, promo) =>
-          controller.board.move(from, to, promo).toOption.map { boardAfter =>
-            chess.controller.io.pgn.PGNParser.toAlgebraic(
-              from, to, controller.board, boardAfter, color == Color.White
-            )
+        getOrCreateStrategy(gameId, strategyId).map { strategy =>
+          val moveOpt = strategy.selectMove(controller.board, color)
+          val san = moveOpt.flatMap { case (from, to, promo) =>
+            controller.board.move(from, to, promo).toOption.map { boardAfter =>
+              chess.controller.io.pgn.PGNParser.toAlgebraic(
+                from, to, controller.board, boardAfter, color == Color.White
+              )
+            }
           }
+          Right(san)
         }
-        Right(san)
     }
 
   private def publishSnapshot(
@@ -260,7 +269,7 @@ class GameSessionService(
               val remaining = if isWhite then cs.whiteRemainingMs else cs.blackRemainingMs
               val startMs = System.currentTimeMillis()
               IO.race(
-                computeAiMoveBlocking(board, color, strategyId, Some(remaining)),
+                computeAiMoveBlocking(board, color, strategyId, Some(remaining), gameId),
                 Temporal[IO].sleep(remaining.millis)
               ).flatMap {
                 case Left(sanOpt) =>
@@ -281,7 +290,7 @@ class GameSessionService(
 
             case None =>
               // No clock: compute without timeout (original behaviour)
-              computeAiMoveBlocking(board, color, strategyId).flatMap {
+              computeAiMoveBlocking(board, color, strategyId, gameId = gameId).flatMap {
                 case Some(move) => makeMove(gameId, move).flatMap(_ => runAutoplay(gameId))
                 case None       => IO.unit
               }
@@ -290,11 +299,13 @@ class GameSessionService(
         case _ => IO.unit
     yield ()
 
-  private def computeAiMoveBlocking(board: Board, color: Color, strategyId: String, clockMs: Option[Long] = None): IO[Option[String]] =
-    IO.blocking {
-      resolveStrategy(strategyId, clockMs).selectMove(board, color).flatMap { case (from, to, promo) =>
-        board.move(from, to, promo).toOption.map { boardAfter =>
-          chess.controller.io.pgn.PGNParser.toAlgebraic(from, to, board, boardAfter, color == Color.White)
+  private def computeAiMoveBlocking(board: Board, color: Color, strategyId: String, clockMs: Option[Long] = None, gameId: String = ""): IO[Option[String]] =
+    getOrCreateStrategy(gameId, strategyId, clockMs).flatMap { strategy =>
+      IO.blocking {
+        strategy.selectMove(board, color).flatMap { case (from, to, promo) =>
+          board.move(from, to, promo).toOption.map { boardAfter =>
+            chess.controller.io.pgn.PGNParser.toAlgebraic(from, to, board, boardAfter, color == Color.White)
+          }
         }
       }
     }
@@ -314,10 +325,45 @@ class GameSessionService(
       )
     )
 
-  private def resolveStrategy(strategyId: String, clockMs: Option[Long] = None): MoveStrategy =
+  // Strategies whose constructors are expensive (they build an opening-book index on creation).
+  // These are cached per game so the index is only built once per game session.
+  private val cachedStrategyIds = Set(
+    "opening-continuation",
+    "opening-continuation-endgame",
+    "opening-intelligence",
+    "opening-intelligence-endgame",
+    "deepening-opening-endgame"
+  )
+
+  /** Returns an existing cached strategy instance for the game (updating its time budget if it
+    * is a time-managed strategy), or creates and caches a new one.  Cheap stateless strategies
+    * are always created fresh.
+    */
+  private def getOrCreateStrategy(gameId: String, strategyId: String, clockMs: Option[Long] = None): IO[MoveStrategy] =
     val idBudget: Long = clockMs match
       case Some(remaining) => (remaining / 5).max(50L).min(2000L)
       case None            => 2000L
+
+    if !cachedStrategyIds.contains(strategyId) then
+      IO.pure(freshStrategy(strategyId, idBudget))
+    else
+      strategyCache.modify { cache =>
+        val forGame = cache.getOrElse(gameId, Map.empty)
+        forGame.get(strategyId) match
+          case Some(s) =>
+            // Update the time budget in-place for time-managed strategies
+            s match
+              case d: DeepeningOpeningEndgameStrategy       => d.timeLimitMs = idBudget
+              case i: IterativeDeepeningEndgameStrategy     => i.timeLimitMs = idBudget
+              case i: IterativeDeepeningStrategy            => i.timeLimitMs = idBudget
+              case _                                        => ()
+            (cache, s)
+          case None =>
+            val s = cachedStrategy(strategyId, idBudget)
+            (cache.updated(gameId, forGame.updated(strategyId, s)), s)
+      }
+
+  private def freshStrategy(strategyId: String, idBudget: Long): MoveStrategy =
     strategyId match
       case "random"              => new RandomStrategy
       case "material-balance"    => new MaterialBalanceStrategy
@@ -327,10 +373,15 @@ class GameSessionService(
       case "quiescence"          => new QuiescenceStrategy
       case "iterative-deepening"         => new IterativeDeepeningStrategy(idBudget)
       case "iterative-deepening-endgame" => new IterativeDeepeningEndgameStrategy(idBudget)
+      case _                             => new GreedyStrategy
+
+  private def cachedStrategy(strategyId: String, idBudget: Long): MoveStrategy =
+    strategyId match
       case "opening-continuation"         => new OpeningContinuationStrategy(fallback = new IterativeDeepeningStrategy(idBudget))
       case "opening-continuation-endgame" => new OpeningContinuationStrategy(fallback = new IterativeDeepeningEndgameStrategy(idBudget))
       case "opening-intelligence"         => new OpeningBookStrategy(fallback = new IterativeDeepeningStrategy(idBudget))
       case "opening-intelligence-endgame" => new OpeningBookStrategy(fallback = new IterativeDeepeningEndgameStrategy(idBudget))
+      case "deepening-opening-endgame"    => new DeepeningOpeningEndgameStrategy(timeLimitMs = idBudget)
       case _                              => new GreedyStrategy
 
   private def activeStrategy(settings: GameSettings, controller: GameController): String =

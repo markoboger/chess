@@ -339,7 +339,8 @@ object MatchRunnerShell:
     "endgame-minimax",
     "iterative-deepening-endgame",
     "opening-continuation-endgame",
-    "opening-intelligence-endgame"
+    "opening-intelligence-endgame",
+    "deepening-opening-endgame"
   )
 
   val strategyMenu: String =
