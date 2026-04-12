@@ -20,8 +20,14 @@ object OpeningParser extends OpeningIO:
 
   // ── In-memory parsing ──────────────────────────────────────────────────────
 
-  /** Parses all five Lichess TSV resources (a–e) into [[Opening]] values. */
-  def parseLichessOpenings(): List[Opening] =
+  /** Parses all five Lichess TSV resources (a–e) into [[Opening]] values.
+    *
+    * The result is cached for the lifetime of the JVM so repeated construction of opening-aware strategies (for
+    * example one cache entry per game in the microservice) does not re-read and re-replay the full book each time.
+    */
+  def parseLichessOpenings(): List[Opening] = lichessOpeningsCache
+
+  private lazy val lichessOpeningsCache: List[Opening] =
     val tsvFiles = List("/openings/a.tsv", "/openings/b.tsv", "/openings/c.tsv", "/openings/d.tsv", "/openings/e.tsv")
     deduplicate(
       tsvFiles.flatMap { path =>

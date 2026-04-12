@@ -137,7 +137,11 @@ function handleKeydown(e: KeyboardEvent) {
           <div class="sidebar-card">
             <Transition name="panel" mode="out-in">
               <PuzzlePanel v-if="activeView === 'puzzles'" key="puzzles" @puzzle-loaded="() => {}" />
-              <GameControls v-else key="game" @new-game="handleNewGame" />
+              <GameControls
+                v-else
+                :key="`game-${gameStore.gameId}`"
+                @new-game="handleNewGame"
+              />
             </Transition>
           </div>
         </div>

@@ -45,7 +45,9 @@ export const gameApi = {
 
   async aiMove(gameId: string, strategy: string): Promise<AiMoveResponse> {
     const request: AiMoveRequest = { strategy }
-    const response = await apiClient.post(`/games/${gameId}/ai-move`, request)
+    const response = await apiClient.post(`/games/${gameId}/ai-move`, request, {
+      timeout: 120_000,
+    })
     return response.data
   },
 

@@ -74,6 +74,10 @@ export const COMPUTER_STRATEGIES: { id: ComputerStrategyId; label: string }[] = 
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
+/** Gap before each scheduled computer move (`makeComputerMove` uses setTimeout). Slightly longer in CvC so double‑AI play stays readable. */
+const COMPUTER_MOVE_DELAY_CVC_MS = 200
+const COMPUTER_MOVE_DELAY_HVC_MS = 120
+
 function deriveGameMode(whiteIsHuman: boolean, blackIsHuman: boolean): GameMode {
   if (whiteIsHuman && blackIsHuman) return 'hvh'
   if (!whiteIsHuman && !blackIsHuman) return 'cvc'
@@ -135,10 +139,12 @@ function errorStatus(err: unknown): number | undefined {
 }
 
 function backendMoveErrorMessage(err: unknown): string {
-  if (!err || typeof err !== 'object') return 'Move rejected by backend.'
+  if (!err || typeof err !== 'object') return 'Request failed.'
+  if (isTimeoutError(err)) return 'Request timed out (server may be busy or unreachable).'
   return (
     (err as { response?: { data?: { error?: string } } }).response?.data?.error ||
-    'Move rejected by backend.'
+    (err as { message?: string }).message ||
+    'Request failed.'
   )
 }
 
@@ -583,7 +589,8 @@ export const useGameStore = defineStore('game', () => {
     try {
       const response = await gameApi.aiMove(gameId.value, strategy)
       return response.move ?? null
-    } catch {
+    } catch (e) {
+      error.value = backendMoveErrorMessage(e)
       return null
     }
   }
@@ -614,7 +621,7 @@ export const useGameStore = defineStore('game', () => {
     if (!isAtLatest.value) return
 
     computerScheduled.value = true
-    const delay = gameMode.value === 'cvc' ? 400 : 250
+    const delay = gameMode.value === 'cvc' ? COMPUTER_MOVE_DELAY_CVC_MS : COMPUTER_MOVE_DELAY_HVC_MS
     const gen = gameGeneration   // capture so the callback can detect a new game
 
     setTimeout(async () => {
@@ -713,6 +720,9 @@ export const useGameStore = defineStore('game', () => {
       if (response.gameId && whiteIsHuman.value && blackIsHuman.value) {
         connectWebSocket(response.gameId)
       }
+      // Toolbar (Run vs Pause) follows gameMode; ensure it matches this session after all wiring.
+      paused.value = false
+      gameMode.value = deriveGameMode(whiteIsHuman.value, blackIsHuman.value)
     } catch {
       error.value = 'Could not create game via backend.'
     } finally {
@@ -747,6 +757,8 @@ export const useGameStore = defineStore('game', () => {
       syncFromGameState(response, { resetClockState: true })
       triggerComputerMoveIfNeeded()
       connectWebSocket(sessionId)
+      paused.value = false
+      gameMode.value = deriveGameMode(whiteIsHuman.value, blackIsHuman.value)
       return true
     } catch (err: unknown) {
       if (errorStatus(err) === 404) {
@@ -958,10 +970,16 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function goToMove(moveIndex: number) {
-    const targetIdx = Math.max(0, Math.min(moveIndex, boardStates.value.length - 1))
+    const last = Math.max(0, boardStates.value.length - 1)
+    const targetIdx = Math.max(0, Math.min(moveIndex, last))
     currentIndex.value = targetIdx
     selectedSquare.value = null
     legalMoves.value = []
+    // Keep chess.js head in sync with the line when jumping to latest (e.g. Run after scrubbing).
+    if (boardStates.value.length > 0 && targetIdx === last) {
+      const fen = boardStates.value[last]
+      if (fen) chess.value = new Chess(fen)
+    }
     updateLastMoveFromIndex()
   }
 

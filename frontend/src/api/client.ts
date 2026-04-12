@@ -2,7 +2,8 @@ import axios from 'axios'
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
-  timeout: 2000,
+  /** Default; heavy endpoints (e.g. ai-move) override per request. */
+  timeout: 30_000,
   headers: {
     'Content-Type': 'application/json',
   },

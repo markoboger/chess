@@ -45,15 +45,15 @@
     <div class="button-row">
       <button class="btn-new-game" @click="emit('new-game')" title="New Game"><SquarePlus :size="15" /> New Game</button>
       <button
-        v-if="gameStore.gameMode !== 'cvc'"
+        v-if="gameMode !== 'cvc'"
         class="btn-run"
         @click="gameStore.setGameMode('cvc')"
         title="Computer vs computer from this position (same as desktop Run)"
       >
         <Play :size="15" /> Run
       </button>
-      <button v-if="gameStore.gameMode === 'cvc'" class="btn-pause" @click="gameStore.togglePause()">
-        <template v-if="gameStore.paused"><Play :size="15" /> Continue</template>
+      <button v-if="gameMode === 'cvc'" class="btn-pause" @click="gameStore.togglePause()">
+        <template v-if="paused"><Play :size="15" /> Continue</template>
         <template v-else><Pause :size="15" /> Pause</template>
       </button>
     </div>
@@ -69,6 +69,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useGameStore } from '../../stores/game'
 import { useAnalysisStore } from '../../stores/analysis'
 import { moveAnnotation } from '../../api/stockfish-api'
@@ -81,6 +82,7 @@ import {
 const emit = defineEmits<{ 'new-game': [] }>()
 
 const gameStore = useGameStore()
+const { gameMode, paused } = storeToRefs(gameStore)
 const analysisStore = useAnalysisStore()
 const pgnScrollRef = ref<HTMLElement | null>(null)
 
@@ -116,7 +118,7 @@ const statusClass = computed(() => {
   if (gameStore.isCheckmate) return 'status-checkmate'
   if (gameStore.isStalemate || gameStore.isDraw) return 'status-draw'
   if (gameStore.isCheck) return 'status-check'
-  if (gameStore.paused) return 'status-paused'
+  if (paused.value) return 'status-paused'
   return ''
 })
 
