@@ -48,6 +48,7 @@ export type GameMode = 'hvh' | 'hvc' | 'cvc'
 export type ComputerSide = 'white' | 'black'
 export type PlayerColor = 'white' | 'black' | 'spectator'
 export type ComputerStrategyId =
+  | 'deepening-opening-endgame'
   | 'random'
   | 'greedy'
   | 'material-balance'
@@ -59,6 +60,7 @@ export type ComputerStrategyId =
   | 'opening-continuation'
 
 export const COMPUTER_STRATEGIES: { id: ComputerStrategyId; label: string }[] = [
+  { id: 'deepening-opening-endgame', label: 'Deepening + Opening + Endgame' },
   { id: 'opening-continuation', label: 'Opening Continuation' },
   { id: 'random', label: 'Random' },
   { id: 'greedy', label: 'Greedy' },
@@ -79,7 +81,7 @@ function deriveGameMode(whiteIsHuman: boolean, blackIsHuman: boolean): GameMode 
 }
 
 function defaultStrategy(strategy?: string | null): ComputerStrategyId {
-  return (strategy as ComputerStrategyId) || 'opening-continuation'
+  return (strategy as ComputerStrategyId) || 'deepening-opening-endgame'
 }
 
 function clockModeFromSettings(settings?: GameSettings): ClockMode {
@@ -188,8 +190,8 @@ export const useGameStore = defineStore('game', () => {
   const computerScheduled = ref(false)
   // Guard against concurrent applyMove calls (e.g. double-click while HTTP is in-flight)
   const moveInFlight = ref(false)
-  const whiteComputerStrategy = ref<ComputerStrategyId>('opening-continuation')
-  const blackComputerStrategy = ref<ComputerStrategyId>('opening-continuation')
+  const whiteComputerStrategy = ref<ComputerStrategyId>('deepening-opening-endgame')
+  const blackComputerStrategy = ref<ComputerStrategyId>('deepening-opening-endgame')
 
   // ── Puzzle mode ──────────────────────────────────────────────────────
   const puzzleMode = ref(false)
@@ -646,7 +648,12 @@ export const useGameStore = defineStore('game', () => {
   }
 
   // ── Actions ──────────────────────────────────────────────────────────
-  async function createGame(startFen?: string, settings?: GameSettings, playAs?: PlayerColor) {
+  async function createGame(
+    startFen?: string,
+    settings?: GameSettings,
+    playAs?: PlayerColor,
+    options?: { skipComputerKickoff?: boolean }
+  ) {
     loading.value = true
     error.value = null
     paused.value = false
@@ -655,7 +662,17 @@ export const useGameStore = defineStore('game', () => {
     moveInFlight.value = false
     disconnectWebSocket()
     try {
-      const createPayload = startFen || settings ? { startFen, settings } : undefined
+      const createPayload =
+        startFen || settings
+          ? { startFen, settings }
+          : {
+              settings: {
+                whiteIsHuman: true,
+                blackIsHuman: true,
+                whiteStrategy: 'deepening-opening-endgame',
+                blackStrategy: 'deepening-opening-endgame',
+              },
+            }
       const response = await gameApi.createGame(createPayload)
       chess.value = new Chess(response.fen)
       gameId.value = response.gameId
@@ -691,7 +708,7 @@ export const useGameStore = defineStore('game', () => {
       resetHistory()
       resetClock()
       syncStatusFromChess()
-      triggerComputerMoveIfNeeded()
+      if (!options?.skipComputerKickoff) triggerComputerMoveIfNeeded()
       // Connect WebSocket for HvH sessions to receive opponent moves
       if (response.gameId && whiteIsHuman.value && blackIsHuman.value) {
         connectWebSocket(response.gameId)
@@ -891,6 +908,8 @@ export const useGameStore = defineStore('game', () => {
 
   // ── Game mode changes ────────────────────────────────────────────────
   function setGameMode(mode: GameMode) {
+    // Like desktop ChessGUI Run: CvC always plays from the latest position, not a scrubbed line.
+    if (mode === 'cvc' && !isAtLatest.value) goToMove(boardStates.value.length - 1)
     gameMode.value = mode
     if (mode !== 'cvc') { paused.value = false }
     // Keep whiteIsHuman/blackIsHuman in sync so isComputerTurn() is consistent
@@ -1081,6 +1100,72 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  /** Replay a stored experiment PGN in a fresh CvC session (mirrors desktop Browse Games). */
+  async function replayBrowsedExperimentPgn(pgnStr: string): Promise<boolean> {
+    const trimmed = pgnStr.trim()
+    if (!trimmed) {
+      error.value = 'No PGN to replay.'
+      return false
+    }
+    error.value = null
+    try {
+      const probe = new Chess()
+      probe.loadPgn(trimmed)
+      const history = probe.history()
+      if (history.length === 0) {
+        error.value = 'PGN contained no moves.'
+        return false
+      }
+
+      const browseSettings: GameSettings = {
+        whiteIsHuman: false,
+        blackIsHuman: false,
+        whiteStrategy: 'deepening-opening-endgame',
+        blackStrategy: 'deepening-opening-endgame',
+      }
+
+      await createGame(undefined, browseSettings, undefined, { skipComputerKickoff: true })
+      if (!gameId.value || error.value) return false
+
+      const states: string[] = [chess.value.fen()]
+      const moves: string[] = []
+      let latestFen = chess.value.fen()
+      for (const san of history) {
+        const response = await gameApi.makeMove(gameId.value, san)
+        latestFen = response.fen
+        states.push(latestFen)
+        moves.push(san)
+      }
+
+      puzzleMode.value = false
+      chess.value = new Chess(latestFen)
+      boardStates.value = states
+      pgnMoves.value = moves
+      currentIndex.value = states.length - 1
+      redoStates.value = []
+      redoMoves.value = []
+      gameOverByTimeout.value = false
+      resetClock()
+      selectedSquare.value = null
+      legalMoves.value = []
+      lastMove.value = null
+      pendingPromotion.value = null
+      syncStatusFromChess()
+      updateLastMoveFromIndex()
+      gameMode.value = 'cvc'
+      whiteIsHuman.value = false
+      blackIsHuman.value = false
+      myColor.value = 'spectator'
+      boardFlipped.value = false
+      paused.value = false
+      triggerComputerMoveIfNeeded()
+      return true
+    } catch {
+      error.value = 'Could not replay experiment PGN.'
+      return false
+    }
+  }
+
   async function loadPgnOrFen(input: string): Promise<boolean> {
     const trimmed = input.trim()
     // FEN heuristic: contains '/' rank separators and no newlines
@@ -1188,6 +1273,7 @@ export const useGameStore = defineStore('game', () => {
     loadFenString,
     loadPgnString,
     loadPgnOrFen,
+    replayBrowsedExperimentPgn,
     formatTime: formatClockTime,
   }
 })

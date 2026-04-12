@@ -12,7 +12,9 @@
         <!-- Game menu -->
         <div class="nav-item" :class="{ open: openMenu === 'game' }">
           <button class="nav-btn" @click.stop="toggle('game')">
-            Game <span class="chevron">▾</span>
+            <Swords :size="16" :stroke-width="2" class="nav-ico" aria-hidden="true" />
+            <span>Game</span>
+            <span class="chevron">▾</span>
           </button>
           <div class="dropdown" v-if="openMenu === 'game'">
             <div class="dropdown-group">Mode</div>
@@ -31,7 +33,9 @@
         <!-- Clock menu -->
         <div class="nav-item" :class="{ open: openMenu === 'clock' }">
           <button class="nav-btn" @click.stop="toggle('clock')">
-            Clock <span class="chevron">▾</span>
+            <ClockIcon :size="16" :stroke-width="2" class="nav-ico" aria-hidden="true" />
+            <span>Clock</span>
+            <span class="chevron">▾</span>
           </button>
           <div class="dropdown" v-if="openMenu === 'clock'">
             <div class="dropdown-group">Time Control</div>
@@ -49,8 +53,10 @@
 
         <!-- Strategy menu -->
         <div class="nav-item" :class="{ open: openMenu === 'strategy' }">
-          <button class="nav-btn" @click.stop="toggle('strategy')">
-            {{ strategyButtonLabel }} <span class="chevron">▾</span>
+          <button class="nav-btn nav-btn-strategy" @click.stop="toggle('strategy')">
+            <Brain :size="16" :stroke-width="2" class="nav-ico" aria-hidden="true" />
+            <span class="nav-btn-strategy-text">{{ strategyButtonLabel }}</span>
+            <span class="chevron">▾</span>
           </button>
           <div class="dropdown" v-if="openMenu === 'strategy'">
             <div class="dropdown-group">White</div>
@@ -80,7 +86,9 @@
         <!-- View menu -->
         <div class="nav-item" :class="{ open: openMenu === 'view' }">
           <button class="nav-btn" @click.stop="toggle('view')">
-            View <span class="chevron">▾</span>
+            <Eye :size="16" :stroke-width="2" class="nav-ico" aria-hidden="true" />
+            <span>View</span>
+            <span class="chevron">▾</span>
           </button>
           <div class="dropdown" v-if="openMenu === 'view'">
             <button class="dd-item" @click="toggleLegal">
@@ -89,32 +97,112 @@
           </div>
         </div>
 
-        <!-- File menu -->
+        <!-- File menu (import / export only — matches desktop File → Import/Export) -->
         <div class="nav-item" :class="{ open: openMenu === 'file' }">
           <button class="nav-btn" @click.stop="toggle('file')">
-            File <span class="chevron">▾</span>
+            <FileText :size="16" :stroke-width="2" class="nav-ico" aria-hidden="true" />
+            <span>File</span>
+            <span class="chevron">▾</span>
           </button>
           <div class="dropdown" v-if="openMenu === 'file'">
             <div class="dropdown-group">Import</div>
-            <button class="dd-item" @click="openImport('fen')">📥 Paste FEN</button>
-            <button class="dd-item" @click="openImport('pgn')">📥 Paste PGN</button>
+            <button type="button" class="dd-item" @click="openImport('fen')">
+              <ClipboardPaste :size="16" :stroke-width="2" class="dd-ico" aria-hidden="true" />
+              Paste FEN
+            </button>
+            <button type="button" class="dd-item" @click="openImport('pgn')">
+              <ClipboardPaste :size="16" :stroke-width="2" class="dd-ico" aria-hidden="true" />
+              Paste PGN
+            </button>
             <div class="dd-sep"></div>
             <div class="dropdown-group">Export</div>
-            <button class="dd-item" @click="copyFen">📋 Copy FEN</button>
-            <button class="dd-item" @click="copyPgn">📋 Copy PGN</button>
+            <button type="button" class="dd-item" @click="copyFen">
+              <Copy :size="16" :stroke-width="2" class="dd-ico" aria-hidden="true" />
+              Copy FEN
+            </button>
+            <button type="button" class="dd-item" @click="copyPgn">
+              <Copy :size="16" :stroke-width="2" class="dd-ico" aria-hidden="true" />
+              Copy PGN
+            </button>
           </div>
         </div>
 
-        <!-- Puzzles button -->
-        <button class="nav-btn nav-btn-puzzles" :class="{ 'nav-btn-active': activeView === 'puzzles' }" @click="emit('toggle-puzzles')">
-          🧩 Puzzles
+        <!-- Openings menu (desktop app: Openings → by family / ECO) -->
+        <div class="nav-item nav-item-openings" :class="{ open: openMenu === 'openings' }">
+          <button class="nav-btn" @click.stop="toggle('openings')">
+            <BookOpen :size="16" :stroke-width="2" class="nav-ico" aria-hidden="true" />
+            <span>Openings</span>
+            <span class="chevron">▾</span>
+          </button>
+          <div v-if="openMenu === 'openings'" class="dropdown dropdown-openings">
+            <div v-if="openingMenuLoading" class="dropdown-hint">Loading book…</div>
+            <div v-else-if="openingsByFamily.length === 0" class="dropdown-hint">No openings loaded.</div>
+            <div v-else class="opening-scroll">
+              <p class="opening-menu-hint">Open a letter group (ECO A–E) to browse openings in that category.</p>
+              <details
+                v-for="[fam, items] in openingsByFamily"
+                :key="fam"
+                class="opening-family-block"
+              >
+                <summary class="opening-family-summary">
+                  <span class="opening-family-title">{{ openingFamilyDesc(fam) }}</span>
+                  <span class="opening-family-count">{{ items.length }}</span>
+                </summary>
+                <div class="opening-family-body">
+                  <button
+                    v-for="o in sortOpeningsInFamily(items)"
+                    :key="o.eco + '|' + o.moves"
+                    type="button"
+                    class="dd-item dd-item-opening dd-item-opening-nested"
+                    @click="applyOpening(o)"
+                  >
+                    <span class="opening-eco">{{ o.eco }}</span>
+                    <span class="opening-name">{{ o.name }}</span>
+                    <span class="opening-plies">{{ movePlies(o.moves) }} plies</span>
+                  </button>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+
+        <!-- Puzzles -->
+        <button
+          type="button"
+          class="nav-btn nav-btn-puzzles"
+          :class="{ 'nav-btn-active': activeView === 'puzzles' }"
+          @click="emit('toggle-puzzles')"
+        >
+          <Puzzle :size="16" :stroke-width="2" class="nav-ico" aria-hidden="true" />
+          <span>Puzzles</span>
         </button>
+
+        <!-- Experiments (desktop: Experiments → Browse Games…) -->
+        <div class="nav-item" :class="{ open: openMenu === 'experiments' }">
+          <button type="button" class="nav-btn" @click.stop="toggle('experiments')">
+            <FlaskConical :size="16" :stroke-width="2" class="nav-ico" aria-hidden="true" />
+            <span>Experiments</span>
+            <span class="chevron">▾</span>
+          </button>
+          <div v-if="openMenu === 'experiments'" class="dropdown">
+            <button type="button" class="dd-item" @click="openBrowseExperiments">
+              <ListTree :size="16" :stroke-width="2" class="dd-ico" aria-hidden="true" />
+              Browse experiment games…
+            </button>
+          </div>
+        </div>
       </nav>
 
       <!-- Right side: theme toggle -->
       <div class="navbar-right">
-        <button class="icon-btn" :title="uiStore.theme === 'dark' ? 'Light mode' : 'Dark mode'" @click="uiStore.toggleTheme()">
-          {{ uiStore.theme === 'dark' ? '☀' : '🌙' }}
+        <button
+          type="button"
+          class="icon-btn"
+          :title="uiStore.theme === 'dark' ? 'Light mode' : 'Dark mode'"
+          @click="uiStore.toggleTheme()"
+        >
+          <Sun v-if="uiStore.theme === 'dark'" :size="20" :stroke-width="2" />
+          <Moon v-else :size="20" :stroke-width="2" />
         </button>
         <!-- Burger button (mobile) -->
         <button class="burger-btn" :class="{ open: mobileOpen }" @click="mobileOpen = !mobileOpen" aria-label="Menu">
@@ -187,15 +275,70 @@
 
         <div class="drawer-section">
           <div class="drawer-label">File</div>
-          <button class="drawer-item" @click="openImport('fen'); mobileOpen=false">📥 Paste FEN</button>
-          <button class="drawer-item" @click="openImport('pgn'); mobileOpen=false">📥 Paste PGN</button>
-          <button class="drawer-item" @click="copyFen; mobileOpen=false">📋 Copy FEN</button>
-          <button class="drawer-item" @click="copyPgn; mobileOpen=false">📋 Copy PGN</button>
+          <button type="button" class="drawer-item" @click="openImport('fen'); mobileOpen=false">
+            <ClipboardPaste :size="16" :stroke-width="2" class="dd-ico" /> Paste FEN
+          </button>
+          <button type="button" class="drawer-item" @click="openImport('pgn'); mobileOpen=false">
+            <ClipboardPaste :size="16" :stroke-width="2" class="dd-ico" /> Paste PGN
+          </button>
+          <button type="button" class="drawer-item" @click="copyFen; mobileOpen=false">
+            <Copy :size="16" :stroke-width="2" class="dd-ico" /> Copy FEN
+          </button>
+          <button type="button" class="drawer-item" @click="copyPgn; mobileOpen=false">
+            <Copy :size="16" :stroke-width="2" class="dd-ico" /> Copy PGN
+          </button>
+        </div>
+
+        <div class="drawer-section drawer-openings">
+          <div class="drawer-label">Openings</div>
+          <div v-if="mobileCatalogLoading" class="drawer-hint">Loading book…</div>
+          <div v-else-if="openingsByFamily.length === 0" class="drawer-hint">No openings loaded.</div>
+          <div v-else class="drawer-opening-scroll">
+            <p class="drawer-opening-hint">Tap a letter group (ECO A–E) to expand.</p>
+            <details
+              v-for="[fam, items] in openingsByFamily"
+              :key="'m-'+fam"
+              class="opening-family-block opening-family-block--drawer"
+            >
+              <summary class="opening-family-summary opening-family-summary--drawer">
+                <span class="opening-family-title">{{ openingFamilyDesc(fam) }}</span>
+                <span class="opening-family-count">{{ items.length }}</span>
+              </summary>
+              <div class="opening-family-body opening-family-body--drawer">
+                <button
+                  v-for="o in sortOpeningsInFamily(items)"
+                  :key="'mo-'+o.eco+o.moves"
+                  type="button"
+                  class="drawer-item drawer-item-compact drawer-item-opening-row"
+                  @click="applyOpening(o); mobileOpen=false"
+                >
+                  <span class="opening-eco">{{ o.eco }}</span>
+                  <span class="opening-line-name">{{ o.name }}</span>
+                </button>
+              </div>
+            </details>
+          </div>
         </div>
 
         <div class="drawer-section">
-          <button class="drawer-item puzzles-item" @click="emit('toggle-puzzles'); mobileOpen=false">
-            🧩 Puzzles
+          <div class="drawer-label">Experiments</div>
+          <button type="button" class="drawer-item" @click="openBrowseExperiments; mobileOpen=false">
+            <ListTree :size="16" :stroke-width="2" class="dd-ico" /> Browse experiment games…
+          </button>
+        </div>
+
+        <div class="drawer-section">
+          <button type="button" class="drawer-item puzzles-item" @click="emit('toggle-puzzles'); mobileOpen=false">
+            <Puzzle :size="16" :stroke-width="2" class="dd-ico" /> Puzzles
+          </button>
+        </div>
+
+        <div class="drawer-section">
+          <div class="drawer-label">Appearance</div>
+          <button type="button" class="drawer-item" @click="uiStore.toggleTheme(); mobileOpen = false">
+            <Sun v-if="uiStore.theme === 'dark'" :size="18" :stroke-width="2" class="dd-ico" aria-hidden="true" />
+            <Moon v-else :size="18" :stroke-width="2" class="dd-ico" aria-hidden="true" />
+            {{ uiStore.theme === 'dark' ? 'Light mode' : 'Dark mode' }}
           </button>
         </div>
       </div>
@@ -224,7 +367,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import {
   useGameStore,
   CLOCK_PRESETS,
@@ -235,15 +378,39 @@ import {
   type ComputerStrategyId,
 } from '../../stores/game'
 import { useUIStore } from '../../stores/ui'
+import { useOpeningStore, type OpeningInfo } from '../../stores/opening'
+import {
+  Swords,
+  Clock as ClockIcon,
+  Brain,
+  Eye,
+  FileText,
+  BookOpen,
+  Puzzle,
+  FlaskConical,
+  ClipboardPaste,
+  Copy,
+  Sun,
+  Moon,
+  ListTree,
+} from 'lucide-vue-next'
 
 const props = defineProps<{ activeView?: 'game' | 'puzzles' }>()
-const emit = defineEmits<{ 'new-game': []; 'toggle-puzzles': [] }>()
+const emit = defineEmits<{
+  'new-game': []
+  'toggle-puzzles': []
+  'browse-experiments': []
+  'show-game': []
+}>()
 
 const gameStore = useGameStore()
 const uiStore = useUIStore()
+const openingStore = useOpeningStore()
 
 const openMenu = ref<string | null>(null)
 const mobileOpen = ref(false)
+const openingMenuLoading = ref(false)
+const mobileCatalogLoading = ref(false)
 
 function strategyLabel(id: ComputerStrategyId): string {
   return COMPUTER_STRATEGIES.find(s => s.id === id)?.label ?? id
@@ -259,8 +426,80 @@ const strategyButtonLabel = computed(() => {
   return w === b ? `Strategy: ${w}` : `Strategy: ${w} / ${b}`
 })
 
-function toggle(menu: string) {
+async function toggle(menu: string) {
   openMenu.value = openMenu.value === menu ? null : menu
+  if (openMenu.value === 'openings') {
+    openingMenuLoading.value = true
+    try {
+      await openingStore.loadCatalog()
+    } finally {
+      openingMenuLoading.value = false
+    }
+  }
+}
+
+/** ECO volume letter → human-readable category (matches common ECO grouping). */
+function openingFamilyDesc(c: string): string {
+  switch (c) {
+    case 'A':
+      return 'A — Flank & irregular'
+    case 'B':
+      return 'B — Semi-open (1.e4, Black asymmetrical)'
+    case 'C':
+      return 'C — Open games (1.e4 e5 & similar)'
+    case 'D':
+      return 'D — Closed & semi-closed'
+    case 'E':
+      return 'E — Indian defenses & others'
+    default:
+      return `${c || '?'} — Other`
+  }
+}
+
+function sortOpeningsInFamily(items: OpeningInfo[]): OpeningInfo[] {
+  return [...items].sort((a, b) => {
+    const byEco = a.eco.localeCompare(b.eco, undefined, { numeric: true, sensitivity: 'base' })
+    if (byEco !== 0) return byEco
+    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  })
+}
+
+/** Menu order: open & double-king-pawn first, then closed, then semi-open, Indian, flank; unknown letters last. */
+const ECO_FAMILY_MENU_ORDER = ['C', 'D', 'B', 'E', 'A']
+
+const openingsByFamily = computed(() => {
+  const fam = new Map<string, OpeningInfo[]>()
+  for (const o of openingStore.catalog) {
+    const key = (o.eco.charAt(0) || '?').toUpperCase()
+    fam.set(key, [...(fam.get(key) ?? []), o])
+  }
+  const entries = [...fam.entries()]
+  entries.sort((a, b) => {
+    const ia = ECO_FAMILY_MENU_ORDER.indexOf(a[0])
+    const ib = ECO_FAMILY_MENU_ORDER.indexOf(b[0])
+    const ra = ia === -1 ? 100 + a[0].charCodeAt(0) : ia
+    const rb = ib === -1 ? 100 + b[0].charCodeAt(0) : ib
+    if (ra !== rb) return ra - rb
+    return a[0].localeCompare(b[0])
+  })
+  return entries
+})
+
+function movePlies(movesPgn: string): number {
+  const t = movesPgn
+    .trim()
+    .split(/\s+/)
+    .filter((x) => x && !/^\d+\.?$/.test(x))
+  return t.length
+}
+
+async function applyOpening(o: OpeningInfo) {
+  closeAll()
+  mobileOpen.value = false
+  gameStore.puzzleMode = false
+  gameStore.setGameMode('hvh')
+  emit('show-game')
+  await gameStore.loadPgnString(o.moves)
 }
 
 function closeAll() {
@@ -276,6 +515,19 @@ function handleOutsideClick(e: MouseEvent) {
 
 onMounted(() => document.addEventListener('click', handleOutsideClick))
 onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
+
+watch(
+  () => mobileOpen.value,
+  async (open) => {
+    if (!open) return
+    mobileCatalogLoading.value = true
+    try {
+      await openingStore.loadCatalog()
+    } finally {
+      mobileCatalogLoading.value = false
+    }
+  }
+)
 
 function setMode(mode: GameMode) {
   gameStore.setGameMode(mode)
@@ -317,12 +569,22 @@ function openImport(type: 'fen' | 'pgn') {
   closeAll()
 }
 
-function doImport() {
+function openBrowseExperiments() {
+  closeAll()
+  emit('browse-experiments')
+}
+
+async function doImport() {
   if (!importText.value.trim()) return
-  importType.value === 'fen'
-    ? gameStore.loadFenString(importText.value)
-    : gameStore.loadPgnString(importText.value)
+  const ok =
+    importType.value === 'fen'
+      ? await gameStore.loadFenString(importText.value)
+      : await gameStore.loadPgnString(importText.value)
   showImport.value = false
+  if (ok) {
+    gameStore.puzzleMode = false
+    emit('show-game')
+  }
 }
 
 function copyFen() {
@@ -436,12 +698,14 @@ function copyPgn() {
   top: calc(100% + 6px);
   left: 0;
   min-width: 210px;
-  background: #fff;
+  background: var(--color-panel-bg);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.18);
   padding: 6px 0;
   z-index: 200;
   animation: fadeInDown 0.1s ease;
+  border: 1px solid var(--color-border);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 @keyframes fadeInDown {
@@ -453,7 +717,7 @@ function copyPgn() {
   padding: 4px 14px 2px;
   font-size: 11px;
   font-weight: 700;
-  color: #aaa;
+  color: var(--color-panel-muted);
   text-transform: uppercase;
   letter-spacing: 0.6px;
 }
@@ -469,25 +733,167 @@ function copyPgn() {
   cursor: pointer;
   font-size: 13.5px;
   text-align: left;
-  color: #222;
-  transition: background 0.08s;
+  color: var(--color-panel-text);
+  transition: background 0.08s, color 0.15s ease;
 }
 
-.dd-item:hover { background: #f0f4ff; }
-.dd-item.active { font-weight: 700; color: #2d5a1b; }
+.dd-item:hover { background: var(--color-panel-hover); }
+.dd-item.active { font-weight: 700; color: var(--color-accent-text); }
 
 .dd-check {
   width: 16px;
   text-align: center;
   font-size: 10px;
-  color: #629924;
+  color: var(--color-accent);
   flex-shrink: 0;
 }
 
 .dd-sep {
   height: 1px;
-  background: #eee;
+  background: var(--color-panel-sep);
   margin: 4px 0;
+}
+
+.nav-ico {
+  flex-shrink: 0;
+  opacity: 0.92;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.dd-ico {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+.nav-btn-strategy {
+  max-width: min(280px, 28vw);
+}
+
+.nav-btn-strategy-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-openings {
+  min-width: 320px;
+  max-width: min(420px, 92vw);
+  padding: 0;
+}
+
+.dropdown-hint {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--color-panel-muted);
+}
+
+.opening-scroll {
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
+  padding: 4px 0 8px;
+}
+
+.opening-menu-hint {
+  margin: 0;
+  padding: 8px 14px 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--color-panel-muted);
+  border-bottom: 1px solid var(--color-panel-sep);
+}
+
+/* ECO family (A–E): one collapsible block per category */
+.opening-family-block {
+  border-bottom: 1px solid var(--color-panel-sep);
+}
+.opening-family-block:last-child {
+  border-bottom: none;
+}
+
+.opening-family-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px 8px;
+  user-select: none;
+  transition: background 0.1s;
+}
+.opening-family-summary::-webkit-details-marker {
+  display: none;
+}
+.opening-family-summary::marker {
+  display: none;
+}
+.opening-family-summary:hover {
+  background: var(--color-panel-hover);
+}
+
+.opening-family-title {
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--color-panel-text);
+  flex: 1;
+  min-width: 0;
+}
+
+.opening-family-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-panel-muted);
+  background: var(--color-control-hover);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.opening-family-body {
+  padding: 0 0 6px;
+}
+
+.dd-item-opening.dd-item-opening-nested {
+  padding-left: 18px;
+  padding-right: 14px;
+}
+
+.dropdown-sub {
+  padding: 6px 14px 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-panel-muted);
+  letter-spacing: 0.02em;
+}
+
+.dd-item-opening {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px 10px;
+  align-items: baseline;
+}
+
+.opening-eco {
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.opening-name {
+  font-size: 13px;
+  color: var(--color-panel-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opening-plies {
+  font-size: 11px;
+  color: var(--color-panel-muted);
+  white-space: nowrap;
 }
 
 /* ── Right side ────────────────────────────────────────────────────── */
@@ -593,6 +999,90 @@ function copyPgn() {
   font-weight: 600;
 }
 
+.drawer-hint {
+  padding: 6px 20px 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.drawer-openings .drawer-opening-scroll {
+  max-height: min(360px, 45vh);
+  overflow-y: auto;
+}
+
+.drawer-opening-hint {
+  margin: 0;
+  padding: 6px 16px 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.opening-family-block--drawer {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.opening-family-block--drawer:last-child {
+  border-bottom: none;
+}
+
+.opening-family-summary--drawer {
+  padding: 10px 16px 8px;
+}
+.opening-family-summary--drawer:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.opening-family-summary--drawer .opening-family-title {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+}
+.opening-family-summary--drawer .opening-family-count {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.opening-family-body--drawer {
+  padding-bottom: 4px;
+}
+
+.drawer-item-opening-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: baseline;
+  text-align: left;
+}
+
+.opening-line-name {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.88);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.drawer-item-opening-row .opening-eco {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.drawer-sub {
+  padding: 8px 20px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.04em;
+}
+
+.drawer-item-compact {
+  padding: 6px 20px;
+  font-size: 13px;
+}
+
+.drawer-item .dd-ico {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 /* ── Drawer transition ─────────────────────────────────────────────── */
 .drawer-enter-active, .drawer-leave-active { transition: all 0.22s ease; }
 .drawer-enter-from, .drawer-leave-to { opacity: 0; transform: translateY(-8px); }
@@ -601,7 +1091,7 @@ function copyPgn() {
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: var(--color-dialog-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -609,19 +1099,21 @@ function copyPgn() {
 }
 
 .dialog {
-  background: #fff;
+  background: var(--color-dialog-bg);
   border-radius: 12px;
   padding: 24px;
   width: 460px;
   max-width: 92vw;
   box-shadow: 0 16px 48px rgba(0,0,0,0.25);
+  border: 1px solid var(--color-border);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .dialog-title {
   font-weight: 700;
   font-size: 16px;
   margin-bottom: 14px;
-  color: #222;
+  color: var(--color-panel-text);
 }
 
 .dialog-textarea {
@@ -629,15 +1121,16 @@ function copyPgn() {
   font-family: 'Fira Code', 'Consolas', monospace;
   font-size: 12px;
   padding: 10px;
-  border: 1.5px solid #ddd;
+  border: 1.5px solid var(--color-border-input);
   border-radius: 6px;
   resize: vertical;
   outline: none;
-  color: #333;
+  color: var(--color-input-text);
+  background: var(--color-input-bg);
   line-height: 1.5;
 }
 
-.dialog-textarea:focus { border-color: #629924; }
+.dialog-textarea:focus { border-color: var(--color-accent); }
 
 .dialog-row {
   display: flex;
@@ -655,10 +1148,10 @@ function copyPgn() {
   cursor: pointer;
 }
 
-.dialog-btn.cancel { background: #eee; color: #555; }
-.dialog-btn.cancel:hover { background: #ddd; }
-.dialog-btn.ok { background: #4f7c1c; color: #fff; }
-.dialog-btn.ok:hover { background: #4e7a1b; }
+.dialog-btn.cancel { background: var(--color-control-hover); color: var(--color-text-secondary); }
+.dialog-btn.cancel:hover { background: var(--color-control-hover2); }
+.dialog-btn.ok { background: var(--color-accent-strong); color: #fff; }
+.dialog-btn.ok:hover { background: var(--color-accent-hover); }
 
 /* ── Responsive: show burger, hide desktop nav ─────────────────────── */
 @media (max-width: 768px) {

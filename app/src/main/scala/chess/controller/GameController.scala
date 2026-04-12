@@ -63,6 +63,10 @@ final class GameController(initialBoard: Board)(using
   /** All board states from initial to latest. */
   def boardStates: Vector[Board] = _history.map(_.board)
 
+  /** FEN string for every historical board state (index i = FEN after i half-moves). */
+  def boardFens: Vector[String] =
+    _history.map(s => FullFen.render(s.board, s.whiteToMove, s.halfmoveClock, s.fullmoveNumber))
+
   /** PGN move strings in order. `pgnMoves(i)` transitions from `boardStates(i)` to `boardStates(i+1)`.
     */
   def pgnMoves: Vector[String] = _pgnMoves

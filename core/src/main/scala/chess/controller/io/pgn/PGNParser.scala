@@ -117,15 +117,17 @@ object PGNParser {
       if piece.role == pieceType && piece.color == color
     } yield square
 
-    // Filter pieces that can move to the target square
+    // Must use fully **legal** moves (not pseudo-legal). In check, `canMoveIgnoringCheck` can
+    // still be true for moves that leave the king in check or fail to escape check — the opening
+    // book then returns such a tuple, `Board.move` fails, and the AI session yields no move.
     possiblePieces.find { square =>
-      // Check if the piece matches the disambiguation hints
       val fileMatches =
         fileHint.isEmpty || File.fromChar(fileHint(0)).contains(square.file)
       val rankMatches =
         rankHint.isEmpty || Rank.fromInt(rankHint.toInt).contains(square.rank)
 
-      fileMatches && rankMatches && board.canMoveIgnoringCheck(square, target)
+      fileMatches && rankMatches &&
+      board.legalMoves(color).exists((from, to) => from == square && to == target)
     }
   }
 

@@ -96,11 +96,27 @@ function getMap(): Promise<Map<string, OpeningInfo>> {
 export const useOpeningStore = defineStore('opening', () => {
   const current = ref<OpeningInfo | null>(null)
   const ready = ref(false)
+  /** Deduplicated list for the Openings menu (same data as the desktop app’s opening book). */
+  const catalog = ref<OpeningInfo[]>([])
 
   // Start loading eagerly so the map is ready by the time moves are made
   async function init() {
     await getMap()
     ready.value = true
+  }
+
+  async function loadCatalog() {
+    if (catalog.value.length > 0) return
+    const map = await getMap()
+    ready.value = true
+    const dedupe = new Map<string, OpeningInfo>()
+    for (const o of map.values()) {
+      const key = `${o.eco}|${o.moves}`
+      if (!dedupe.has(key)) dedupe.set(key, o)
+    }
+    catalog.value = [...dedupe.values()].sort(
+      (a, b) => a.eco.localeCompare(b.eco) || a.name.localeCompare(b.name)
+    )
   }
 
   async function lookupByFen(piecePlacement: string) {
@@ -120,5 +136,5 @@ export const useOpeningStore = defineStore('opening', () => {
     current.value = null
   }
 
-  return { current, ready, init, lookupByFen, bestContinuationForFen, clear }
+  return { current, ready, catalog, init, loadCatalog, lookupByFen, bestContinuationForFen, clear }
 })

@@ -53,25 +53,25 @@ watch(
 
 .eco {
   font-weight: 700;
-  color: #4a7c1b;
+  color: var(--color-opening-badge-text);
   font-size: 12px;
   flex-shrink: 0;
 }
 
 .sep {
-  color: #aaa;
+  color: var(--color-opening-sep);
   flex-shrink: 0;
 }
 
 .name {
-  color: #444;
+  color: var(--color-opening-name);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .opening-badge--empty .name {
-  color: #999;
+  color: var(--color-text-muted);
   font-style: italic;
 }
 

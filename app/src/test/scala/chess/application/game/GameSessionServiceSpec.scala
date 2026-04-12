@@ -324,5 +324,22 @@ class GameSessionServiceSpec extends AnyWordSpec with Matchers {
     "return Left for an unknown game" in {
       service.computeAiMove("no-such-id", "random").unsafeRunSync() shouldBe Left(GameSessionService.GameNotFound)
     }
+
+    "return a move after check when using deepening-opening-endgame (PGN must resolve legal SAN)" in {
+      val svc = service
+      val settings = chess.model.GameSettings(
+        whiteIsHuman = false,
+        blackIsHuman = false,
+        whiteStrategy = "deepening-opening-endgame",
+        blackStrategy = "deepening-opening-endgame",
+      )
+      val pgn = "1. Nf3 g6 2. d4 Bg7 3. Bf4 c5 4. c3 cxd4 5. cxd4 Qa5+"
+      val (gameId, _) = svc.createGame(settings = settings).unsafeRunSync().toOption.get
+      svc.loadPgn(gameId, pgn).unsafeRunSync() shouldBe a[Right[?, ?]]
+
+      val result = svc.computeAiMove(gameId, "deepening-opening-endgame").unsafeRunSync()
+      result shouldBe a[Right[?, ?]]
+      result.toOption.flatten shouldBe defined
+    }
   }
 }

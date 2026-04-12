@@ -1,0 +1,25 @@
+﻿experiment,game_id,white_strategy,black_strategy,result,winner,move_count,duration_s,error,started_at,finished_at
+"endgame-minimax vs all","60b7c9e0-b201-4510-8320-9373d536055f","endgame-minimax","greedy","WhiteWin","white",45,3,711,"",2026-04-11 21:14:36,2026-04-11 21:14:40
+"endgame-minimax vs all","39e81048-c081-4abb-8f86-c2981e1b6b88","endgame-minimax","greedy","WhiteWin","white",25,3,159,"",2026-04-11 21:14:40,2026-04-11 21:14:43
+"endgame-minimax vs all","32006213-c95f-44fb-9b70-f222f486e09d","endgame-minimax","greedy","WhiteWin","white",13,1,398,"",2026-04-11 21:14:43,2026-04-11 21:14:44
+"endgame-minimax vs all","353cf5d5-853a-42c1-8d36-8a133cd7e513","greedy","endgame-minimax","BlackWin","black",38,2,387,"",2026-04-11 21:14:44,2026-04-11 21:14:47
+"endgame-minimax vs all","aaeea101-e1a1-45f6-8cdc-025b2ff426c7","greedy","endgame-minimax","BlackWin","black",32,3,879,"",2026-04-11 21:14:47,2026-04-11 21:14:51
+"endgame-minimax vs all","d127782e-cba4-4cdf-8b72-b1acf1cf488b","greedy","endgame-minimax","BlackWin","black",54,5,244,"",2026-04-11 21:14:51,2026-04-11 21:14:56
+"endgame-minimax vs all","72233403-beb4-4296-b831-8648a1cf96e1","endgame-minimax","iterative-deepening-endgame","Draw","",89,97,831,"",2026-04-11 21:14:56,2026-04-11 21:16:34
+"endgame-minimax vs all","12e5fb43-337a-4c95-8b78-678cc627a187","endgame-minimax","iterative-deepening-endgame","BlackWin","black",126,142,411,"",2026-04-11 21:16:34,2026-04-11 21:18:56
+"endgame-minimax vs all","028ed99d-0dfc-4225-8397-b14e90b9d839","endgame-minimax","iterative-deepening-endgame","WhiteWin","white",55,63,154,"",2026-04-11 21:18:56,2026-04-11 21:19:59
+"endgame-minimax vs all","66365bff-3a3b-441d-ab3d-2d74455fbb82","iterative-deepening-endgame","endgame-minimax","WhiteWin","white",97,102,830,"",2026-04-11 21:19:59,2026-04-11 21:21:42
+"endgame-minimax vs all","435bacbd-f1b8-4a2a-86a9-a55ed500e064","iterative-deepening-endgame","endgame-minimax","WhiteWin","white",105,114,280,"",2026-04-11 21:21:42,2026-04-11 21:23:36
+"endgame-minimax vs all","4d44c535-2f7b-4d6f-8459-ec0b8c62fcd0","iterative-deepening-endgame","endgame-minimax","Draw","",54,59,633,"",2026-04-11 21:23:36,2026-04-11 21:24:36
+"endgame-minimax vs all","a35c7943-0c8f-47cd-a0ca-5a005071fb4e","endgame-minimax","opening-continuation-endgame","Draw","",46,63,288,"",2026-04-11 21:24:36,2026-04-11 21:25:39
+"endgame-minimax vs all","56cd23cc-8b31-406e-8bb5-5e05502ecc99","endgame-minimax","opening-continuation-endgame","Draw","",46,63,119,"",2026-04-11 21:25:39,2026-04-11 21:26:43
+"endgame-minimax vs all","48110483-6b4f-4819-84f6-b6d5144e3611","endgame-minimax","opening-continuation-endgame","Draw","",27,34,636,"",2026-04-11 21:26:43,2026-04-11 21:27:17
+"endgame-minimax vs all","3822e562-54ad-408e-ad79-a34da1d99066","opening-continuation-endgame","endgame-minimax","WhiteWin","white",121,167,172,"",2026-04-11 21:27:17,2026-04-11 21:30:04
+"endgame-minimax vs all","4a9edbfa-2beb-4a70-a6b5-1bafe77b47ac","opening-continuation-endgame","endgame-minimax","WhiteWin","white",89,119,643,"",2026-04-11 21:30:04,2026-04-11 21:32:04
+"endgame-minimax vs all","2b029e9b-e8e9-41fd-9e9e-dc18b62b90ee","opening-continuation-endgame","endgame-minimax","WhiteWin","white",59,80,854,"",2026-04-11 21:32:04,2026-04-11 21:33:25
+"endgame-minimax vs all","1baa1f1d-2e04-428f-bf03-5b8370bc1b7b","endgame-minimax","opening-intelligence-endgame","BlackWin","black",90,114,310,"",2026-04-11 21:33:25,2026-04-11 21:35:19
+"endgame-minimax vs all","8fe77b06-b378-446d-bbf7-5795f4a06c6e","endgame-minimax","opening-intelligence-endgame","BlackWin","black",92,117,246,"",2026-04-11 21:35:19,2026-04-11 21:37:17
+"endgame-minimax vs all","91d5bd53-23ee-417c-93d9-5d972e0dfcb6","endgame-minimax","opening-intelligence-endgame","BlackWin","black",68,86,145,"",2026-04-11 21:37:17,2026-04-11 21:38:43
+"endgame-minimax vs all","011371a0-357f-42b9-9315-3a2321ea924b","opening-intelligence-endgame","endgame-minimax","WhiteWin","white",51,56,753,"",2026-04-11 21:38:43,2026-04-11 21:39:39
+"endgame-minimax vs all","c79922cc-0173-4f02-a3a1-48800ccc5099","opening-intelligence-endgame","endgame-minimax","","",0,603,022,"Timed out while waiting for backend game completion",2026-04-11 21:39:39,2026-04-11 21:49:43
+"endgame-minimax vs all","d72d3f17-0023-4a37-a4e5-b9dad4144be6","opening-intelligence-endgame","endgame-minimax","","",0,603,016,"Timed out while waiting for backend game completion",2026-04-11 21:49:43,2026-04-11 21:59:46

@@ -25,6 +25,20 @@
       </div>
     </div>
 
+    <!-- Stockfish analysis (chess-api.com, same as desktop GUI) -->
+    <div class="fen-bar analysis-bar">
+      <button
+        type="button"
+        class="analyze-toggle"
+        :class="{ 'analyze-on': analysisStore.enabled }"
+        title="Toggle engine analysis (uses chess-api.com)"
+        @click="analysisStore.toggleAnalysis(gameStore.boardStates)"
+      >
+        Analyse
+      </button>
+      <span class="eval-line" :style="{ color: evalColor }">{{ evalLine }}</span>
+    </div>
+
     <!-- FEN display (compact single-line) -->
     <div class="fen-bar">
       <span class="fen-label">FEN</span>
@@ -50,9 +64,34 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useGameStore } from '../../stores/game'
+import { useAnalysisStore } from '../../stores/analysis'
 import { Copy, Check } from 'lucide-vue-next'
 
 const gameStore = useGameStore()
+const analysisStore = useAnalysisStore()
+
+const evalLine = computed(() => {
+  if (!analysisStore.enabled) return 'Analysis off'
+  const r = analysisStore.cache.get(gameStore.fen)
+  if (!r) return 'Analyzing…'
+  if (r.mateIn != null) {
+    const n = r.mateIn
+    const s = n > 0 ? `M${n}` : `M${-n}`
+    return `Stockfish (d${r.depth}): ${s}`
+  }
+  const ev =
+    r.evalPawns >= 0 ? `+${r.evalPawns.toFixed(2)}` : r.evalPawns.toFixed(2)
+  return `Stockfish (d${r.depth}): ${ev}`
+})
+
+const evalColor = computed(() => {
+  if (!analysisStore.enabled) return 'var(--color-text-muted)'
+  const r = analysisStore.cache.get(gameStore.fen)
+  if (!r) return 'var(--color-text-muted)'
+  if (r.evalPawns > 0.5) return 'var(--color-accent)'
+  if (r.evalPawns < -0.5) return 'var(--color-err-text)'
+  return 'var(--color-text-muted)'
+})
 
 const copyFenSuccess = ref(false)
 const copyFenLabel = ref('Copy FEN')
@@ -89,14 +128,15 @@ function copySession() {
 
 <style scoped>
 .board-info-panel {
-  border-top: 1px solid #e0ddd8;
+  border-top: 1px solid var(--color-border);
 }
 
 /* Clock + Captures panel */
 .clock-captures-panel {
   display: flex;
-  background: #ebebeb;
-  border-bottom: 1px solid #ddd;
+  background: var(--color-section-header-bg);
+  border-bottom: 1px solid var(--color-border-input);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 .captures-side {
   flex: 1;
@@ -109,24 +149,24 @@ function copySession() {
   flex-direction: column;
   justify-content: center;
   gap: 0;
-  border-left: 1px solid #ddd;
+  border-left: 1px solid var(--color-border-input);
 }
 .clock-label {
   font-size: 10px;
   font-weight: 700;
-  color: #888;
+  color: var(--color-text-muted);
   letter-spacing: 0.5px;
 }
 .clock-time {
   font-family: monospace;
   font-size: 22px;
   font-weight: 700;
-  color: #888;
+  color: var(--color-text-muted);
   line-height: 1.2;
 }
 .clock-time.clock-active {
-  color: #333;
-  background: #d5e8d4;
+  color: var(--color-text);
+  background: var(--color-accent-soft-bg);
   border-radius: 4px;
   padding: 0 4px;
 }
@@ -135,7 +175,7 @@ function copySession() {
 }
 .clock-time.clock-active.clock-danger {
   color: #a92424;
-  background: #f7d7d7;
+  background: var(--color-err-bg);
 }
 
 .captured-row {
@@ -151,7 +191,7 @@ function copySession() {
   text-align: center;
   font-weight: 700;
   font-size: 11px;
-  color: #555;
+  color: var(--color-text-secondary);
   padding: 1px 0;
 }
 
@@ -161,20 +201,25 @@ function copySession() {
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  background: #f7f6f4;
+  background: var(--color-muted-bg);
   min-height: 28px;
+  transition: background-color 0.2s ease;
+}
+
+.fen-bar + .fen-bar {
+  border-top: 1px solid var(--color-border);
 }
 .fen-label {
   font-weight: 700;
   font-size: 10px;
-  color: #888;
+  color: var(--color-text-muted);
   letter-spacing: 0.5px;
   flex-shrink: 0;
 }
 .fen-text {
   font-family: monospace;
   font-size: 10px;
-  color: #555;
+  color: var(--color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -184,9 +229,10 @@ function copySession() {
 .copy-btn-sm {
   font-size: 11px;
   padding: 2px 4px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-input);
   border-radius: 3px;
-  background: #fafafa;
+  background: var(--color-control-bg);
+  color: var(--color-text);
   cursor: pointer;
   line-height: 1;
   flex-shrink: 0;
@@ -194,13 +240,45 @@ function copySession() {
   align-items: center;
   justify-content: center;
 }
-.copy-btn-sm:hover { background: #eee; }
+.copy-btn-sm:hover { background: var(--color-control-hover); }
+
+.analysis-bar {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.analyze-toggle {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color-analysis-row-border);
+  background: var(--color-analysis-toggle-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.analyze-toggle:hover {
+  background: var(--color-analysis-toggle-hover);
+}
+.analyze-toggle.analyze-on {
+  background: #2ecc71;
+  border-color: #27ae60;
+  color: #fff;
+}
+.eval-line {
+  font-family: monospace;
+  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+}
 
 .session-bar {
-  background: #f0f8e6;
-  border-top: 1px solid #d5e8b8;
+  background: var(--color-best-bg);
+  border-top: 1px solid var(--color-best-border);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 .session-id-text {
-  color: #2d5a1b;
+  color: var(--color-accent-text);
 }
 </style>

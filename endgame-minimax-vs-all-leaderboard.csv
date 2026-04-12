@@ -1,0 +1,5 @@
+﻿rank,opponent,focus_wins,draws,opponent_wins,points,win_rate_pct,avg_ply,avg_game_s
+1,"greedy",6,0,0,12,100,0,34,5,3,296
+2,"iterative-deepening-endgame",1,2,3,4,16,7,87,7,96,690
+3,"opening-continuation-endgame",0,3,3,3,0,0,64,7,88,119
+4,"opening-intelligence-endgame",0,0,4,0,0,0,50,2,263,415

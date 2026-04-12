@@ -110,6 +110,26 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private var openingInfoLabel: Label = uninitialized
   private var blackStrategyLabel: Label = uninitialized
 
+  // ── Stockfish analysis ──────────────────────────────────────────────────────
+  private[aview] case class AnalysisResult(
+    evalPawns: Double,
+    mateIn: Option[Int],
+    bestSan: String,
+    bestFrom: String,
+    bestTo: String,
+    depth: Int
+  )
+  private val stockfishUrl = "https://chess-api.com/v1"
+  private[aview] var arrowCanvas: javafx.scene.canvas.Canvas = uninitialized
+  private var evalLabel: Label = uninitialized
+  private var analysisToggleBtn: Button = uninitialized
+  // Reference scale/offset tracked by the board rescaler for arrow drawing
+  @volatile private[aview] var boardScale: Double = 1.0
+  @volatile private[aview] var boardOffsetX: Double = 0.0
+  @volatile private[aview] var boardOffsetY: Double = 0.0
+  private[aview] var analysisEnabled: Boolean = false
+  private[aview] val analysisCache = scala.collection.mutable.HashMap[String, AnalysisResult]()
+
   // ── Chess clock ────────────────────────────────────────────────────────────
   enum ClockMode:
     case NoLimit
@@ -219,6 +239,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
           updateBoard()
           updateCapturedPanel()
           updateOpeningLabel()
+          if (analysisEnabled) analyzePositionAsync(controller.getBoardAsFEN)
+          else clearArrow()
           triggerComputerMoveIfNeeded()
         case MoveResult.Failed(_, _) =>
           // Errors are handled inline by the originating action
@@ -335,6 +357,129 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
   private def jsonBool(json: String, key: String): Option[Boolean] =
     s""""$key"\\s*:\\s*(true|false)""".r.findFirstMatchIn(json).map(_.group(1) == "true")
+
+  private def jsonNum(json: String, key: String): Option[Double] =
+    s""""$key"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?)""".r.findFirstMatchIn(json).map(_.group(1).toDouble)
+
+  // ── Stockfish analysis via chess-api.com ─────────────────────────────────────
+
+  /** Posts the FEN to chess-api.com, parses the response, caches the result.
+    * Runs on a background thread; UI update via Platform.runLater after completion.
+    */
+  private def analyzePositionAsync(fen: String): Unit =
+    if (analysisCache.contains(fen)) {
+      Platform.runLater(() => updateAnalysisDisplay(fen))
+      return
+    }
+    val t = new Thread(() => {
+      val escapedFen = fen.replace("\"", "\\\"")
+      val body = s"""{"fen":"$escapedFen","depth":12}"""
+      httpPost(stockfishUrl, body).foreach { json =>
+        val evalPawns = jsonNum(json, "eval").getOrElse(0.0)
+        val mateIn    = jsonNum(json, "mate").map(_.toInt) match
+          case Some(0) => None
+          case v       => v
+        val bestSan   = jsonStr(json, "san").getOrElse("")
+        val bestFrom  = jsonStr(json, "from").getOrElse("")
+        val bestTo    = jsonStr(json, "to").getOrElse("")
+        val depth     = jsonNum(json, "depth").map(_.toInt).getOrElse(12)
+        val result = AnalysisResult(evalPawns, mateIn, bestSan, bestFrom, bestTo, depth)
+        analysisCache(fen) = result
+        Platform.runLater(() => updateAnalysisDisplay(fen))
+      }
+    }, "stockfish-analysis")
+    t.setDaemon(true)
+    t.start()
+
+  /** Updates the eval label and best-move arrow for the currently displayed position. */
+  private def updateAnalysisDisplay(fen: String): Unit =
+    if (!analysisEnabled) return
+    val currentFen = controller.getBoardAsFEN
+    if (fen != currentFen) return  // stale result for a different position
+    analysisCache.get(fen).foreach { result =>
+      // Update eval label
+      if (evalLabel != null) {
+        val evalStr = result.mateIn match
+          case Some(n) if n > 0 => s"M$n"
+          case Some(n)          => s"M${-n}"
+          case None             => f"${result.evalPawns}%+.2f"
+        evalLabel.text = s"Stockfish (d${result.depth}): $evalStr"
+        val barColor = if (result.evalPawns > 0.5) "#27ae60"
+          else if (result.evalPawns < -0.5) "#c0392b"
+          else "#888888"
+        evalLabel.style = s"-fx-text-fill: $barColor; -fx-font-size: 12px; -fx-font-family: monospace;"
+      }
+      // Draw best-move arrow
+      if (arrowCanvas != null && result.bestFrom.length == 2 && result.bestTo.length == 2) {
+        drawArrow(result.bestFrom, result.bestTo)
+      }
+    }
+
+  /** Returns a move annotation symbol based on centipawn loss.
+    * @param evalBefore eval (from White's perspective) at the position *before* the move
+    * @param evalAfter  eval (from White's perspective) at the position *after* the move
+    * @param whiteMove  true if White made the move
+    */
+  private def moveAnnotation(evalBefore: Double, evalAfter: Double, whiteMove: Boolean): String =
+    val cpLoss =
+      if (whiteMove) (evalBefore - evalAfter) * 100  // positive = bad for White
+      else (evalAfter - evalBefore) * 100             // positive = bad for Black (eval went up for White)
+    if (cpLoss < 10)       ""
+    else if (cpLoss < 25)  "?!"
+    else if (cpLoss < 100) "?"
+    else                   "??"
+
+  /** Draws a coloured arrow on the canvas from the given UCI square names. */
+  private[aview] def drawArrow(fromSq: String, toSq: String): Unit =
+    if (arrowCanvas == null) return
+    val gc = arrowCanvas.getGraphicsContext2D
+    gc.clearRect(0, 0, arrowCanvas.getWidth, arrowCanvas.getHeight)
+    Try {
+      val fromFile = fromSq.charAt(0) - 'a'
+      val fromRank = fromSq.charAt(1) - '1'
+      val toFile   = toSq.charAt(0) - 'a'
+      val toRank   = toSq.charAt(1) - '1'
+      // Grid layout: rank labels 25px wide, padding 20px, then 8×80px squares (unscaled)
+      val squareSize = 80.0
+      val padding    = 20.0
+      val rankLabelW = 25.0
+      val s = boardScale
+      // Flip for board orientation
+      val (fc, fr, tc, tr) =
+        if (!boardFlipped)
+          (fromFile, 7 - fromRank, toFile, 7 - toRank)
+        else
+          (7 - fromFile, fromRank, 7 - toFile, toRank)
+      val ox = boardOffsetX + (padding + rankLabelW + fc * squareSize + squareSize / 2) * s
+      val oy = boardOffsetY + (padding + fr * squareSize + squareSize / 2) * s
+      val dx = boardOffsetX + (padding + rankLabelW + tc * squareSize + squareSize / 2) * s
+      val dy = boardOffsetY + (padding + tr * squareSize + squareSize / 2) * s
+      val arrowLen = math.sqrt((dx - ox) * (dx - ox) + (dy - oy) * (dy - oy))
+      val angle    = math.atan2(dy - oy, dx - ox)
+      val headLen  = squareSize * s * 0.35
+      val lineW    = squareSize * s * 0.12
+
+      gc.setFill(javafx.scene.paint.Color.color(0.2, 0.6, 0.2, 0.75))
+      gc.setStroke(javafx.scene.paint.Color.color(0.2, 0.6, 0.2, 0.75))
+      gc.setLineWidth(lineW)
+      // Shaft
+      gc.strokeLine(ox, oy, dx - headLen * math.cos(angle), dy - headLen * math.sin(angle))
+      // Arrowhead
+      val ax = dx
+      val ay = dy
+      gc.setLineWidth(1)
+      val leftX  = ax - headLen * math.cos(angle - 0.5)
+      val leftY  = ay - headLen * math.sin(angle - 0.5)
+      val rightX = ax - headLen * math.cos(angle + 0.5)
+      val rightY = ay - headLen * math.sin(angle + 0.5)
+      gc.fillPolygon(Array(ax, leftX, rightX), Array(ay, leftY, rightY), 3)
+    }
+
+  private def clearArrow(): Unit =
+    if (arrowCanvas != null) {
+      val gc = arrowCanvas.getGraphicsContext2D
+      gc.clearRect(0, 0, arrowCanvas.getWidth, arrowCanvas.getHeight)
+    }
 
   // ── Session backend calls ────────────────────────────────────────────────────
 
@@ -490,7 +635,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
   private[aview] def showNewGameDialog(): Unit = {
     var whiteHuman = true; var blackHuman = true
-    var whiteStrat = "opening-continuation"; var blackStrat = "opening-continuation"
+    var whiteStrat = "deepening-opening-endgame"; var blackStrat = "deepening-opening-endgame"
     var clockMs: Option[Long] = None; var incMs: Option[Long] = None
     var playAsWhite = true
 
@@ -1162,6 +1307,56 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       children = Seq(undoButton, redoButton, flipButton)
     }
 
+    // ── Stockfish analysis toggle ─────────────────────────────────────────────
+    evalLabel = new Label("Analysis off") {
+      style = "-fx-text-fill: #888888; -fx-font-size: 12px; -fx-font-family: monospace;"
+      wrapText = true
+      maxWidth = 260
+    }
+
+    analysisToggleBtn = new Button("Analyse") {
+      style = "-fx-font-size: 12px; -fx-padding: 5px 12px; -fx-background-color: #ecf0f1; -fx-text-fill: #333;"
+      tooltip = new Tooltip("Toggle Stockfish analysis via chess-api.com")
+      onAction = _ => {
+        analysisEnabled = !analysisEnabled
+        if (analysisEnabled) {
+          style = "-fx-font-size: 12px; -fx-padding: 5px 12px; -fx-background-color: #2ecc71; -fx-text-fill: white; -fx-font-weight: bold;"
+          analyzePositionAsync(controller.getBoardAsFEN)
+          // Kick off background analysis for all already-played positions
+          val fens = controller.boardFens
+          val t = new Thread(() => fens.foreach(f => if (!analysisCache.contains(f)) {
+            val escapedFen = f.replace("\"", "\\\"")
+            val body = s"""{"fen":"$escapedFen","depth":12}"""
+            httpPost(stockfishUrl, body).foreach { json =>
+              val evalPawns = jsonNum(json, "eval").getOrElse(0.0)
+              val mateIn    = jsonNum(json, "mate").map(_.toInt) match
+                case Some(0) => None
+                case v       => v
+              val bestSan  = jsonStr(json, "san").getOrElse("")
+              val bestFrom = jsonStr(json, "from").getOrElse("")
+              val bestTo   = jsonStr(json, "to").getOrElse("")
+              val depth    = jsonNum(json, "depth").map(_.toInt).getOrElse(12)
+              analysisCache(f) = AnalysisResult(evalPawns, mateIn, bestSan, bestFrom, bestTo, depth)
+              Platform.runLater(() => updatePgnDisplay())
+            }
+          }), "stockfish-bulk")
+          t.setDaemon(true)
+          t.start()
+        } else {
+          style = "-fx-font-size: 12px; -fx-padding: 5px 12px; -fx-background-color: #ecf0f1; -fx-text-fill: #333;"
+          evalLabel.text = "Analysis off"
+          evalLabel.style = "-fx-text-fill: #888888; -fx-font-size: 12px; -fx-font-family: monospace;"
+          clearArrow()
+          updatePgnDisplay()
+        }
+      }
+    }
+
+    val analysisBox = new HBox(8) {
+      alignment = Pos.CenterLeft
+      children = Seq(analysisToggleBtn, evalLabel)
+    }
+
     puzzleInfoLabel = new Label("") {
       wrapText = true
       maxWidth = 260
@@ -1209,6 +1404,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         new Separator(),
         gameButtonBox,
         toolButtonBox,
+        analysisBox,
         openingInfoLabel,
         puzzleInfoLabel,
         puzzleLink
@@ -1307,9 +1503,16 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     }
   }
 
+  private def moveQualityColor(annotation: String): String = annotation match
+    case "??" => "#c0392b"   // crimson – blunder
+    case "?"  => "#e67e22"   // orange  – mistake
+    case "?!" => "#f1c40f"   // amber   – dubious
+    case _    => "#27ae60"   // green   – good
+
   private def updatePgnDisplay(): Unit = {
     pgnDisplay.children.clear()
     val moves = controller.pgnMoves
+    val fens  = if (analysisEnabled) controller.boardFens else Vector.empty[String]
     val activeIdx =
       controller.currentIndex - 1 // index of the move that produced the current board
     var activeNode = Option.empty[Text]
@@ -1321,24 +1524,51 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         })
       }
 
+      // Compute annotation if we have eval for both surrounding positions
+      val annotation: String =
+        if (!analysisEnabled || fens.length <= i + 1) ""
+        else {
+          val fenBefore = fens(i)
+          val fenAfter  = fens(i + 1)
+          (analysisCache.get(fenBefore), analysisCache.get(fenAfter)) match
+            case (Some(before), Some(after)) =>
+              moveAnnotation(before.evalPawns, after.evalPawns, whiteMove = i % 2 == 0)
+            case _ => ""
+        }
+
       val isActive = i == activeIdx
-      val moveText = new Text(move + " ") {
+      val baseColor = if (isActive) Color.web("#1565C0")
+        else if (annotation.nonEmpty) Color.web(moveQualityColor(annotation))
+        else Color.Black
+
+      val moveText = new Text(move) {
         font = Font.font(
           "monospace",
           if (isActive) FontWeight.Bold else FontWeight.Normal,
           13
         )
-        fill = if (isActive) Color.web("#1565C0") else Color.Black
+        fill = baseColor
         style = "-fx-cursor: hand;"
 
         onMouseEntered = _ => if (!isActive) fill = Color.web("#1565C0")
-        onMouseExited = _ => if (!isActive) fill = Color.Black
+        onMouseExited  = _ => fill = baseColor
         onMouseClicked = _ => {
           controller.goToMove(i + 1)
           selectedSquare = None
+          if (analysisEnabled) analyzePositionAsync(controller.getBoardAsFEN)
         }
       }
       pgnDisplay.children.add(moveText)
+
+      // Annotation superscript (e.g. "?", "??", "?!")
+      if (annotation.nonEmpty) {
+        pgnDisplay.children.add(new Text(annotation) {
+          font = Font.font("monospace", FontWeight.Bold, 11)
+          fill = Color.web(moveQualityColor(annotation))
+        })
+      }
+      pgnDisplay.children.add(new Text(" "))
+
       if (isActive) activeNode = Some(moveText)
 
       // Line break after every full move (i.e. after Black's move)
@@ -2264,8 +2494,13 @@ class ChessGUILauncher extends javafx.application.Application {
     val scaleTransform = new javafx.scene.transform.Scale(1, 1, 0, 0)
     boardGroup.delegate.getTransforms.add(scaleTransform)
 
+    // Canvas overlay for best-move arrows (mouse-transparent, sits above the board)
+    gui.arrowCanvas = new javafx.scene.canvas.Canvas(800, 700)
+    gui.arrowCanvas.setMouseTransparent(true)
+    val arrowCanvasNode: scalafx.scene.Node = new scalafx.scene.canvas.Canvas(gui.arrowCanvas)
+
     val boardContainer = new Pane {
-      children = Seq(boardGroup)
+      children = Seq(boardGroup, arrowCanvasNode)
       style = "-fx-background-color: transparent;"
     }
     VBox.setVgrow(boardContainer, Priority.Always)
@@ -2280,8 +2515,23 @@ class ChessGUILauncher extends javafx.application.Application {
           val s = Math.min(availW / nativeW, availH / nativeH)
           scaleTransform.setX(s)
           scaleTransform.setY(s)
-          boardGroup.layoutX = (availW - nativeW * s) / 2
-          boardGroup.layoutY = (availH - nativeH * s) / 2
+          val ox = (availW - nativeW * s) / 2
+          val oy = (availH - nativeH * s) / 2
+          boardGroup.layoutX = ox
+          boardGroup.layoutY = oy
+          // Resize canvas to match container and track offset/scale for arrow drawing
+          gui.arrowCanvas.setWidth(availW)
+          gui.arrowCanvas.setHeight(availH)
+          gui.boardScale   = s
+          gui.boardOffsetX = ox
+          gui.boardOffsetY = oy
+          // Redraw arrow at new size if analysis is active
+          if (gui.analysisEnabled) {
+            gui.analysisCache.get(gui.controller.getBoardAsFEN).foreach { r =>
+              if (r.bestFrom.length == 2 && r.bestTo.length == 2)
+                gui.drawArrow(r.bestFrom, r.bestTo)
+            }
+          }
         }
       }
     }

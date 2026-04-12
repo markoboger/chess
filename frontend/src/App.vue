@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { Puzzle } from 'lucide-vue-next'
 import NavBar from './components/layout/NavBar.vue'
 import ChessBoard from './components/board/ChessBoard.vue'
 import BoardInfoPanel from './components/controls/BoardInfoPanel.vue'
@@ -7,6 +8,7 @@ import GameControls from './components/controls/GameControls.vue'
 import OpeningBadge from './components/game/OpeningBadge.vue'
 import PuzzlePanel from './components/game/PuzzlePanel.vue'
 import NewGameDialog from './components/ui/NewGameDialog.vue'
+import BrowseExperimentsDialog from './components/ui/BrowseExperimentsDialog.vue'
 import { useGameStore } from './stores/game'
 import { usePuzzleStore } from './stores/puzzle'
 import { useOpeningStore } from './stores/opening'
@@ -17,6 +19,7 @@ const openingStore = useOpeningStore()
 
 const activeView = ref<'game' | 'puzzles'>('game')
 const showNewGameDialog = ref(false)
+const showBrowseExperimentsDialog = ref(false)
 
 function togglePuzzles() {
   activeView.value = activeView.value === 'puzzles' ? 'game' : 'puzzles'
@@ -36,6 +39,19 @@ function handleNewGame() {
 
 function handleGameStarted() {
   showNewGameDialog.value = false
+}
+
+function handleExperimentReplayed() {
+  activeView.value = 'game'
+  puzzleStore.reset()
+  gameStore.puzzleMode = false
+}
+
+/** Return to the main board after import, opening pick, etc. (does not reset the position). */
+function showGameFromNav() {
+  activeView.value = 'game'
+  puzzleStore.reset()
+  gameStore.puzzleMode = false
 }
 
 onMounted(async () => {
@@ -90,12 +106,20 @@ function handleKeydown(e: KeyboardEvent) {
       :active-view="activeView"
       @new-game="handleNewGame"
       @toggle-puzzles="togglePuzzles"
+      @browse-experiments="showBrowseExperimentsDialog = true"
+      @show-game="showGameFromNav"
     />
 
     <NewGameDialog
       :visible="showNewGameDialog"
       @close="showNewGameDialog = false"
       @started="handleGameStarted"
+    />
+
+    <BrowseExperimentsDialog
+      :visible="showBrowseExperimentsDialog"
+      @close="showBrowseExperimentsDialog = false"
+      @replayed="handleExperimentReplayed"
     />
 
     <main class="app-main">
@@ -122,7 +146,8 @@ function handleKeydown(e: KeyboardEvent) {
       <div class="opening-row">
         <OpeningBadge v-if="!puzzleStore.active" />
         <span v-else-if="puzzleStore.puzzle" class="puzzle-mode-badge">
-          🧩 Puzzle mode · Find the best move
+          <Puzzle :size="14" :stroke-width="2" class="puzzle-badge-ico" aria-hidden="true" />
+          Puzzle mode · Find the best move
         </span>
       </div>
     </main>
@@ -135,9 +160,10 @@ function handleKeydown(e: KeyboardEvent) {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #eeece8;
-  color: #222;
+  background: var(--color-page-bg);
+  color: var(--color-text);
   min-height: 100vh;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* ── App shell ─────────────────────────────────────────────────────── */
@@ -166,10 +192,11 @@ body {
 }
 
 .left-card {
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 12px 0 0 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+  box-shadow: 0 4px 20px var(--color-card-shadow);
   overflow: hidden;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .board-area {
@@ -187,12 +214,18 @@ body {
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  background: #f2e3d5;
-  border: 1px solid #c49772;
+  background: var(--color-puzzle-mode-bg);
+  border: 1px solid var(--color-puzzle-mode-border);
   border-radius: 20px;
   font-size: 12.5px;
   font-weight: 600;
-  color: #5f3516;
+  color: var(--color-puzzle-mode-text);
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.puzzle-badge-ico {
+  flex-shrink: 0;
+  color: var(--color-puzzle-mode-text);
 }
 
 /* ── Sidebar ──────────────────────────────────────────────────────── */
@@ -206,13 +239,14 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: white;
+  background: var(--color-card-bg);
   border-radius: 0 12px 12px 0;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.10);
-  border-left: 1px solid #e0ddd8;
+  box-shadow: 0 4px 20px var(--color-card-shadow);
+  border-left: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 /* ── Panel transition ──────────────────────────────────────────────── */

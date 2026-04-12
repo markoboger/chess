@@ -158,8 +158,8 @@ const tab = ref<'new' | 'join'>('new')
 // New game settings
 const whiteIsHuman = ref(true)
 const blackIsHuman = ref(true)
-const whiteStrategy = ref<ComputerStrategyId>('opening-continuation')
-const blackStrategy = ref<ComputerStrategyId>('opening-continuation')
+const whiteStrategy = ref<ComputerStrategyId>('deepening-opening-endgame')
+const blackStrategy = ref<ComputerStrategyId>('deepening-opening-endgame')
 const selectedClock = ref<ClockMode>({ kind: 'none' })
 const startFen = ref('')
 const playAs = ref<PlayerColor>('white')
@@ -294,7 +294,7 @@ async function doJoin() {
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.55);
+  background: var(--color-dialog-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -302,19 +302,22 @@ async function doJoin() {
 }
 
 .dialog {
-  background: #fff;
+  background: var(--color-dialog-bg);
+  color: var(--color-text);
   border-radius: 14px;
   width: 480px;
   max-width: 95vw;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  border: 1px solid var(--color-border);
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 /* ── Tabs ───────────────────────────────────────────────────────────── */
 .tabs {
   display: flex;
-  border-bottom: 2px solid #eee;
+  border-bottom: 2px solid var(--color-dialog-title-border);
 }
 
 .tab {
@@ -324,7 +327,7 @@ async function doJoin() {
   background: none;
   font-size: 14px;
   font-weight: 600;
-  color: #888;
+  color: var(--color-text-muted);
   cursor: pointer;
   transition: color 0.15s, border-bottom 0.15s;
   border-bottom: 3px solid transparent;
@@ -332,8 +335,8 @@ async function doJoin() {
 }
 
 .tab.active {
-  color: #2d5a1b;
-  border-bottom-color: #629924;
+  color: var(--color-accent-text);
+  border-bottom-color: var(--color-accent);
 }
 
 /* ── Tab body ───────────────────────────────────────────────────────── */
@@ -354,7 +357,7 @@ async function doJoin() {
 .section-label {
   font-size: 11px;
   font-weight: 700;
-  color: #aaa;
+  color: var(--color-panel-muted);
   text-transform: uppercase;
   letter-spacing: 0.6px;
 }
@@ -362,7 +365,7 @@ async function doJoin() {
 .optional {
   font-weight: 400;
   text-transform: none;
-  color: #bbb;
+  color: var(--color-panel-muted2);
   letter-spacing: 0;
   font-size: 11px;
 }
@@ -384,7 +387,7 @@ async function doJoin() {
 .player-name {
   font-size: 13.5px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text);
   width: 44px;
   flex-shrink: 0;
 }
@@ -393,26 +396,26 @@ async function doJoin() {
   display: flex;
   border-radius: 6px;
   overflow: hidden;
-  border: 1.5px solid #ddd;
+  border: 1.5px solid var(--color-toggle-border);
 }
 
 .toggle-btn {
   padding: 5px 12px;
   border: none;
-  background: #f5f5f5;
+  background: var(--color-toggle-inactive-bg);
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
-  color: #666;
+  color: var(--color-text-secondary);
   transition: background 0.12s, color 0.12s;
 }
 
 .toggle-btn + .toggle-btn {
-  border-left: 1.5px solid #ddd;
+  border-left: 1.5px solid var(--color-toggle-border);
 }
 
 .toggle-btn.active {
-  background: #4f7c1c;
+  background: var(--color-accent-strong);
   color: #fff;
   font-weight: 700;
 }
@@ -420,16 +423,16 @@ async function doJoin() {
 .strategy-select {
   flex: 1;
   padding: 5px 8px;
-  border: 1.5px solid #ddd;
+  border: 1.5px solid var(--color-border-input);
   border-radius: 6px;
   font-size: 12.5px;
-  color: #333;
-  background: #fff;
+  color: var(--color-input-text);
+  background: var(--color-input-bg);
   cursor: pointer;
   outline: none;
 }
 
-.strategy-select:focus { border-color: #629924; }
+.strategy-select:focus { border-color: var(--color-accent); }
 
 /* ── Clock grid ─────────────────────────────────────────────────────── */
 .clock-grid {
@@ -440,19 +443,19 @@ async function doJoin() {
 
 .clock-btn {
   padding: 7px 6px;
-  border: 1.5px solid #ddd;
+  border: 1.5px solid var(--color-border-input);
   border-radius: 6px;
-  background: #f9f9f9;
+  background: var(--color-control-bg);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  color: #555;
+  color: var(--color-text-secondary);
   text-align: center;
   transition: background 0.1s, border-color 0.1s, color 0.1s;
 }
 
-.clock-btn:hover { border-color: #629924; color: #2d5a1b; }
-.clock-btn.active { background: #4f7c1c; border-color: #4f7c1c; color: #fff; font-weight: 700; }
+.clock-btn:hover { border-color: var(--color-accent); color: var(--color-accent-text); }
+.clock-btn.active { background: var(--color-accent-strong); border-color: var(--color-accent-strong); color: #fff; font-weight: 700; }
 
 /* ── Play as ────────────────────────────────────────────────────────── */
 .play-as-group {
@@ -463,25 +466,26 @@ async function doJoin() {
 .fen-input {
   width: 100%;
   padding: 8px 10px;
-  border: 1.5px solid #ddd;
+  border: 1.5px solid var(--color-border-input);
   border-radius: 6px;
   font-family: 'Fira Code', 'Consolas', monospace;
   font-size: 12px;
-  color: #333;
+  color: var(--color-input-text);
+  background: var(--color-input-bg);
   outline: none;
   transition: border-color 0.1s;
 }
 
-.fen-input:focus { border-color: #629924; }
+.fen-input:focus { border-color: var(--color-accent); }
 
 /* ── Error ──────────────────────────────────────────────────────────── */
 .error-msg {
   font-size: 12.5px;
-  color: #c0392b;
+  color: var(--color-err-text);
   padding: 6px 10px;
-  background: #fdf0ee;
+  background: var(--color-error-soft-bg);
   border-radius: 6px;
-  border: 1px solid #f5c6c0;
+  border: 1px solid var(--color-error-soft-border);
 }
 
 /* ── Action buttons ─────────────────────────────────────────────────── */
@@ -496,21 +500,21 @@ async function doJoin() {
   padding: 9px 20px;
   border: none;
   border-radius: 7px;
-  background: #eee;
-  color: #555;
+  background: var(--color-control-hover);
+  color: var(--color-text-secondary);
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.1s;
 }
 
-.btn-cancel:hover { background: #ddd; }
+.btn-cancel:hover { background: var(--color-control-hover2); }
 
 .btn-start {
   padding: 9px 24px;
   border: none;
   border-radius: 7px;
-  background: #4f7c1c;
+  background: var(--color-accent-strong);
   color: #fff;
   font-size: 13.5px;
   font-weight: 700;
@@ -518,7 +522,7 @@ async function doJoin() {
   transition: background 0.1s;
 }
 
-.btn-start:hover:not(:disabled) { background: #4e7a1b; }
+.btn-start:hover:not(:disabled) { background: var(--color-accent-hover); }
 .btn-start:disabled { opacity: 0.55; cursor: default; }
 
 /* ── Session list ───────────────────────────────────────────────────── */
@@ -527,7 +531,7 @@ async function doJoin() {
   border: none;
   cursor: pointer;
   font-size: 14px;
-  color: #629924;
+  color: var(--color-accent);
   padding: 0 4px;
   margin-left: 6px;
   line-height: 1;
@@ -553,7 +557,7 @@ async function doJoin() {
 
 .no-sessions {
   font-size: 13px;
-  color: #707070;
+  color: var(--color-text-secondary);
   padding: 8px 0;
 }
 
@@ -570,30 +574,31 @@ async function doJoin() {
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  border: 1.5px solid #ddd;
+  border: 1.5px solid var(--color-border-input);
   border-radius: 7px;
-  background: #fafafa;
+  background: var(--color-session-row-bg);
+  color: var(--color-text);
   cursor: pointer;
   text-align: left;
   font-size: 13px;
   transition: border-color 0.1s, background 0.1s;
 }
-.session-row:hover { border-color: #629924; background: #f5fbee; }
-.session-row.selected { border-color: #629924; background: #edf7dc; }
+.session-row:hover { border-color: var(--color-accent); background: var(--color-session-row-hover-bg); }
+.session-row.selected { border-color: var(--color-accent); background: var(--color-session-row-selected-bg); }
 
 .session-mode {
   font-weight: 700;
-  color: #333;
+  color: var(--color-text);
   min-width: 60px;
 }
 .session-status {
   flex: 1;
-  color: #555;
+  color: var(--color-text-secondary);
 }
 .session-id-short {
   font-family: 'Fira Code', 'Consolas', monospace;
   font-size: 11px;
-  color: #999;
+  color: var(--color-text-muted);
 }
 
 /* ── Transition ─────────────────────────────────────────────────────── */

@@ -5,16 +5,19 @@ export const useUIStore = defineStore('ui', () => {
   const theme = ref<'light' | 'dark'>('light')
   const mobileMenuOpen = ref(false)
 
-  // Load theme from localStorage on init
-  const savedTheme = localStorage.getItem('chess-theme')
-  if (savedTheme === 'dark' || savedTheme === 'light') {
-    theme.value = savedTheme
-  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    theme.value = 'dark'
+  // Load theme from localStorage on init (browser only)
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    const savedTheme = localStorage.getItem('chess-theme')
+    if (savedTheme === 'dark' || savedTheme === 'light') {
+      theme.value = savedTheme
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      theme.value = 'dark'
+    }
   }
 
   // Apply theme to document
   function applyTheme() {
+    if (typeof document === 'undefined') return
     if (theme.value === 'dark') {
       document.documentElement.classList.add('dark')
     } else {
@@ -24,7 +27,9 @@ export const useUIStore = defineStore('ui', () => {
 
   // Watch theme changes
   watch(theme, (newTheme) => {
-    localStorage.setItem('chess-theme', newTheme)
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('chess-theme', newTheme)
+    }
     applyTheme()
   })
 

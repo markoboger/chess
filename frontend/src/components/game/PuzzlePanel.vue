@@ -2,7 +2,10 @@
   <div class="puzzle-panel">
     <!-- Header -->
     <div class="panel-header">
-      <span class="panel-title">🧩 Puzzle Practice</span>
+      <span class="panel-title">
+        <Puzzle :size="16" :stroke-width="2" class="panel-title-ico" aria-hidden="true" />
+        Puzzle Practice
+      </span>
       <button class="load-btn" @click="handleLoadPuzzle()" :disabled="puzzleStore.loading">
         {{ puzzleStore.loading ? 'Loading…' : puzzleStore.puzzle ? '↺ Next' : 'Load Puzzle' }}
       </button>
@@ -77,6 +80,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { Puzzle } from 'lucide-vue-next'
 import { usePuzzleStore } from '../../stores/puzzle'
 import { useGameStore } from '../../stores/game'
 
@@ -162,33 +166,41 @@ function handleRetry() {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid #e8e8e8;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 700;
   font-size: 14px;
-  color: #333;
+  color: var(--color-text);
+}
+
+.panel-title-ico {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
 }
 
 .load-btn {
   font-size: 12px;
   padding: 5px 12px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
-  background: #fafafa;
+  background: var(--color-control-bg);
   cursor: pointer;
-  color: #555;
+  color: var(--color-text-secondary);
   transition: all 0.12s;
 }
-.load-btn:hover:not(:disabled) { background: #e8e8e8; }
+.load-btn:hover:not(:disabled) { background: var(--color-control-hover2); }
 .load-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* Error / empty */
 .panel-error {
   padding: 12px 16px;
-  background: #fde8e8;
-  color: #c0392b;
+  background: var(--color-err-bg);
+  color: var(--color-err-text);
   font-size: 13px;
 }
 
@@ -201,7 +213,7 @@ function handleRetry() {
   gap: 16px;
   padding: 32px 24px;
   text-align: center;
-  color: #666;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
@@ -221,13 +233,13 @@ function handleRetry() {
 }
 
 .meta-chip.rating {
-  background: #fff3cd;
-  color: #856404;
+  background: var(--color-puzzle-rating-bg);
+  color: var(--color-puzzle-rating-text);
 }
 
 .meta-chip.theme {
-  background: #e8f4ff;
-  color: #0056b3;
+  background: var(--color-puzzle-chip-theme-bg);
+  color: var(--color-puzzle-theme-chip-text);
 }
 
 /* Status banner */
@@ -240,9 +252,9 @@ function handleRetry() {
   text-align: center;
 }
 
-.status-banner.solved   { background: #d4edda; color: #155724; }
-.status-banner.failed   { background: #fde8e8; color: #721c24; }
-.status-banner.thinking { background: #e8f4ff; color: #004085; }
+.status-banner.solved   { background: var(--color-puzzle-solved-bg); color: var(--color-puzzle-solved-text); }
+.status-banner.failed   { background: var(--color-puzzle-fail-bg); color: var(--color-puzzle-fail-text); }
+.status-banner.thinking { background: var(--color-puzzle-think-bg); color: var(--color-puzzle-think-text); }
 
 /* Progress dots */
 .progress-row {
@@ -256,12 +268,12 @@ function handleRetry() {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #ddd;
+  background: var(--color-progress-dot);
   transition: background 0.2s;
 }
 
-.progress-dot.done    { background: #629924; }
-.progress-dot.current { background: #b58863; box-shadow: 0 0 0 2px rgba(181,136,99,0.35); }
+.progress-dot.done    { background: var(--color-accent); }
+.progress-dot.current { background: var(--color-progress-current); box-shadow: 0 0 0 2px rgba(181,136,99,0.35); }
 
 /* Actions */
 .action-row {
@@ -273,7 +285,7 @@ function handleRetry() {
 
 .btn-primary {
   padding: 8px 16px;
-  background: #4f7c1c;
+  background: var(--color-accent-strong);
   color: #fff;
   border: none;
   border-radius: 7px;
@@ -283,12 +295,12 @@ function handleRetry() {
   transition: background 0.12s;
   flex: 1;
 }
-.btn-primary:hover { background: #4e7a1b; }
+.btn-primary:hover { background: var(--color-accent-hover); }
 
 .btn-secondary {
   padding: 8px 14px;
-  background: #f0f0f0;
-  color: #333;
+  background: var(--color-btn-secondary-bg);
+  color: var(--color-text);
   border: none;
   border-radius: 7px;
   font-size: 13px;
@@ -296,21 +308,21 @@ function handleRetry() {
   cursor: pointer;
   transition: background 0.12s;
 }
-.btn-secondary:hover { background: #e0e0e0; }
+.btn-secondary:hover { background: var(--color-btn-secondary-hover); }
 
 /* Solution box */
 .solution-box {
   margin: 12px 16px 0;
   padding: 10px 12px;
-  background: #f9f9f9;
-  border: 1px solid #e0e0e0;
+  background: var(--color-solution-box-bg);
+  border: 1px solid var(--color-solution-box-border);
   border-radius: 8px;
 }
 
 .solution-label {
   font-size: 11px;
   font-weight: 700;
-  color: #888;
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 6px;
@@ -319,7 +331,7 @@ function handleRetry() {
 .solution-moves {
   font-family: 'Fira Code', 'Consolas', monospace;
   font-size: 13px;
-  color: #333;
+  color: var(--color-text);
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -327,12 +339,12 @@ function handleRetry() {
 }
 
 .sol-sep {
-  color: #999;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
 .sol-move {
-  background: #ededf0;
+  background: var(--color-solution-move-bg);
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: 600;

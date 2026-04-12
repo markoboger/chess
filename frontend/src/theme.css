@@ -1,0 +1,238 @@
+/**
+ * Light / dark theme via `html.dark` (toggled by Pinia ui store).
+ * Components use these custom properties for surfaces and text.
+ */
+:root {
+  color-scheme: light;
+  --color-page-bg: #eeece8;
+  --color-text: #222222;
+  --color-text-secondary: #555555;
+  --color-text-muted: #888888;
+  --color-border: #e0ddd8;
+  --color-border-subtle: #e8e8e8;
+  --color-border-strong: #cccccc;
+  --color-border-input: #dddddd;
+  --color-card-bg: #ffffff;
+  --color-card-shadow: rgba(0, 0, 0, 0.1);
+
+  --color-panel-bg: #ffffff;
+  --color-panel-text: #222222;
+  --color-panel-muted: #888888;
+  --color-panel-muted2: #aaaaaa;
+  --color-panel-hover: #f0f4ff;
+  --color-panel-sep: #eeeeee;
+
+  --color-warn-bg: #f9e2b8;
+  --color-warn-text: #8f4f05;
+  --color-err-bg: #fde8e8;
+  --color-err-text: #c0392b;
+  --color-err-border: #f5c6cb;
+  --color-info-bg: #d9edf9;
+  --color-info-text: #165f8e;
+  --color-paused-bg: #f0f0f0;
+  --color-paused-text: #555555;
+
+  --color-accent: #629924;
+  --color-accent-strong: #4f7c1c;
+  --color-accent-hover: #4e7a1b;
+  --color-accent-text: #2d5a1b;
+  --color-accent-soft-bg: #edf7dc;
+  --color-accent-soft-border: #629924;
+
+  --color-control-bg: #fafafa;
+  --color-control-hover: #eeeeee;
+  --color-control-hover2: #e8e8e8;
+
+  --color-pgn-active-bg: #e3f2fd;
+  --color-pgn-active-text: #1565c0;
+
+  --color-section-header-bg: #f5f5f5;
+  --color-section-header-text: #333333;
+  --color-section-border: #e0e0e0;
+
+  --color-board-frame: #333333;
+  --color-coord: #666666;
+  --color-board-shadow: rgba(0, 0, 0, 0.25);
+
+  --color-dialog-overlay: rgba(0, 0, 0, 0.5);
+  --color-dialog-bg: #ffffff;
+  --color-dialog-title-border: #eeeeee;
+  --color-input-bg: #fafafa;
+  --color-input-text: #333333;
+  --color-input-placeholder: #aaaaaa;
+
+  --color-muted-bg: #f7f6f4;
+  --color-analysis-row-border: #dddddd;
+  --color-analysis-toggle-bg: #ecf0f1;
+  --color-analysis-toggle-hover: #dfe6ea;
+  --color-best-bg: #f0f8e6;
+  --color-best-border: #d5e8b8;
+
+  --color-puzzle-chip-theme-bg: #e8f4ff;
+  --color-puzzle-chip-theme-text: #1a5276;
+  --color-puzzle-solved-bg: #d5f5e3;
+  --color-puzzle-solved-text: #1e8449;
+  --color-puzzle-fail-bg: #fadbd8;
+  --color-puzzle-fail-text: #922b21;
+  --color-puzzle-think-bg: #eaf2ff;
+  --color-puzzle-think-text: #1f4e79;
+
+  --color-opening-badge-text: #4a7c1b;
+  --color-opening-sep: #aaaaaa;
+  --color-opening-name: #444444;
+
+  --color-puzzle-mode-bg: #f2e3d5;
+  --color-puzzle-mode-border: #c49772;
+  --color-puzzle-mode-text: #5f3516;
+
+  --color-promo-overlay: rgba(0, 0, 0, 0.5);
+  --color-promo-dialog-bg: #ffffff;
+  --color-promo-title: #333333;
+  --color-promo-btn-border: #dddddd;
+  --color-promo-btn-bg: #fafafa;
+  --color-promo-btn-hover-border: #b58863;
+  --color-promo-btn-hover-bg: #f0d9b5;
+  --color-promo-label: #555555;
+
+  --color-status-mate-bg: #f3d0cb;
+  --color-status-mate-text: #982c21;
+  --color-pgn-blunder: #c0392b;
+  --color-pgn-mistake: #e67e22;
+  --color-pgn-dubious: #c9a227;
+
+  --color-session-row-bg: #fafafa;
+  --color-session-row-hover-bg: #f5fbee;
+  --color-session-row-selected-bg: #edf7dc;
+  --color-toggle-inactive-bg: #f5f5f5;
+  --color-toggle-border: #dddddd;
+  --color-error-soft-bg: #fdf0ee;
+  --color-error-soft-border: #f5c6c0;
+  --color-puzzle-rating-bg: #fff3cd;
+  --color-puzzle-rating-text: #856404;
+  --color-puzzle-theme-chip-text: #0056b3;
+  --color-progress-dot: #dddddd;
+  --color-progress-current: #b58863;
+  --color-solution-move-bg: #ededf0;
+  --color-solution-box-bg: #f9f9f9;
+  --color-solution-box-border: #e0e0e0;
+  --color-btn-secondary-bg: #f0f0f0;
+  --color-btn-secondary-hover: #e0e0e0;
+}
+
+
+html.dark {
+  color-scheme: dark;
+  --color-page-bg: #121214;
+  --color-text: #ececea;
+  --color-text-secondary: #b8b4ae;
+  --color-text-muted: #8a8680;
+  --color-border: #323238;
+  --color-border-subtle: #2c2c32;
+  --color-border-strong: #484850;
+  --color-border-input: #404048;
+  --color-card-bg: #1c1c21;
+  --color-card-shadow: rgba(0, 0, 0, 0.45);
+
+  --color-panel-bg: #26262c;
+  --color-panel-text: #ececea;
+  --color-panel-muted: #9a968f;
+  --color-panel-muted2: #7a7670;
+  --color-panel-hover: #32323a;
+  --color-panel-sep: #3a3a42;
+
+  --color-warn-bg: #3d3220;
+  --color-warn-text: #f0d090;
+  --color-err-bg: #352222;
+  --color-err-text: #ffab91;
+  --color-err-border: #5c3333;
+  --color-info-bg: #1e3342;
+  --color-info-text: #9ecfef;
+  --color-paused-bg: #2a2a30;
+  --color-paused-text: #c4c0ba;
+
+  --color-accent: #7cb342;
+  --color-accent-strong: #8bc34a;
+  --color-accent-hover: #9ccc65;
+  --color-accent-text: #c5e1a5;
+  --color-accent-soft-bg: #2a3528;
+  --color-accent-soft-border: #558b2f;
+
+  --color-control-bg: #25252b;
+  --color-control-hover: #32323a;
+  --color-control-hover2: #36363e;
+
+  --color-pgn-active-bg: #2a3d52;
+  --color-pgn-active-text: #90caf9;
+
+  --color-section-header-bg: #222228;
+  --color-section-header-text: #ddd9d3;
+  --color-section-border: #34343c;
+
+  --color-board-frame: #8a8580;
+  --color-coord: #a09a94;
+  --color-board-shadow: rgba(0, 0, 0, 0.55);
+
+  --color-dialog-overlay: rgba(0, 0, 0, 0.65);
+  --color-dialog-bg: #242428;
+  --color-dialog-title-border: #3a3a42;
+  --color-input-bg: #1a1a1e;
+  --color-input-text: #ececea;
+  --color-input-placeholder: #7a7670;
+
+  --color-muted-bg: #222228;
+  --color-analysis-row-border: #3a3a42;
+  --color-analysis-toggle-bg: #2a2a32;
+  --color-analysis-toggle-hover: #34343c;
+  --color-best-bg: #2a3528;
+  --color-best-border: #4a6a3a;
+
+  --color-puzzle-chip-theme-bg: #243444;
+  --color-puzzle-chip-theme-text: #a8d4f0;
+  --color-puzzle-solved-bg: #1f3d2f;
+  --color-puzzle-solved-text: #7dcea0;
+  --color-puzzle-fail-bg: #3d2525;
+  --color-puzzle-fail-text: #f5b7b1;
+  --color-puzzle-think-bg: #243044;
+  --color-puzzle-think-text: #a9cce3;
+
+  --color-opening-badge-text: #aed581;
+  --color-opening-sep: #8a8680;
+  --color-opening-name: #d0ccc6;
+
+  --color-puzzle-mode-bg: #3d2e24;
+  --color-puzzle-mode-border: #8b6040;
+  --color-puzzle-mode-text: #f0d4c0;
+
+  --color-promo-overlay: rgba(0, 0, 0, 0.6);
+  --color-promo-dialog-bg: #2a2a30;
+  --color-promo-title: #ececea;
+  --color-promo-btn-border: #404048;
+  --color-promo-btn-bg: #25252b;
+  --color-promo-btn-hover-border: #b58863;
+  --color-promo-btn-hover-bg: #3d3428;
+  --color-promo-label: #c4c0ba;
+
+  --color-status-mate-bg: #402828;
+  --color-status-mate-text: #ffb4ab;
+  --color-pgn-blunder: #ff8a80;
+  --color-pgn-mistake: #ffcc80;
+  --color-pgn-dubious: #ffe082;
+
+  --color-session-row-bg: #25252b;
+  --color-session-row-hover-bg: #2a3528;
+  --color-session-row-selected-bg: #2f4030;
+  --color-toggle-inactive-bg: #2a2a30;
+  --color-toggle-border: #404048;
+  --color-error-soft-bg: #3d2525;
+  --color-error-soft-border: #5c3333;
+  --color-puzzle-rating-bg: #4a4020;
+  --color-puzzle-rating-text: #f5d78a;
+  --color-puzzle-theme-chip-text: #a8d4f0;
+  --color-progress-dot: #404048;
+  --color-progress-current: #c4a574;
+  --color-solution-move-bg: #32323a;
+  --color-solution-box-bg: #25252b;
+  --color-solution-box-border: #3a3a42;
+  --color-btn-secondary-bg: #2a2a30;
+  --color-btn-secondary-hover: #34343c;
+}

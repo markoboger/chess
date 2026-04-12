@@ -16,6 +16,10 @@ class ApiModelsSpec extends AnyWordSpec with Matchers {
       CreateGameRequest().startFen shouldBe None
     }
 
+    "decode empty JSON object (Vue client default body)" in {
+      decode[CreateGameRequest]("{}") shouldBe Right(CreateGameRequest(None, GameSettings()))
+    }
+
     "round-trip through JSON with None" in {
       val req = CreateGameRequest(None)
       decode[CreateGameRequest](req.asJson.noSpaces) shouldBe Right(req)

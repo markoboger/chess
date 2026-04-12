@@ -24,10 +24,10 @@
         <template v-for="(move, i) in gameStore.pgnMoves" :key="i">
           <span v-if="i % 2 === 0" class="pgn-number">{{ Math.floor(i / 2) + 1 }}.</span>
           <span
-            class="pgn-move"
-            :class="{ 'pgn-active': i === gameStore.currentIndex - 1 }"
-            @click="gameStore.goToMove(i + 1)"
-          >{{ move }}</span>
+            class="pgn-move-wrap"
+            :class="pgnWrapClass(i)"
+            @click="onPgnMoveClick(i)"
+          ><span class="pgn-move-text">{{ move }}</span><sup v-if="moveAnn(i)" class="pgn-ann">{{ moveAnn(i) }}</sup></span>
           <br v-if="i % 2 === 1" />
         </template>
       </div>
@@ -44,7 +44,14 @@
     <!-- Game action buttons -->
     <div class="button-row">
       <button class="btn-new-game" @click="emit('new-game')" title="New Game"><SquarePlus :size="15" /> New Game</button>
-      <button v-if="gameStore.gameMode === 'hvc'" class="btn-run" @click="gameStore.setGameMode('cvc')" title="Run"><Play :size="15" /> Run</button>
+      <button
+        v-if="gameStore.gameMode !== 'cvc'"
+        class="btn-run"
+        @click="gameStore.setGameMode('cvc')"
+        title="Computer vs computer from this position (same as desktop Run)"
+      >
+        <Play :size="15" /> Run
+      </button>
       <button v-if="gameStore.gameMode === 'cvc'" class="btn-pause" @click="gameStore.togglePause()">
         <template v-if="gameStore.paused"><Play :size="15" /> Continue</template>
         <template v-else><Pause :size="15" /> Pause</template>
@@ -63,6 +70,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { useGameStore } from '../../stores/game'
+import { useAnalysisStore } from '../../stores/analysis'
+import { moveAnnotation } from '../../api/stockfish-api'
 import {
   ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight,
   SquarePlus, Play, Pause, Undo2, Redo2, ArrowUpDown,
@@ -72,7 +81,32 @@ import {
 const emit = defineEmits<{ 'new-game': [] }>()
 
 const gameStore = useGameStore()
+const analysisStore = useAnalysisStore()
 const pgnScrollRef = ref<HTMLElement | null>(null)
+
+function moveAnn(i: number): string {
+  if (!analysisStore.enabled) return ''
+  const states = gameStore.boardStates
+  if (states.length <= i + 1) return ''
+  const before = analysisStore.cache.get(states[i])
+  const after = analysisStore.cache.get(states[i + 1])
+  if (!before || !after) return ''
+  return moveAnnotation(before.evalPawns, after.evalPawns, i % 2 === 0)
+}
+
+function pgnWrapClass(i: number): string {
+  const active = i === gameStore.currentIndex - 1
+  if (active) return 'pgn-active-wrap'
+  const ann = moveAnn(i)
+  if (ann === '??') return 'pgn-blunder-wrap'
+  if (ann === '?') return 'pgn-mistake-wrap'
+  if (ann === '?!') return 'pgn-dubious-wrap'
+  return ''
+}
+
+function onPgnMoveClick(i: number) {
+  gameStore.goToMove(i + 1)
+}
 
 const copySuccess = ref(false)
 const copyPgnLabel = ref('Copy PGN')
@@ -98,7 +132,7 @@ function copyPgn() {
 watch(() => gameStore.currentIndex, async () => {
   await nextTick()
   if (!pgnScrollRef.value) return
-  const active = pgnScrollRef.value.querySelector('.pgn-active')
+  const active = pgnScrollRef.value.querySelector('.pgn-active-wrap')
   if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   else pgnScrollRef.value.scrollTop = pgnScrollRef.value.scrollHeight
 })
@@ -117,21 +151,22 @@ watch(() => gameStore.currentIndex, async () => {
   padding: 10px 16px;
   font-weight: 700;
   font-size: 15px;
-  color: #333;
-  background: #f5f5f5;
-  border-bottom: 1px solid #e0e0e0;
+  color: var(--color-section-header-text);
+  background: var(--color-section-header-bg);
+  border-bottom: 1px solid var(--color-section-border);
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
-.status-check { color: #8f4f05; background: #f9e2b8; }
-.status-checkmate { color: #982c21; background: #f3d0cb; }
-.status-draw { color: #165f8e; background: #d9edf9; }
-.status-paused { color: #555; background: #f0f0f0; }
+.status-check { color: var(--color-warn-text); background: var(--color-warn-bg); }
+.status-checkmate { color: var(--color-status-mate-text); background: var(--color-status-mate-bg); }
+.status-draw { color: var(--color-info-text); background: var(--color-info-bg); }
+.status-paused { color: var(--color-paused-text); background: var(--color-paused-bg); }
 
 .error-bar {
   padding: 6px 16px;
   font-size: 13px;
-  color: #c0392b;
-  background: #fde8e8;
-  border-bottom: 1px solid #f5c6cb;
+  color: var(--color-err-text);
+  background: var(--color-err-bg);
+  border-bottom: 1px solid var(--color-err-border);
 }
 
 /* PGN section */
@@ -149,20 +184,21 @@ watch(() => gameStore.currentIndex, async () => {
   padding: 8px 0 4px;
   flex-shrink: 0;
 }
-.section-title { font-weight: 600; font-size: 13px; color: #555; }
+.section-title { font-weight: 600; font-size: 13px; color: var(--color-text-secondary); }
 .copy-btn {
   font-size: 13px;
   padding: 3px 6px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-input);
   border-radius: 4px;
-  background: #fafafa;
+  background: var(--color-control-bg);
+  color: var(--color-text);
   cursor: pointer;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
-.copy-btn:hover { background: #eee; }
+.copy-btn:hover { background: var(--color-control-hover); }
 
 .pgn-scroll {
   font-family: monospace;
@@ -171,24 +207,36 @@ watch(() => gameStore.currentIndex, async () => {
   flex: 1;
   overflow-y: auto;
   padding: 6px 8px;
-  background: white;
-  border: 1px solid #ddd;
+  background: var(--color-card-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-input);
   border-radius: 6px;
   min-height: 120px;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
-.pgn-empty { color: #aaa; font-style: italic; }
-.pgn-number { color: #888; margin-right: 2px; }
-.pgn-move {
+.pgn-empty { color: var(--color-panel-muted2); font-style: italic; }
+.pgn-number { color: var(--color-text-muted); margin-right: 2px; }
+.pgn-move-wrap {
   cursor: pointer;
   padding: 1px 3px;
   border-radius: 3px;
   margin-right: 4px;
+  display: inline;
 }
-.pgn-move:hover { color: #1565C0; background: #e3f2fd; }
-.pgn-active {
+.pgn-move-wrap:hover { color: var(--color-pgn-active-text); background: var(--color-pgn-active-bg); }
+.pgn-active-wrap {
   font-weight: 700;
-  color: #1565C0;
-  background: #e3f2fd;
+  color: var(--color-pgn-active-text);
+  background: var(--color-pgn-active-bg);
+}
+.pgn-active-wrap .pgn-ann { color: var(--color-pgn-active-text); }
+.pgn-blunder-wrap { color: var(--color-pgn-blunder); font-weight: 600; }
+.pgn-mistake-wrap { color: var(--color-pgn-mistake); font-weight: 600; }
+.pgn-dubious-wrap { color: var(--color-pgn-dubious); font-weight: 600; }
+.pgn-ann {
+  font-weight: 700;
+  font-size: 10px;
+  margin-left: 1px;
 }
 
 /* Navigation row */
@@ -203,15 +251,16 @@ watch(() => gameStore.currentIndex, async () => {
   width: 40px;
   height: 30px;
   font-size: 14px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
-  background: #fafafa;
+  background: var(--color-control-bg);
+  color: var(--color-text);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.nav-btn:hover:not(:disabled) { background: #e8e8e8; }
+.nav-btn:hover:not(:disabled) { background: var(--color-control-hover2); }
 .nav-btn:disabled { opacity: 0.35; cursor: default; }
 
 /* Game action buttons */
@@ -282,15 +331,16 @@ watch(() => gameStore.currentIndex, async () => {
   width: 36px;
   height: 30px;
   font-size: 16px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border-strong);
   border-radius: 5px;
-  background: #fafafa;
+  background: var(--color-control-bg);
+  color: var(--color-text);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.12s;
 }
-.tool-btn:hover:not(:disabled) { background: #e8e8e8; }
+.tool-btn:hover:not(:disabled) { background: var(--color-control-hover2); }
 .tool-btn:disabled { opacity: 0.35; cursor: default; }
 </style>

@@ -1,10 +1,39 @@
 package chess.microservices.shared
 
-import io.circe.{Decoder, Encoder}
+import io.circe.{Decoder, Encoder, HCursor}
 import io.circe.generic.semiauto.*
 import chess.model.GameSettings
 
-given Decoder[GameSettings] = io.circe.generic.semiauto.deriveDecoder
+/** Decoders apply case-class defaults when JSON omits keys (e.g. `{}` from the Vue client). */
+private def boolOr(c: HCursor, field: String, default: Boolean): Decoder.Result[Boolean] =
+  c.get[Boolean](field) match
+    case Left(_)    => Right(default)
+    case Right(v) => Right(v)
+
+private def strOr(c: HCursor, field: String, default: String): Decoder.Result[String] =
+  c.get[String](field) match
+    case Left(_)    => Right(default)
+    case Right(v) => Right(v)
+
+given Decoder[GameSettings] = Decoder.instance { c =>
+  for
+    whiteIsHuman <- boolOr(c, "whiteIsHuman", default = true)
+    blackIsHuman <- boolOr(c, "blackIsHuman", default = true)
+    whiteStrategy <- strOr(c, "whiteStrategy", default = "opening-continuation")
+    blackStrategy <- strOr(c, "blackStrategy", default = "opening-continuation")
+    clockInitialMs <- c.get[Option[Long]]("clockInitialMs")
+    clockIncrementMs <- c.get[Option[Long]]("clockIncrementMs")
+    backendAutoplay <- boolOr(c, "backendAutoplay", default = false)
+  yield GameSettings(
+    whiteIsHuman,
+    blackIsHuman,
+    whiteStrategy,
+    blackStrategy,
+    clockInitialMs,
+    clockIncrementMs,
+    backendAutoplay
+  )
+}
 given Encoder[GameSettings] = io.circe.generic.semiauto.deriveEncoder
 
 /** Request to create a new game
@@ -16,7 +45,16 @@ given Encoder[GameSettings] = io.circe.generic.semiauto.deriveEncoder
 case class CreateGameRequest(startFen: Option[String] = None, settings: GameSettings = GameSettings())
 
 object CreateGameRequest:
-  given Decoder[CreateGameRequest] = deriveDecoder
+  given Decoder[CreateGameRequest] = Decoder.instance { c =>
+    val startFenR = c.get[Option[String]]("startFen")
+    val settingsR = c.downField("settings").as[GameSettings]
+    startFenR.flatMap { sf =>
+      settingsR.fold(
+        _ => Right(CreateGameRequest(sf, GameSettings())),
+        st => Right(CreateGameRequest(sf, st))
+      )
+    }
+  }
   given Encoder[CreateGameRequest] = deriveEncoder
 
 /** Response when creating a game
