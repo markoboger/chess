@@ -30,7 +30,8 @@ import chess.controller.strategy.{
   IterativeDeepeningStrategy,
   IterativeDeepeningEndgameStrategy,
   OpeningContinuationStrategy,
-  OpeningBookStrategy
+  OpeningBookStrategy,
+  DeepeningOpeningEndgameStrategy
 }
 import chess.model.{Board, Piece, PromotableRole, Role, Square, File, Rank, MoveResult, MoveError, GameEvent}
 import chess.model.{Color => ChessColor}
@@ -70,10 +71,10 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
   private[aview] var gameMode: GameMode = GameMode.HumanVsHuman
   private[aview] val whiteComputer: ComputerPlayer = new ComputerPlayer(
-    new OpeningContinuationStrategy(openings)
+    new DeepeningOpeningEndgameStrategy(openings)
   )
   private[aview] val blackComputer: ComputerPlayer = new ComputerPlayer(
-    new OpeningContinuationStrategy(openings)
+    new DeepeningOpeningEndgameStrategy(openings)
   )
   // Whether a background computer-move thread is currently scheduled
   @volatile private var computerScheduled: Boolean = false
@@ -481,7 +482,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     case "opening-continuation-endgame"     => new OpeningContinuationStrategy(openings, new IterativeDeepeningEndgameStrategy())
     case "opening-intelligence"             => new OpeningBookStrategy(openings)
     case "opening-intelligence-endgame"     => new OpeningBookStrategy(openings, new IterativeDeepeningEndgameStrategy())
-    case _                                  => new OpeningContinuationStrategy(openings)
+    case "deepening-opening-endgame"        => new DeepeningOpeningEndgameStrategy(openings)
+    case _                                  => new DeepeningOpeningEndgameStrategy(openings)
   }
 
   // ── New Game dialog ───────────────────────────────────────────────────────────
@@ -492,8 +494,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     var clockMs: Option[Long] = None; var incMs: Option[Long] = None
     var playAsWhite = true
 
-    val stratIds     = Array("opening-continuation","opening-continuation-endgame","opening-intelligence","opening-intelligence-endgame","random","greedy","material-balance","piece-square","minimax","endgame-minimax","quiescence","iterative-deepening","iterative-deepening-endgame")
-    val stratLabels  = Array("Opening Continuation","Opening Continuation+EG","Opening Intelligence","Opening Intelligence+EG","Random","Greedy","Material Balance","Piece-Square","Minimax (d=3)","Endgame Minimax (d=3)","Quiescence (d=3)","Iterative Deepening","ID+Endgame")
+    val stratIds     = Array("deepening-opening-endgame","opening-continuation","opening-continuation-endgame","opening-intelligence","opening-intelligence-endgame","random","greedy","material-balance","piece-square","minimax","endgame-minimax","quiescence","iterative-deepening","iterative-deepening-endgame")
+    val stratLabels  = Array("Deepening+Opening+Endgame ★","Opening Continuation","Opening Continuation+EG","Opening Intelligence","Opening Intelligence+EG","Random","Greedy","Material Balance","Piece-Square","Minimax (d=3)","Endgame Minimax (d=3)","Quiescence (d=3)","Iterative Deepening","ID+Endgame")
     val clockPresets = Array(
       ("No Limit", None, None), ("Bullet 1+0", Some(60_000L), Some(0L)),
       ("Blitz 3+0", Some(180_000L), Some(0L)), ("Blitz 5+0", Some(300_000L), Some(0L)),
@@ -2015,7 +2017,8 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       "Minimax+QSearch (d=3)" -> (() => new QuiescenceStrategy(3)),
       "Minimax+QSearch (d=4)" -> (() => new QuiescenceStrategy(4)),
       "Iterative Deepening" -> (() => new IterativeDeepeningStrategy()),
-      "Opening Continuation" -> (() => new OpeningContinuationStrategy(openings))
+      "Opening Continuation" -> (() => new OpeningContinuationStrategy(openings)),
+      "Deepening+Opening+Endgame ★" -> (() => new DeepeningOpeningEndgameStrategy(openings))
     )
 
     def makeStrategySubmenu(label: String, player: ComputerPlayer): Menu = {
