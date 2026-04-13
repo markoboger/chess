@@ -312,14 +312,14 @@ watch(() => gameStore.currentIndex, async () => {
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  background: #8f470f;
+  background: var(--color-btn-pause-bg);
   color: white;
   transition: all 0.15s;
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
-.btn-pause:hover { background: #a35312; transform: scale(1.02); }
+.btn-pause:hover { background: var(--color-btn-pause-hover); transform: scale(1.02); }
 
 /* Tool row (Undo / Redo / Flip) */
 .tool-row {

@@ -4,6 +4,8 @@
  */
 :root {
   color-scheme: light;
+  --color-btn-pause-bg: #e67e22;
+  --color-btn-pause-hover: #d35400;
   --color-page-bg: #eeece8;
   --color-text: #222222;
   --color-text-secondary: #555555;
@@ -122,6 +124,8 @@
 
 html.dark {
   color-scheme: dark;
+  --color-btn-pause-bg: #f39c12;
+  --color-btn-pause-hover: #e67e22;
   --color-page-bg: #121214;
   --color-text: #ececea;
   --color-text-secondary: #b8b4ae;
