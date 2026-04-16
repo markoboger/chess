@@ -720,9 +720,6 @@ export const useGameStore = defineStore('game', () => {
       if (response.gameId && whiteIsHuman.value && blackIsHuman.value) {
         connectWebSocket(response.gameId)
       }
-      // Toolbar (Run vs Pause) follows gameMode; ensure it matches this session after all wiring.
-      paused.value = false
-      gameMode.value = deriveGameMode(whiteIsHuman.value, blackIsHuman.value)
     } catch {
       error.value = 'Could not create game via backend.'
     } finally {
@@ -757,8 +754,6 @@ export const useGameStore = defineStore('game', () => {
       syncFromGameState(response, { resetClockState: true })
       triggerComputerMoveIfNeeded()
       connectWebSocket(sessionId)
-      paused.value = false
-      gameMode.value = deriveGameMode(whiteIsHuman.value, blackIsHuman.value)
       return true
     } catch (err: unknown) {
       if (errorStatus(err) === 404) {
@@ -856,16 +851,36 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  function selectSquare(square: string) {
-    if (pendingPromotion.value) return
-    if (!isAtLatest.value) return
-    if (isGameOver.value) return
+  function clearSelection() {
+    selectedSquare.value = null
+    legalMoves.value = []
+  }
+
+  function canInteractWithBoard(): boolean {
+    if (pendingPromotion.value) return false
+    if (!isAtLatest.value) return false
+    if (isGameOver.value) return false
     // Block all interaction while a move HTTP round-trip is in flight
-    if (moveInFlight.value) return
+    if (moveInFlight.value) return false
     // Block when it's computer's turn (skip in puzzle mode)
-    if (!puzzleMode.value && isComputerTurn()) return
+    if (!puzzleMode.value && isComputerTurn()) return false
     // Block when it's the remote opponent's turn in a session
-    if (!puzzleMode.value && myColor.value !== 'spectator' && !isMyTurn()) return
+    if (!puzzleMode.value && myColor.value !== 'spectator' && !isMyTurn()) return false
+    return true
+  }
+
+  function needsPromotion(from: string, to: string): boolean {
+    const fromPiece = viewChess.value.get(from as ChessSquare)
+    if (fromPiece?.type !== 'p') return false
+    const toRank = to[1]
+    return (
+      (fromPiece.color === 'w' && toRank === '8') ||
+      (fromPiece.color === 'b' && toRank === '1')
+    )
+  }
+
+  function selectSquare(square: string) {
+    if (!canInteractWithBoard()) return
 
     const piece = viewChess.value.get(square as ChessSquare)
     const currentTurn = viewChess.value.turn()
@@ -874,17 +889,12 @@ export const useGameStore = defineStore('game', () => {
       // In puzzle mode, don't apply the move — let the puzzle panel handle it
       if (puzzleMode.value) {
         puzzlePendingMove.value = { from: selectedSquare.value, to: square }
-        selectedSquare.value = null
-        legalMoves.value = []
+        clearSelection()
         return
       }
-      const fromPiece = viewChess.value.get(selectedSquare.value as ChessSquare)
-      if (fromPiece?.type === 'p') {
-        const toRank = square[1]
-        if ((fromPiece.color === 'w' && toRank === '8') || (fromPiece.color === 'b' && toRank === '1')) {
-          pendingPromotion.value = { from: selectedSquare.value, to: square }
-          return
-        }
+      if (needsPromotion(selectedSquare.value, square)) {
+        pendingPromotion.value = { from: selectedSquare.value, to: square }
+        return
       }
       void applyMove(selectedSquare.value, square).then(ok => {
         if (ok) triggerComputerMoveIfNeeded()
@@ -898,8 +908,7 @@ export const useGameStore = defineStore('game', () => {
         legalMoves.value = []
       }
     } else {
-      selectedSquare.value = null
-      legalMoves.value = []
+      clearSelection()
     }
   }
 
@@ -914,8 +923,7 @@ export const useGameStore = defineStore('game', () => {
 
   function cancelPromotion() {
     pendingPromotion.value = null
-    selectedSquare.value = null
-    legalMoves.value = []
+    clearSelection()
   }
 
   // ── Game mode changes ────────────────────────────────────────────────
