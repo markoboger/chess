@@ -31,40 +31,11 @@ async function buildFenMap(): Promise<Map<string, OpeningInfo>> {
       if (!res.ok) continue
       const text = await res.text()
       for (const rawLine of text.split('\n')) {
-        const line = rawLine.trim()
-        if (!line || line.startsWith('eco')) continue
-        const tab1 = line.indexOf('\t')
-        const tab2 = line.indexOf('\t', tab1 + 1)
-        if (tab1 < 0 || tab2 < 0) continue
-        const eco = line.slice(0, tab1).trim()
-        const name = line.slice(tab1 + 1, tab2).trim()
-        const pgn = line.slice(tab2 + 1).trim()
-        if (!eco || !name) continue
-        try {
-          const board = new Chess()
-          const tokens = pgn.split(/\s+/).filter(token => token && !/^\d+\.+$/.test(token))
-          for (let i = 0; i < tokens.length; i++) {
-            const key = continuationKey(board.fen())
-            const next = tokens[i]
-            const entry: OpeningContinuation = {
-              san: next,
-              remainingPlies: tokens.length - i,
-              eco,
-              name,
-            }
-            prefixes.set(key, [...(prefixes.get(key) ?? []), entry])
-            if (!board.move(next as any)) break
-          }
-
-          board.reset()
-          if (pgn) board.loadPgn(pgn)
-          const placement = board.fen().split(' ')[0]
-          if (!map.has(placement)) {
-            map.set(placement, { eco, name, moves: pgn })
-          }
-        } catch {
-          // ignore entries with unparseable PGN
-        }
+        const parsed = parseTsvLine(rawLine)
+        if (!parsed) continue
+        const { eco, name, pgn } = parsed
+        indexContinuation(prefixes, eco, name, pgn)
+        indexFinalPosition(map, eco, name, pgn)
       }
     } catch {
       // ignore fetch errors for individual files
@@ -79,6 +50,67 @@ async function buildFenMap(): Promise<Map<string, OpeningInfo>> {
     ]),
   )
   return map
+}
+
+function parseTsvLine(rawLine: string): { eco: string; name: string; pgn: string } | null {
+  const line = rawLine.trim()
+  if (!line || line.startsWith('eco')) return null
+  const tab1 = line.indexOf('\t')
+  const tab2 = line.indexOf('\t', tab1 + 1)
+  if (tab1 < 0 || tab2 < 0) return null
+  const eco = line.slice(0, tab1).trim()
+  const name = line.slice(tab1 + 1, tab2).trim()
+  const pgn = line.slice(tab2 + 1).trim()
+  if (!eco || !name) return null
+  return { eco, name, pgn }
+}
+
+function pgnTokens(pgn: string): string[] {
+  return pgn.split(/\s+/).filter(token => token && !/^\d+\.+$/.test(token))
+}
+
+function indexContinuation(
+  prefixes: Map<string, OpeningContinuation[]>,
+  eco: string,
+  name: string,
+  pgn: string,
+): void {
+  try {
+    const board = new Chess()
+    const tokens = pgnTokens(pgn)
+    for (let i = 0; i < tokens.length; i++) {
+      const key = continuationKey(board.fen())
+      const next = tokens[i]
+      const entry: OpeningContinuation = {
+        san: next,
+        remainingPlies: tokens.length - i,
+        eco,
+        name,
+      }
+      prefixes.set(key, [...(prefixes.get(key) ?? []), entry])
+      if (!board.move(next as any)) break
+    }
+  } catch {
+    // ignore entries with unparseable PGN
+  }
+}
+
+function indexFinalPosition(
+  map: Map<string, OpeningInfo>,
+  eco: string,
+  name: string,
+  pgn: string,
+): void {
+  try {
+    const board = new Chess()
+    if (pgn) board.loadPgn(pgn)
+    const placement = board.fen().split(' ')[0]
+    if (!map.has(placement)) {
+      map.set(placement, { eco, name, moves: pgn })
+    }
+  } catch {
+    // ignore entries with unparseable PGN
+  }
 }
 
 function continuationKey(fen: string): string {

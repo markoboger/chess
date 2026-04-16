@@ -11,6 +11,7 @@ import java.time.Instant
 import java.util.UUID
 import scala.concurrent.duration.*
 import chess.application.game.GameSessionService.GameNotFound
+import chess.application.game.GameSessionService.timeoutStatus
 
 /** Application service for managing active chess game sessions.
   *
@@ -114,8 +115,8 @@ class GameSessionService(
       val fen = controller.getBoardAsFEN
       val pgn = controller.pgnText
       val status = clockLossMap.get(gameId) match
-        case Some(Color.White) => "Timeout: Black wins on time"
-        case Some(Color.Black) => "Timeout: White wins on time"
+        case Some(Color.White) => timeoutStatus(loser = Color.White)
+        case Some(Color.Black) => timeoutStatus(loser = Color.Black)
         case None              => controller.gameStatus
       (fen, pgn, status, settings)
     }
@@ -311,14 +312,13 @@ class GameSessionService(
     }
 
   private def publishClockLoss(gameId: String, controller: GameController, loser: Color): IO[Unit] =
-    val winner = if loser == Color.White then "Black" else "White"
     publisher.publish(
       GameSessionEvent(
         gameId   = gameId,
         eventType = "game_over",
         fen      = Some(controller.getBoardAsFEN),
         pgn      = Some(controller.pgnText),
-        status   = Some(s"Timeout: $winner wins on time"),
+        status   = Some(timeoutStatus(loser)),
         move     = None,
         gameEvent = Some("clock"),
         occurredAt = Instant.now()
@@ -401,6 +401,11 @@ private final case class ClockState(
 
 object GameSessionService:
   val GameNotFound = "Game not found"
+
+  def timeoutStatus(loser: Color): String =
+    loser match
+      case Color.White => "Timeout: Black wins on time"
+      case Color.Black => "Timeout: White wins on time"
 
   def apply(
       publisher: GameEventPublisher = GameEventPublisher.noop

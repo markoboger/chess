@@ -26,23 +26,23 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
 
   def selectMove(board: Board, color: Color): Option[(Square, Square, Option[PromotableRole])] =
     val moves = SearchSupport.legalSearchMoves(board, color)
-    if moves.isEmpty then return None
+    if moves.isEmpty then None
+    else
+      val deadline = System.currentTimeMillis() + timeLimitMs
 
-    val deadline = System.currentTimeMillis() + timeLimitMs
+      // Depth-0 fallback: use the first legal move so we always have a result.
+      var bestMove: Option[(Square, Square, Option[PromotableRole])] = moves.headOption.map(_.asTuple)
 
-    // Depth-0 fallback: use the first legal move so we always have a result.
-    var bestMove: Option[(Square, Square, Option[PromotableRole])] = moves.headOption.map(_.asTuple)
+      var depth = 1
+      var keepGoing = true
 
-    var depth = 1
-    var keepGoing = true
+      while keepGoing do
+        val (result, aborted) = searchAtDepth(board, color, depth, deadline)
+        if !aborted then bestMove = result
+        if aborted || System.currentTimeMillis() >= deadline then keepGoing = false
+        else depth += 1
 
-    while keepGoing do
-      val (result, aborted) = searchAtDepth(board, color, depth, deadline)
-      if !aborted then bestMove = result
-      if aborted || System.currentTimeMillis() >= deadline then keepGoing = false
-      else depth += 1
-
-    bestMove
+      bestMove
 
   /** One full alpha-beta pass at `depth`. Returns (best-move, was-aborted). */
   private def searchAtDepth(
@@ -102,25 +102,24 @@ class IterativeDeepeningStrategy(var timeLimitMs: Long = 2000L) extends MoveStra
       deadline: Long,
       seenInPath: Set[NodeKey]
   ): (Int, Boolean) =
-    if System.currentTimeMillis() >= deadline then return (0, true)
-
-    // Detect repetition within the search path: this line is a draw.
-    val key = nodeKey(board, mode == SearchMode.Maximize)
-    if seenInPath.contains(key) then return (DrawPolicy.repetitionScore(board, rootColor), false)
-
-    if depth == 0 then return (Evaluator.evaluate(board, rootColor), false)
-
-    val currentColor = mode.currentColor(rootColor)
-    SearchSupport
-      .terminalScore(board, currentColor, mode, depth, INF, rootColor)
-      .map((_, false))
-      .getOrElse {
-        val nextSeen = seenInPath + key
-        val moves = SearchSupport.legalSearchMoves(board, currentColor)
-        SearchSupport.searchChildrenUntilDeadline(moves, mode, alpha, beta, INF) { (move, currentAlpha, currentBeta) =>
-          childScore(move, depth, mode, currentAlpha, currentBeta, rootColor, deadline, nextSeen)
-        }
-      }
+    if System.currentTimeMillis() >= deadline then (0, true)
+    else
+      // Detect repetition within the search path: this line is a draw.
+      val key = nodeKey(board, mode == SearchMode.Maximize)
+      if seenInPath.contains(key) then (DrawPolicy.repetitionScore(board, rootColor), false)
+      else if depth == 0 then (Evaluator.evaluate(board, rootColor), false)
+      else
+        val currentColor = mode.currentColor(rootColor)
+        SearchSupport
+          .terminalScore(board, currentColor, mode, depth, INF, rootColor)
+          .map((_, false))
+          .getOrElse {
+            val nextSeen = seenInPath + key
+            val moves = SearchSupport.legalSearchMoves(board, currentColor)
+            SearchSupport.searchChildrenUntilDeadline(moves, mode, alpha, beta, INF) { (move, currentAlpha, currentBeta) =>
+              childScore(move, depth, mode, currentAlpha, currentBeta, rootColor, deadline, nextSeen)
+            }
+          }
 
   private def childScore(
       move: SearchSupport.SearchMove,

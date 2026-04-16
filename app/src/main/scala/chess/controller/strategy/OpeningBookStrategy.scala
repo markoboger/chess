@@ -56,28 +56,25 @@ class OpeningBookStrategy(
     bookDone   = false
 
   def selectMove(board: Board, color: Color): Option[(Square, Square, Option[PromotableRole])] =
-    if bookDone || openings.isEmpty then
-      return fallback.selectMove(board, color)
-
-    if chosen.isEmpty && color == Color.White then
-      pickOpening()
-
-    if chosen.isEmpty then
-      return fallback.selectMove(board, color)
-
-    val moveIdx  = if color == Color.White then 2 * whiteIndex else 2 * blackIndex + 1
-    val isWhite  = color == Color.White
-
-    if moveIdx >= bookMoves.length then
-      fallback.selectMove(board, color)
+    if bookDone || openings.isEmpty then fallback.selectMove(board, color)
     else
-      PGNParser.parseMove(bookMoves(moveIdx), board, isWhite) match
-        case Success((from, to)) =>
-          if isWhite then whiteIndex += 1 else blackIndex += 1
-          Some((from, to, MoveStrategy.promotionFor(board, from, to, color)))
-        case Failure(_) =>
-          bookDone = true
-          fallback.selectMove(board, color)
+      if chosen.isEmpty && color == Color.White then pickOpening()
+
+      chosen match
+        case None => fallback.selectMove(board, color)
+        case Some(_) =>
+          val isWhite = color == Color.White
+          val moveIdx = if isWhite then 2 * whiteIndex else 2 * blackIndex + 1
+
+          if moveIdx >= bookMoves.length then fallback.selectMove(board, color)
+          else
+            PGNParser.parseMove(bookMoves(moveIdx), board, isWhite) match
+              case Success((from, to)) =>
+                if isWhite then whiteIndex += 1 else blackIndex += 1
+                Some((from, to, MoveStrategy.promotionFor(board, from, to, color)))
+              case Failure(_) =>
+                bookDone = true
+                fallback.selectMove(board, color)
 
   private def pickOpening(): Unit =
     val o = openings(rng.nextInt(openings.length))

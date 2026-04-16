@@ -156,8 +156,9 @@ object Evaluator:
 
     !relevantFiles.exists { fileIndex =>
       blockingRanks.exists { rankIndex =>
-        val candidate = Square.fromCoords(fileIndex, rankIndex).get
-        board.pieceAt(candidate).exists(piece => piece.color == enemyColor && piece.role == Role.Pawn)
+        Square
+          .fromCoords(fileIndex, rankIndex)
+          .exists(candidate => board.pieceAt(candidate).exists(piece => piece.color == enemyColor && piece.role == Role.Pawn))
       }
     }
 

@@ -15,6 +15,8 @@ import chess.persistence.OpeningRepository
 object GameRoutes:
 
   object FenQueryParam extends QueryParamDecoderMatcher[String]("fen")
+  private val GameNotFound = "Game not found"
+  private val OpeningNotFound = "Opening not found"
 
   def routes(gameSessions: GameSessionService)(using
       fenIO: FenIO,
@@ -54,7 +56,7 @@ object GameRoutes:
           case Some((fen, pgn, status, settings)) =>
             Ok(GameStateResponse(gameId, fen, pgn, status, settings))
           case None =>
-            NotFound(ErrorResponse("Game not found"))
+            NotFound(ErrorResponse(GameNotFound))
         }
 
       // DELETE /games - Delete all game sessions
@@ -65,7 +67,7 @@ object GameRoutes:
       case DELETE -> Root / "games" / gameId =>
         gameSessions.deleteGame(gameId).flatMap { deleted =>
           if deleted then NoContent()
-          else NotFound(ErrorResponse("Game not found"))
+          else NotFound(ErrorResponse(GameNotFound))
         }
 
       // POST /games/:id/moves - Make a move
@@ -85,7 +87,7 @@ object GameRoutes:
           case Some(moves) =>
             Ok(MoveHistoryResponse(moves))
           case None =>
-            NotFound(ErrorResponse("Game not found"))
+            NotFound(ErrorResponse(GameNotFound))
         }
 
       // GET /games/:id/fen - Get current FEN position
@@ -94,7 +96,7 @@ object GameRoutes:
           case Some(fen) =>
             Ok(FenResponse(fen))
           case None =>
-            NotFound(ErrorResponse("Game not found"))
+            NotFound(ErrorResponse(GameNotFound))
         }
 
       // GET /openings/lookup?fen=<piece-placement> - Look up opening by board position
@@ -103,7 +105,7 @@ object GameRoutes:
           case Some(opening) =>
             Ok(OpeningLookupResponse(opening.eco, opening.name, opening.moves))
           case None =>
-            NotFound(ErrorResponse("Opening not found"))
+            NotFound(ErrorResponse(OpeningNotFound))
         }
 
       // POST /games/:id/pgn - Replay a full PGN into an existing session

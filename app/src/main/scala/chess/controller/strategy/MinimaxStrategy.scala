@@ -24,14 +24,15 @@ class MinimaxStrategy(val depth: Int = 3) extends MoveStrategy:
 
   def selectMove(board: Board, color: Color): Option[(Square, Square, Option[PromotableRole])] =
     val moves = SearchSupport.legalSearchMoves(board, color)
-    if moves.isEmpty then return None
-    val rootPath: Set[NodeKey] = Set(nodeKey(board, maximizing = true))
-    val (_, bestMoves) =
-      moves.foldLeft((-INF, List.empty[(Square, Square, Option[PromotableRole])])) { case ((bestScore, bestMoves), move) =>
-        val score = rootMoveScore(move, color, rootPath)
-        SearchSupport.updateBestMoves(bestScore, bestMoves, move, score)
-      }
-    SearchSupport.chooseRandom(bestMoves)
+    if moves.isEmpty then None
+    else
+      val rootPath: Set[NodeKey] = Set(nodeKey(board, maximizing = true))
+      val (_, bestMoves) =
+        moves.foldLeft((-INF, List.empty[(Square, Square, Option[PromotableRole])])) { case ((bestScore, bestMoves), move) =>
+          val score = rootMoveScore(move, color, rootPath)
+          SearchSupport.updateBestMoves(bestScore, bestMoves, move, score)
+        }
+      SearchSupport.chooseRandom(bestMoves)
 
   private def rootMoveScore(
       move: SearchSupport.SearchMove,
@@ -70,20 +71,19 @@ class MinimaxStrategy(val depth: Int = 3) extends MoveStrategy:
   ): Int =
     // Detect repetition within the search path: this line is a draw.
     val key = nodeKey(board, mode == SearchMode.Maximize)
-    if seenInPath.contains(key) then return DrawPolicy.repetitionScore(board, rootColor)
-
-    if depth == 0 then return Evaluator.evaluate(board, rootColor)
-
-    val currentColor = mode.currentColor(rootColor)
-    SearchSupport
-      .terminalScore(board, currentColor, mode, depth, INF, rootColor)
-      .getOrElse {
-        val nextSeen = seenInPath + key
-        val moves = SearchSupport.legalSearchMoves(board, currentColor)
-        SearchSupport.searchChildren(moves, mode, alpha, beta, INF) { (move, currentAlpha, currentBeta) =>
-          childScore(move, depth, mode, currentAlpha, currentBeta, rootColor, nextSeen)
+    if seenInPath.contains(key) then DrawPolicy.repetitionScore(board, rootColor)
+    else if depth == 0 then Evaluator.evaluate(board, rootColor)
+    else
+      val currentColor = mode.currentColor(rootColor)
+      SearchSupport
+        .terminalScore(board, currentColor, mode, depth, INF, rootColor)
+        .getOrElse {
+          val nextSeen = seenInPath + key
+          val moves = SearchSupport.legalSearchMoves(board, currentColor)
+          SearchSupport.searchChildren(moves, mode, alpha, beta, INF) { (move, currentAlpha, currentBeta) =>
+            childScore(move, depth, mode, currentAlpha, currentBeta, rootColor, nextSeen)
+          }
         }
-      }
 
   private def childScore(
       move: SearchSupport.SearchMove,

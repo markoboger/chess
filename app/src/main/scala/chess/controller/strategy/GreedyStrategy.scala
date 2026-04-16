@@ -23,20 +23,20 @@ class GreedyStrategy extends MoveStrategy:
 
   def selectMove(board: Board, color: Color): Option[(Square, Square, Option[PromotableRole])] =
     val moves = board.legalMoves(color)
-    if moves.isEmpty then return None
+    if moves.isEmpty then None
+    else
+      // Partition into captures and quiet moves
+      val captures = moves.flatMap { (from, to) =>
+        board.pieceAt(to).map(captured => (from, to, pieceValue(captured.role)))
+      }
 
-    // Partition into captures and quiet moves
-    val captures = moves.flatMap { (from, to) =>
-      board.pieceAt(to).map(captured => (from, to, pieceValue(captured.role)))
-    }
+      val (from, to) =
+        if captures.nonEmpty then
+          // Pick the highest-value capture (break ties randomly)
+          val best = captures.maxBy(_._3)._3
+          val bestCaptures = captures.filter(_._3 == best)
+          val pick = bestCaptures(Random.nextInt(bestCaptures.length))
+          (pick._1, pick._2)
+        else moves(Random.nextInt(moves.length))
 
-    val (from, to) =
-      if captures.nonEmpty then
-        // Pick the highest-value capture (break ties randomly)
-        val best = captures.maxBy(_._3)._3
-        val bestCaptures = captures.filter(_._3 == best)
-        val pick = bestCaptures(Random.nextInt(bestCaptures.length))
-        (pick._1, pick._2)
-      else moves(Random.nextInt(moves.length))
-
-    Some((from, to, MoveStrategy.promotionFor(board, from, to, color)))
+      Some((from, to, MoveStrategy.promotionFor(board, from, to, color)))

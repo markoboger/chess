@@ -20,6 +20,7 @@ object UIServer extends IOApp.Simple:
 
   private val port = sys.env.getOrElse("PORT", "8082").toInt
   private val staticRoot = Path("frontend/dist")
+  private def fileNotFound(fileName: String) = s"File not found: $fileName"
 
   def routes: HttpRoutes[IO] = HttpRoutes.of[IO] {
 
@@ -52,7 +53,7 @@ object UIServer extends IOApp.Simple:
         Ok(body).map(_.withContentType(`Content-Type`(mediaType)))
 
       case false =>
-        NotFound(s"File not found: $fileName")
+        NotFound(fileNotFound(fileName))
     }
 
   def run: IO[Unit] =
