@@ -1,5 +1,5 @@
 # Dockerfile for API Gateway
-FROM sbtscala/scala-sbt:eclipse-temurin-jammy-21.0.5_11_1.10.6_3.5.2 AS builder
+FROM sbtscala/scala-sbt:eclipse-temurin-21.0.8_9_1.12.9_3.8.3 AS builder
 
 WORKDIR /app
 
@@ -8,13 +8,13 @@ COPY build.sbt .
 COPY project project/
 
 # Download dependencies
-RUN sbt update
+RUN SBT_OPTS="-Dsbt.watch.mode=polling" sbt update
 
 # Copy source code
 COPY src src/
 
 # Build the application
-RUN sbt compile stage
+RUN SBT_OPTS="-Dsbt.watch.mode=polling" sbt compile stage
 
 # Runtime image
 FROM eclipse-temurin:21-jre-jammy

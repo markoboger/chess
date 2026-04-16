@@ -38,6 +38,7 @@ import chess.model.{Color => ChessColor}
 import chess.controller.io.FileIO
 import chess.controller.io.json.circe.CirceJsonFileIO
 import chess.controller.io.json.upickle.UPickleJsonFileIO
+import scala.jdk.CollectionConverters.*
 import chess.AppBindings.given
 import chess.util.Observer
 import chess.controller.clock.ClockActor
@@ -1454,7 +1455,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         val content: Option[String] =
           if (db.hasString && db.getString.trim.nonEmpty)
             Some(db.getString.trim)
-          else if (db.hasFiles) Try(readFromFile(db.getFiles.get(0))).toOption
+          else if (db.hasFiles) db.getFiles.asScala.headOption.flatMap(file => Try(readFromFile(file)).toOption)
           else None
         controlPanel.style = panelNormalStyle
         content.foreach { txt =>

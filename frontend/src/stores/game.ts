@@ -6,6 +6,7 @@ import type { GameStatus, Turn } from '../types/game'
 import type { GameSettings } from '../types/api'
 import { useOpeningStore } from './opening'
 import { gameApi } from '../api/game-api'
+import { log } from '../utils/log'
 
 function formatClockTime(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000))
@@ -519,19 +520,19 @@ export const useGameStore = defineStore('game', () => {
 
   function applyRemoteMove(msg: MoveAppliedMessage) {
     const newFen = msg.fen
-    console.log('[WS] move_applied received', { move: msg.move, pgn: msg.pgn, fen: newFen, currentPgnLen: pgnMoves.value.length, moveInFlight: moveInFlight.value })
+    log.debug('[WS] move_applied received', { move: msg.move, pgn: msg.pgn, fen: newFen, currentPgnLen: pgnMoves.value.length, moveInFlight: moveInFlight.value })
     if (!newFen || fenSignature(newFen) === fenSignature(chess.value.fen())) {
-      console.log('[WS] skipped: fenSig match')
+      log.debug('[WS] skipped: fenSig match')
       return
     }
 
     const parsedMoves = parsePgnMovesSafe(msg.pgn ?? '')
     if (parsedMoves.length > 0 && parsedMoves.length < pgnMoves.value.length) {
-      console.log('[WS] skipped: stale event', parsedMoves.length, '<', pgnMoves.value.length)
+      log.debug('[WS] skipped: stale event', parsedMoves.length, '<', pgnMoves.value.length)
       return
     }
 
-    console.log('[WS] APPLYING move', { parsedMoves, gameMode: gameMode.value })
+    log.debug('[WS] APPLYING move', { parsedMoves, gameMode: gameMode.value })
     chess.value = new Chess(newFen)
     if (parsedMoves.length > 0) {
       boardStates.value = replayStatesFromMoves(parsedMoves)
@@ -647,9 +648,9 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function triggerComputerMoveIfNeeded() {
-    console.log('[trigger] isComputerTurn=', isComputerTurn(), 'gameMode=', gameMode.value, 'whiteIsHuman=', whiteIsHuman.value, 'blackIsHuman=', blackIsHuman.value, 'latestTurn=', latestTurn.value)
+    log.debug('[trigger] isComputerTurn=', isComputerTurn(), 'gameMode=', gameMode.value, 'whiteIsHuman=', whiteIsHuman.value, 'blackIsHuman=', blackIsHuman.value, 'latestTurn=', latestTurn.value)
     if (!isGameOver.value && !paused.value && isComputerTurn() && isAtLatest.value) {
-      console.log('[trigger] TRIGGERING computer move')
+      log.debug('[trigger] TRIGGERING computer move')
       makeComputerMove()
     }
   }
@@ -783,7 +784,7 @@ export const useGameStore = defineStore('game', () => {
   }
 
   async function applyMove(from: string, to: string, promotion?: string): Promise<boolean> {
-    console.log(
+    log.debug(
       '[applyMove] CALLED',
       from,
       '->',

@@ -49,16 +49,19 @@ object OpeningParser extends OpeningIO:
 
   /** Parses a single TSV line into an [[Opening]]. Returns None for header or malformed lines. */
   def parseTsvLine(line: String): Option[Opening] =
-    if line.startsWith("eco\t") then return None
-    val parts = line.split("\t", 3)
-    if parts.length < 3 then return None
-    val eco = parts(0).trim
-    val name = parts(1).trim
-    val pgn = parts(2).trim
-    if eco.isEmpty || name.isEmpty || pgn.isEmpty then return None
-    computeFenAndMoveCount(pgn).flatMap { case (fen, moveCount) =>
-      Try(Opening.unsafe(eco, name, pgn, fen, moveCount)).toOption
-    }
+    if line.startsWith("eco\t") then None
+    else
+      val parts = line.split("\t", 3)
+      if parts.length < 3 then None
+      else
+        val eco = parts(0).trim
+        val name = parts(1).trim
+        val pgn = parts(2).trim
+        if eco.isEmpty || name.isEmpty || pgn.isEmpty then None
+        else
+          computeFenAndMoveCount(pgn).flatMap { case (fen, moveCount) =>
+            Try(Opening.unsafe(eco, name, pgn, fen, moveCount)).toOption
+          }
 
   // ── CSV parsing (legacy format: eco,name,moves with header) ───────────────
 
@@ -112,18 +115,32 @@ object OpeningParser extends OpeningIO:
 
   /** Validates opening data quality; returns a list of human-readable error messages. */
   def validateOpenings(openings: List[Opening]): List[String] =
-    val errors = scala.collection.mutable.ListBuffer[String]()
+    val duplicateErrors =
+      openings
+        .groupBy(o => (o.eco, o.name))
+        .collect { case ((eco, name), dups) if dups.lengthCompare(1) > 0 =>
+          s"Duplicate (eco, name): ($eco, $name) — ${dups.length} entries"
+        }
+        .toList
 
-    openings.groupBy(o => (o.eco, o.name)).filter(_._2.length > 1).foreach { case ((eco, name), dups) =>
-      errors += s"Duplicate (eco, name): ($eco, $name) — ${dups.length} entries"
-    }
-    openings.foreach { o =>
-      if !o.eco.matches("[A-E][0-9]{2}") then errors += s"Invalid ECO format: ${o.eco}"
-      if o.name.isEmpty then errors += s"Empty name for ECO: ${o.eco}"
-      if o.moveCount < 1 || o.moveCount > 50 then
-        errors += s"Unreasonable move count for ${o.eco} ${o.name}: ${o.moveCount}"
-    }
-    errors.toList
+    val formatErrors =
+      openings.flatMap { o =>
+        val ecoErrors =
+          if o.eco.matches("[A-E][0-9]{2}") then Nil
+          else List(s"Invalid ECO format: ${o.eco}")
+
+        val nameErrors =
+          if o.name.nonEmpty then Nil
+          else List(s"Empty name for ECO: ${o.eco}")
+
+        val moveCountErrors =
+          if o.moveCount >= 1 && o.moveCount <= 50 then Nil
+          else List(s"Unreasonable move count for ${o.eco} ${o.name}: ${o.moveCount}")
+
+        ecoErrors ++ nameErrors ++ moveCountErrors
+      }
+
+    duplicateErrors ++ formatErrors
 
   /** Prints summary statistics for a collection of openings. */
   def printStatistics(openings: List[Opening]): Unit =

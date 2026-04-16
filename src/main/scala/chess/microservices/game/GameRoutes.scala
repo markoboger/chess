@@ -16,6 +16,7 @@ object GameRoutes:
 
   object FenQueryParam extends QueryParamDecoderMatcher[String]("fen")
   private val GameNotFound = "Game not found"
+  private val OpeningNotFound = "Opening not found"
 
   def routes(gameSessions: GameSessionService)(using
       fenIO: FenIO,
@@ -104,7 +105,7 @@ object GameRoutes:
           case Some(opening) =>
             Ok(OpeningLookupResponse(opening.eco, opening.name, opening.moves))
           case None =>
-            NotFound(ErrorResponse("Opening not found"))
+            NotFound(ErrorResponse(OpeningNotFound))
         }
 
       // POST /games/:id/pgn - Replay a full PGN into an existing session

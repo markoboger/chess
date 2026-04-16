@@ -46,31 +46,38 @@ object OpeningContinuationStrategy:
 
       openings.foreach { opening =>
         val sanMoves = parseSan(opening.moves)
-        var board = Board.initial
-        var color = Color.White
-        var keepGoing = true
-        var idx = 0
 
-        while keepGoing && idx < sanMoves.length do
-          val san = sanMoves(idx)
-          val key = positionKey(board, color)
-          val continuation = Continuation(san, sanMoves.length - idx, opening.eco, opening.name)
-          entries.update(key, entries.getOrElse(key, Vector.empty) :+ continuation)
+        @annotation.tailrec
+        def indexFrom(idx: Int, board: Board, color: Color): Unit =
+          if idx >= sanMoves.length then ()
+          else
+            val san = sanMoves(idx)
+            val key = positionKey(board, color)
+            val continuation = Continuation(san, sanMoves.length - idx, opening.eco, opening.name)
+            entries.update(key, entries.getOrElse(key, Vector.empty) :+ continuation)
 
-          PGNParser.parseMove(san, board, color == Color.White).toOption
-            .flatMap { case (from, to) =>
-              val promo = MoveStrategy.promotionFor(board, from, to, color)
-              board.move(from, to, promo).toOption
-            } match
-            case Some(nextBoard) =>
-              board = nextBoard
-              color = color.opposite
-              idx += 1
-            case None =>
-              keepGoing = false
+            val nextBoardOpt =
+              PGNParser
+                .parseMove(san, board, color == Color.White)
+                .toOption
+                .flatMap { case (from, to) =>
+                  val promo = MoveStrategy.promotionFor(board, from, to, color)
+                  board.move(from, to, promo).toOption
+                }
+
+            nextBoardOpt match
+              case Some(nextBoard) => indexFrom(idx + 1, nextBoard, color.opposite)
+              case None            => ()
+
+        indexFrom(0, Board.initial, Color.White)
       }
 
-      Book(entries.view.mapValues(_.distinctBy(_.nextSan)).toMap)
+      val deduped =
+        entries.iterator.map { case (key, conts) =>
+          key -> conts.distinctBy(_.nextSan)
+        }.toMap
+
+      Book(deduped)
 
     private def parseSan(pgn: String): Vector[String] =
       pgn.split("\\s+").toVector.filterNot(token => token.isEmpty || token.matches("\\d+\\.+"))

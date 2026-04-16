@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { log } from '../utils/log'
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -12,7 +13,7 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     if (config.method === 'post' && config.url?.includes('/moves')) {
-      console.warn(
+      log.warn(
         '[HTTP] POST moves:',
         config.url,
         config.data,
@@ -26,7 +27,7 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('API Error:', error.response?.data || error.message)
+    log.error('API Error:', error.response?.data || error.message)
     return Promise.reject(error)
   }
 )

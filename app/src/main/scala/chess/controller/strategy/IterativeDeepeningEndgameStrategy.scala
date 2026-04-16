@@ -29,21 +29,21 @@ class IterativeDeepeningEndgameStrategy(var timeLimitMs: Long = 2000L, val qDept
 
   def selectMove(board: Board, color: Color): Option[(Square, Square, Option[PromotableRole])] =
     val moves = SearchSupport.legalSearchMoves(board, color)
-    if moves.isEmpty then return None
+    if moves.isEmpty then None
+    else
+      val deadline = System.currentTimeMillis() + timeLimitMs
+      var bestMove: Option[(Square, Square, Option[PromotableRole])] = moves.headOption.map(_.asTuple)
 
-    val deadline = System.currentTimeMillis() + timeLimitMs
-    var bestMove: Option[(Square, Square, Option[PromotableRole])] = moves.headOption.map(_.asTuple)
+      var depth = 1
+      var keepGoing = true
 
-    var depth = 1
-    var keepGoing = true
+      while keepGoing do
+        val (result, aborted) = searchAtDepth(board, color, depth, deadline)
+        if !aborted then bestMove = result
+        if aborted || System.currentTimeMillis() >= deadline then keepGoing = false
+        else depth += 1
 
-    while keepGoing do
-      val (result, aborted) = searchAtDepth(board, color, depth, deadline)
-      if !aborted then bestMove = result
-      if aborted || System.currentTimeMillis() >= deadline then keepGoing = false
-      else depth += 1
-
-    bestMove
+      bestMove
 
   private def searchAtDepth(
       board: Board,
@@ -100,24 +100,23 @@ class IterativeDeepeningEndgameStrategy(var timeLimitMs: Long = 2000L, val qDept
       deadline: Long,
       seenInPath: Set[NodeKey]
   ): (Int, Boolean) =
-    if System.currentTimeMillis() >= deadline then return (0, true)
-
-    val key = nodeKey(board, mode == SearchMode.Maximize)
-    if seenInPath.contains(key) then return (DrawPolicy.repetitionScore(board, rootColor), false)
-
-    if depth == 0 then return (quiescence(board, alpha, beta, mode, rootColor, qDepth), false)
-
-    val currentColor = mode.currentColor(rootColor)
-    SearchSupport
-      .terminalScore(board, currentColor, mode, depth, INF, rootColor)
-      .map((_, false))
-      .getOrElse {
-        val nextSeen = seenInPath + key
-        val moves = SearchSupport.legalSearchMoves(board, currentColor)
-        SearchSupport.searchChildrenUntilDeadline(moves, mode, alpha, beta, INF) { (move, currentAlpha, currentBeta) =>
-          childScore(move, depth, mode, currentAlpha, currentBeta, rootColor, deadline, nextSeen)
-        }
-      }
+    if System.currentTimeMillis() >= deadline then (0, true)
+    else
+      val key = nodeKey(board, mode == SearchMode.Maximize)
+      if seenInPath.contains(key) then (DrawPolicy.repetitionScore(board, rootColor), false)
+      else if depth == 0 then (quiescence(board, alpha, beta, mode, rootColor, qDepth), false)
+      else
+        val currentColor = mode.currentColor(rootColor)
+        SearchSupport
+          .terminalScore(board, currentColor, mode, depth, INF, rootColor)
+          .map((_, false))
+          .getOrElse {
+            val nextSeen = seenInPath + key
+            val moves = SearchSupport.legalSearchMoves(board, currentColor)
+            SearchSupport.searchChildrenUntilDeadline(moves, mode, alpha, beta, INF) { (move, currentAlpha, currentBeta) =>
+              childScore(move, depth, mode, currentAlpha, currentBeta, rootColor, deadline, nextSeen)
+            }
+          }
 
   private def childScore(
       move: SearchSupport.SearchMove,
@@ -144,18 +143,28 @@ class IterativeDeepeningEndgameStrategy(var timeLimitMs: Long = 2000L, val qDept
   ): Int =
     val standPat = Evaluator.evaluate(board, rootColor)
     if mode == SearchMode.Maximize then
-      if standPat >= beta then return beta
-      if remaining == 0 then return standPat
-      val tacticalMoves = SearchSupport.legalSearchMoves(board, rootColor).filter(m => QuiescenceStrategy.isTacticalMove(board, m))
-      if tacticalMoves.isEmpty then return alpha.max(standPat)
-      SearchSupport.searchChildren(tacticalMoves, SearchMode.Maximize, alpha.max(standPat), beta, INF) { (move, a, b) =>
-        quiescence(move.board, a, b, SearchMode.Minimize, rootColor, remaining - 1)
-      }
+      if standPat >= beta then beta
+      else if remaining == 0 then standPat
+      else
+        val tacticalMoves =
+          SearchSupport
+            .legalSearchMoves(board, rootColor)
+            .filter(m => QuiescenceStrategy.isTacticalMove(board, m))
+        if tacticalMoves.isEmpty then alpha.max(standPat)
+        else
+          SearchSupport.searchChildren(tacticalMoves, SearchMode.Maximize, alpha.max(standPat), beta, INF) { (move, a, b) =>
+            quiescence(move.board, a, b, SearchMode.Minimize, rootColor, remaining - 1)
+          }
     else
-      if standPat <= alpha then return alpha
-      if remaining == 0 then return standPat
-      val tacticalMoves = SearchSupport.legalSearchMoves(board, rootColor.opposite).filter(m => QuiescenceStrategy.isTacticalMove(board, m))
-      if tacticalMoves.isEmpty then return beta.min(standPat)
-      SearchSupport.searchChildren(tacticalMoves, SearchMode.Minimize, alpha, beta.min(standPat), INF) { (move, a, b) =>
-        quiescence(move.board, a, b, SearchMode.Maximize, rootColor, remaining - 1)
-      }
+      if standPat <= alpha then alpha
+      else if remaining == 0 then standPat
+      else
+        val tacticalMoves =
+          SearchSupport
+            .legalSearchMoves(board, rootColor.opposite)
+            .filter(m => QuiescenceStrategy.isTacticalMove(board, m))
+        if tacticalMoves.isEmpty then beta.min(standPat)
+        else
+          SearchSupport.searchChildren(tacticalMoves, SearchMode.Minimize, alpha, beta.min(standPat), INF) { (move, a, b) =>
+            quiescence(move.board, a, b, SearchMode.Maximize, rootColor, remaining - 1)
+          }
