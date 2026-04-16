@@ -16,16 +16,27 @@ final case class SbtProject(
     dependsOn: List[String]
 )
 
-final case class MemberMeta(kind: String, doc: Option[String])
+final case class MemberMeta(kind: String, decl: String, doc: Option[String], publicDefs: Vector[String])
 
 final case class PackageGraph(
     packages: Set[String],
     edges: Map[String, Set[String]],
     members: Map[String, Map[String, MemberMeta]], // package -> (member name -> metadata)
-    memberCalls: Map[String, Set[String]]          // memberId -> memberId (inferred from constructor param types)
+    memberCalls: Map[String, Set[String]],         // memberId -> memberId (inferred from constructor param types)
+    memberImplements: Map[String, Set[String]]     // parent memberId -> child memberId (inferred from extends/with)
+    ,
+    memberCompanions: List[(String, String)]       // (type memberId -> companion object memberId)
 )
 
 object GenerateIlograph:
+  private final case class ProjectScanData(
+      packages: Set[String],
+      edges: Map[String, Set[String]],
+      members: Map[String, Map[String, MemberMeta]],
+      inherits: Map[String, Set[String]], // memberId -> qualified/unqualified parent type tokens
+      companions: List[(String, String)], // (type memberId -> companion object memberId)
+      scalaFiles: List[Path]
+  )
   private val TimeFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd:HH-mm")
   private val ProjectPalette: Vector[String] = Vector(
     "#1f77b4", // blue
@@ -53,19 +64,23 @@ object GenerateIlograph:
   // Note: this intentionally matches *indented* definitions too (Scala 3 significant indentation),
   // so we can surface nested `class`/`object`/`enum`/`trait` members as their own resources.
   private val TopLevelDefRe: Regex =
-    """(?m)^\s*(?:final\s+|sealed\s+|abstract\s+|case\s+|private\s+|protected\s+|open\s+|transparent\s+|inline\s+)*\b(class|trait|object|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\b""".r
+    """(?m)^\s*((?:final\s+|sealed\s+|abstract\s+|case\s+|private\s+|protected\s+|open\s+|transparent\s+|inline\s+)*)\b(class|trait|object|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\b""".r
 
   private val TopLevelDefWithCtorRe: Regex =
-    """(?m)^\s*(?:final\s+|sealed\s+|abstract\s+|case\s+|private\s+|protected\s+|open\s+|transparent\s+|inline\s+)*\b(class|trait|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(\([^=\n]*\))?""".r
+    """(?m)^\s*((?:final\s+|sealed\s+|abstract\s+|case\s+|private\s+|protected\s+|open\s+|transparent\s+|inline\s+)*)\b(class|trait|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(\([^=\n]*\))?""".r
+
+  // Match constructor-bearing definitions up to the name (params are parsed separately, possibly multiline).
+  private val CtorHeaderRe: Regex =
+    """(?m)^\s*((?:final\s+|sealed\s+|abstract\s+|case\s+|private\s+|protected\s+|open\s+|transparent\s+|inline\s+)*)\b(class|trait|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\b""".r
 
   // Icon taxonomy is strictly by artifact category:
   // project, package, class, trait, object, enum.
   // Temporary debugging: force a single icon everywhere to verify rendering.
   private val ProjectIcon = "Networking/database.svg"
-  private val PackageIcon = "Networking/database.svg"
+  private val PackageIcon = "Networking/firewall.svg"
   private val ClassIcon = "Networking/database.svg"
-  private val TraitIcon = "Networking/database.svg"
-  private val ObjectIcon = "Networking/database.svg"
+  private val TraitIcon = "Networking/router.svg"
+  private val ObjectIcon = "Networking/vpn.svg"
   private val EnumIcon = "Networking/database.svg"
 
   def main(args: Array[String]): Unit =
@@ -79,7 +94,32 @@ object GenerateIlograph:
     val buildText = Files.readString(buildSbt, StandardCharsets.UTF_8)
     val meta = parseMeta(buildText)
     val projects = parseProjects(buildText)
-    val packageGraphs = projects.map(p => p.id -> scanProjectPackages(repoRoot.resolve(p.dir))).toMap
+    val scans = projects.map(p => p.id -> scanProjectSources(repoRoot.resolve(p.dir))).toMap
+
+    // Build a global index of all discovered members across all projects so `calls` can resolve
+    // cross-module dependencies (e.g. Data -> Core types).
+    val globalMembersByPkg =
+      scans.values.foldLeft(Map.empty[String, Map[String, MemberMeta]]) { (acc, scan) =>
+        scan.members.foldLeft(acc) { case (acc2, (pkg, ms)) =>
+          acc2.updated(pkg, acc2.getOrElse(pkg, Map.empty) ++ ms)
+        }
+      }
+
+    val globalIndex = buildMemberIndex(globalMembersByPkg)
+
+    val packageGraphs =
+      scans.map { case (pid, scan) =>
+        val memberCalls = scanMemberCalls(scan.scalaFiles, scan.packages, globalIndex)
+        val memberImplements = resolveImplements(scan.inherits, globalIndex)
+        pid -> PackageGraph(
+          packages = scan.packages,
+          edges = scan.edges,
+          members = scan.members,
+          memberCalls = memberCalls,
+          memberImplements = memberImplements,
+          memberCompanions = scan.companions
+        )
+      }
     val projectColors = projects.map(p => p.id -> colorForProject(p.id)).toMap
 
     val timestamp = LocalDateTime.now().format(TimeFmt)
@@ -126,7 +166,7 @@ object GenerateIlograph:
       SbtProject(id = id, dir = dir, displayName = name, dependsOn = deps)
     }
 
-  private def scanProjectPackages(projectRoot: Path): PackageGraph =
+  private def scanProjectSources(projectRoot: Path): ProjectScanData =
     // Exclude tests to keep diagrams readable.
     val scalaDirs = List(
       projectRoot.resolve("src").resolve("main").resolve("scala")
@@ -148,13 +188,16 @@ object GenerateIlograph:
     }
     val declaredPkgs = filePkgs.toSet
 
+    val companions = scala.collection.mutable.ArrayBuffer.empty[(String, String)]
+
     val membersByPkg = scalaFiles.foldLeft(Map.empty[String, Map[String, MemberMeta]]) { (acc, p) =>
       val text = normalizeSourceText(Files.readString(p, StandardCharsets.UTF_8))
       val pkgOpt = PackageRe.findFirstMatchIn(text).map(_.group(1))
       pkgOpt match
         case None => acc
         case Some(pkg) =>
-          val defs = discoverMembers(text)
+          val (defs, comps) = discoverMembersAndCompanions(text, pkg)
+          companions ++= comps
           if defs.isEmpty then acc
           else acc.updated(pkg, acc.getOrElse(pkg, Map.empty) ++ defs)
     }
@@ -170,10 +213,30 @@ object GenerateIlograph:
           acc.updated(srcPkg, merged)
     }
 
-    val memberIndex = buildMemberIndex(membersByPkg)
-    val memberCalls = scanMemberCalls(scalaFiles, declaredPkgs, memberIndex)
+    val inheritsRaw =
+      scalaFiles.foldLeft(Map.empty[String, Set[String]]) { (acc, p) =>
+        val text = normalizeSourceText(Files.readString(p, StandardCharsets.UTF_8))
+        val pkgOpt = PackageRe.findFirstMatchIn(text).map(_.group(1))
+        pkgOpt match
+          case None => acc
+          case Some(pkg) =>
+            val members = discoverInherits(text)
+            // convert to memberId keyed map
+            members.foldLeft(acc) { case (acc2, (name, parents)) =>
+              val fromId = memberResourceId(pkg, name)
+              if parents.isEmpty then acc2
+              else acc2.updated(fromId, acc2.getOrElse(fromId, Set.empty) ++ parents)
+            }
+      }
 
-    PackageGraph(packages = declaredPkgs, edges = edges, members = membersByPkg, memberCalls = memberCalls)
+    ProjectScanData(
+      packages = declaredPkgs,
+      edges = edges,
+      members = membersByPkg,
+      inherits = inheritsRaw,
+      companions = companions.toList.distinct,
+      scalaFiles = scalaFiles
+    )
 
   private final case class MemberIndex(
       bySimpleName: Map[String, Set[String]], // Name -> memberIds
@@ -237,19 +300,87 @@ object GenerateIlograph:
       }
       .getOrElse("")
 
+  private def stripLineComment(line: String): String =
+    val idx = line.indexOf("//")
+    if idx < 0 then line else line.substring(0, idx)
+
+  private def normalizeDefSignature(line: String): Option[String] =
+    // Produce a stable single-line signature:
+    // - includes `def` and return type (if present)
+    // - omits params
+    // Examples:
+    //   "def foo(x: Int): String = ..." -> "def foo: String"
+    //   "override def bar: Int =" -> "def bar: Int"
+    //   "def baz = ..." -> "def baz"
+    val noComment = stripLineComment(line).trim
+    if !noComment.contains("def") then None
+    else
+      val afterOverride = noComment.stripPrefix("override ").trim
+      val idxDef = afterOverride.indexOf("def")
+      val fromDef = if idxDef >= 0 then afterOverride.substring(idxDef).trim else afterOverride
+
+      // Drop anything after '='
+      val beforeEq = fromDef.takeWhile(_ != '=').trim
+
+      // Remove first (...) block if present (balanced)
+      val open = beforeEq.indexOf('(')
+      val withoutParams =
+        if open < 0 then beforeEq
+        else
+          var i = open + 1
+          var depth = 1
+          while i < beforeEq.length && depth > 0 do
+            val c = beforeEq.charAt(i)
+            if c == '(' then depth += 1
+            else if c == ')' then depth -= 1
+            i += 1
+          val head = beforeEq.substring(0, open).trim
+          val rest = if i <= beforeEq.length then beforeEq.substring(i).trim else ""
+          s"$head $rest".trim
+
+      val normalized = withoutParams.replaceAll("\\s+", " ").trim
+      if normalized.isEmpty then None
+      else
+        // Ilograph uses `[...]` for perspective links; generic types like `Vector[String]` can be mis-parsed.
+        // Fallback: render generics with parentheses in function list.
+        Some(normalized.replace('[', '(').replace(']', ')'))
+
+  // Capture whole def line; normalize it to "def name: ReturnType" (no params).
+  private val PublicDefLineRe: Regex =
+    """(?m)^\s*(?!private\b)(?!protected\b)(?:override\s+)?def\b[^\n]*""".r
+
   /** Best-effort discovery of top-level members in a compilation unit (name -> metadata). */
-  private def discoverMembers(text: String): Map[String, MemberMeta] =
+  private def discoverMembersAndCompanions(text: String, pkg: String): (Map[String, MemberMeta], List[(String, String)]) =
     val cleaned = text // keep comments for doc lookup
 
     val docRe = """(?s)/\*\*([^*]|\*(?!/))*\*/""".r
     val docs = docRe.findAllMatchIn(cleaned).toList
+    val defs = TopLevelDefRe.findAllMatchIn(cleaned).toList
 
-    TopLevelDefRe
-      .findAllMatchIn(cleaned)
-      .map { m =>
-        val kind = m.group(1)
-        val name = m.group(2)
+    def memberBodySlice(idx: Int): String =
+      val start = defs(idx).end
+      val end = if idx + 1 < defs.length then defs(idx + 1).start else cleaned.length
+      cleaned.substring(start, end)
+
+    def kindRank(k: String): Int =
+      k match
+        case "class"  => 1
+        case "trait"  => 2
+        case "enum"   => 3
+        case "object" => 4
+        case _         => 9
+
+    val entries =
+      defs.zipWithIndex.map { case (m, i) =>
+        val modsRaw = Option(m.group(1)).getOrElse("")
+        val mods = modsRaw.trim.replaceAll("\\s+", " ").trim
+        val kind = m.group(2)
+        val name = m.group(3)
         val defStart = m.start
+
+        val decl =
+          val prefix = if mods.isEmpty then "" else s"$mods "
+          s"${prefix}${kind} ${name}"
 
         val doc =
           docs
@@ -262,8 +393,111 @@ object GenerateIlograph:
             .map(cm => extractDocSummary(cm.group(0)))
             .filter(_.nonEmpty)
 
-        name -> MemberMeta(kind = kind, doc = doc)
+        val body = memberBodySlice(i)
+        val pubDefs =
+          PublicDefLineRe
+            .findAllMatchIn(body)
+            .map(_.matched)
+            .flatMap(normalizeDefSignature)
+            .toVector
+            .distinct
+            .take(20)
+
+        name -> MemberMeta(kind = kind, decl = decl, doc = doc, publicDefs = pubDefs)
       }
+
+    val grouped = entries.groupBy(_._1)
+    val companions = scala.collection.mutable.ArrayBuffer.empty[(String, String)]
+
+    val out =
+      grouped.toList.foldLeft(Map.empty[String, MemberMeta]) { case (acc, (name, metas)) =>
+        val ms = metas.map(_._2)
+        val (objs, nonObjs) = ms.partition(_.kind == "object")
+
+        // Keep one primary non-object kind under the original name.
+        val primaryNonObj = nonObjs.sortBy(m => kindRank(m.kind)).headOption
+        val acc1 = primaryNonObj.map(m => acc.updated(name, m)).getOrElse(acc)
+
+        // If there is also an object with the same name AND a non-object type, rename the object
+        // and add a companion edge. Otherwise keep the object under its original name.
+        val acc2 =
+          (primaryNonObj, objs.headOption) match
+            case (Some(_), Some(objMeta)) =>
+              val objName = s"O_$name"
+              companions += ((memberResourceId(pkg, name), memberResourceId(pkg, objName)))
+              acc1.updated(objName, objMeta)
+            case _ => acc1
+
+        // If there are no non-objects, keep one object under the original name.
+        if primaryNonObj.isEmpty then
+          objs.headOption.map(m => acc2.updated(name, m)).getOrElse(acc2)
+        else acc2
+      }
+
+    (out, companions.toList)
+
+  private val InheritsClauseRe: Regex =
+    // Capture everything after `extends` on the same line (continuations handled separately)
+    """(?m)^\s*(?:final\s+|sealed\s+|abstract\s+|case\s+|private\s+|protected\s+|open\s+|transparent\s+|inline\s+)*\b(?:class|trait|object|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\b[^\n]*\bextends\s+([^\n]+)$""".r
+
+  private def discoverInherits(text: String): Map[String, Set[String]] =
+    val cleaned = stripScalaComments(text)
+    val lines = cleaned.linesIterator.toVector
+
+    def collectClause(startLineIdx: Int, initial: String): String =
+      // Pull in immediate continuation lines that start with whitespace and contain `with` segments,
+      // stopping at a blank line or at a line that looks like a new top-level definition.
+      val b = new StringBuilder(initial.trim)
+      var i = startLineIdx + 1
+      var done = false
+      while i < lines.length && !done do
+        val l = lines(i)
+        val trimmed = l.trim
+        if trimmed.isEmpty then done = true
+        else if trimmed.startsWith("class ") || trimmed.startsWith("trait ") || trimmed.startsWith("object ") || trimmed.startsWith("enum ")
+        then done = true
+        else if l.startsWith(" ") || l.startsWith("\t") then
+          // continuation line - include if it contributes to extends/with chain
+          if trimmed.startsWith("with ") || trimmed.contains(" with ") then
+            b.append(" ").append(trimmed)
+          i += 1
+        else done = true
+      b.toString
+
+    val tokenRe = """[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*""".r
+
+    InheritsClauseRe
+      .findAllMatchIn(cleaned)
+      .flatMap { m =>
+        val name = m.group(1)
+        val clauseLine = m.group(2)
+        val lineIdx = cleaned.substring(0, m.start).count(_ == '\n')
+        val clause = collectClause(lineIdx, clauseLine)
+
+        val tokens = tokenRe.findAllIn(clause).toList
+        val parents =
+          tokens
+            .map(_.trim)
+            .filter(t => t.nonEmpty && !IgnoredTypeNames.contains(t))
+            .filterNot(t => t == name)
+            .toSet
+
+        if parents.isEmpty then None else Some(name -> parents)
+      }
+      .toMap
+
+  private def resolveImplements(inheritsRaw: Map[String, Set[String]], idx: MemberIndex): Map[String, Set[String]] =
+    // Flip direction: parent -> child
+    // Input is childMemberId -> raw parent type tokens.
+    val pairs =
+      inheritsRaw.toList.flatMap { case (childId, toks) =>
+        toks.flatMap(t => resolveTypeToMemberId(t, idx)).map(parentId => (parentId, childId))
+      }
+
+    pairs
+      .groupBy(_._1)
+      .view
+      .mapValues(_.map(_._2).toSet)
       .toMap
 
   private def scanMemberCalls(
@@ -280,16 +514,16 @@ object GenerateIlograph:
           case Some(pkg) if !declaredPkgs.contains(pkg) => acc
           case Some(pkg) =>
             val cleaned = stripScalaComments(text)
-            TopLevelDefWithCtorRe
+            CtorHeaderRe
               .findAllMatchIn(cleaned)
               .foldLeft(acc) { (acc2, m) =>
-                val name = m.group(2)
-
-                val params = Option(m.group(3)).getOrElse("")
+                val name = m.group(3)
                 val fromId = memberResourceId(pkg, name)
-                val typeNames = extractTypeNames(params)
-                val targets =
-                  typeNames.flatMap(resolveTypeToMemberId(_, idx)).filterNot(_ == fromId)
+
+                // Constructor params can span multiple lines; parse balanced (...) blocks after the header.
+                val paramBlocks = extractCtorParamBlocks(cleaned, m.end)
+                val typeNames = paramBlocks.flatMap(extractTypeNames).toSet
+                val targets = typeNames.flatMap(resolveTypeToMemberId(_, idx)).filterNot(_ == fromId)
                 if targets.isEmpty then acc2
                 else acc2.updated(fromId, acc2.getOrElse(fromId, Set.empty) ++ targets)
               }
@@ -324,14 +558,69 @@ object GenerateIlograph:
   private def extractTypeNames(paramBlock: String): Set[String] =
     if paramBlock.isEmpty then Set.empty
     else
-      val afterColons = paramBlock.split(':').drop(1).toList
-      val candidates =
-        afterColons.flatMap { tail =>
-          val chunk = tail.takeWhile(c => c != ',' && c != ')')
-          val re = """[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*""".r
-          re.findAllIn(chunk).toList
-        }
-      candidates.map(_.trim).filter(t => t.nonEmpty && !IgnoredTypeNames.contains(t)).toSet
+      // Parse `(... name: Type, name2: Option[Vector[Board]] ...)` and keep the full type,
+      // respecting nested generic brackets so commas inside `Either[A, B]` don't truncate.
+      val types = scala.collection.mutable.ArrayBuffer.empty[String]
+
+      var i = 0
+      while i < paramBlock.length do
+        if paramBlock.charAt(i) == ':' then
+          i += 1
+          while i < paramBlock.length && paramBlock.charAt(i).isWhitespace do i += 1
+
+          val start = i
+          var squareDepth = 0
+          var parenDepth = 0
+          var done = false
+
+          while i < paramBlock.length && !done do
+            val c = paramBlock.charAt(i)
+            c match
+              case '[' => squareDepth += 1; i += 1
+              case ']' => if squareDepth > 0 then squareDepth -= 1; i += 1
+              case '(' => parenDepth += 1; i += 1
+              case ')' =>
+                if squareDepth == 0 && parenDepth == 0 then done = true
+                else
+                  if parenDepth > 0 then parenDepth -= 1
+                  i += 1
+              case ',' =>
+                if squareDepth == 0 && parenDepth == 0 then done = true
+                else i += 1
+              case _ => i += 1
+
+          val raw = paramBlock.substring(start, i).trim
+          if raw.nonEmpty then types += raw
+        else i += 1
+
+      val tokenRe = """[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*""".r
+      val tokens = types.toList.flatMap(t => tokenRe.findAllIn(t).toList)
+      tokens.map(_.trim).filter(t => t.nonEmpty && !IgnoredTypeNames.contains(t)).toSet
+
+  private def extractCtorParamBlocks(text: String, startIdx: Int): List[String] =
+    // Starting just after the header match, find any immediately following `( ... )` blocks.
+    // Supports multiline and multiple parameter lists.
+    var i = startIdx
+    val blocks = scala.collection.mutable.ArrayBuffer.empty[String]
+
+    def skipWs(): Unit =
+      while i < text.length && text.charAt(i).isWhitespace do i += 1
+
+    skipWs()
+    while i < text.length && text.charAt(i) == '(' do
+      val open = i
+      i += 1
+      var depth = 1
+      while i < text.length && depth > 0 do
+        val c = text.charAt(i)
+        if c == '(' then depth += 1
+        else if c == ')' then depth -= 1
+        i += 1
+      val close = i
+      if close > open + 1 then blocks += text.substring(open, close)
+      skipWs()
+
+    blocks.toList
 
   private def resolveTypeToMemberId(typeName: String, idx: MemberIndex): Option[String] =
     idx.byQualified.get(typeName).orElse {
@@ -371,7 +660,9 @@ object GenerateIlograph:
       projectColors: Map[String, String],
       timestamp: String
   ): String =
-    def q(s: String): String = s""""${s.replace("\"", "'")}""""
+    def q(s: String): String =
+      val safe = s.replace("\n", "\\n").replace("\"", "'")
+      s""""$safe""""
     def indent(level: Int)(line: String): String = ("  " * level) + line
 
     val header = List(
@@ -404,6 +695,7 @@ object GenerateIlograph:
         List(
           indent(5)(s"- name: ${p.id}"),
           indent(6)(s"subtitle: ${q(p.displayName.getOrElse(p.id))}"),
+          indent(6)(s"description: ${q(s"[Packages ${p.id}]")}"),
           indent(6)(s"dir: ${q(p.dir)}"),
           indent(6)(s"icon: ${q(ProjectIcon)}"),
           indent(6)(s"color: ${q("Black")}"),
@@ -420,7 +712,7 @@ object GenerateIlograph:
 
     val packageResources =
       projects.sortBy(_.id.toLowerCase).flatMap { p =>
-        val graph = packageGraphs.getOrElse(p.id, PackageGraph(Set.empty, Map.empty, Map.empty, Map.empty))
+        val graph = packageGraphs.getOrElse(p.id, PackageGraph(Set.empty, Map.empty, Map.empty, Map.empty, Map.empty, Nil))
         val pkgs = graph.packages.toList.sorted
         val full = projectColors.getOrElse(p.id, "#7f7f7f")
         val shell = lightenHex(full, 0.82)
@@ -428,6 +720,7 @@ object GenerateIlograph:
           List(
             indent(3)(s"- name: ${p.id}"),
             indent(4)(s"subtitle: ${q(p.dir)}"),
+            indent(4)(s"description: ${q(s"[Packages ${p.id}]")}"),
             indent(4)(s"icon: ${q(ProjectIcon)}"),
             indent(4)(s"color: ${q("Black")}"),
             indent(4)(s"backgroundColor: ${q(shell)}"),
@@ -461,24 +754,20 @@ object GenerateIlograph:
               members.flatMap { case (m, meta) =>
                 val memberBg = darkenHex(bgForDepth(depth), 0.14)
                 val memberId = memberResourceId(pkg, m)
-                val kindLabel = meta.kind match
-                  case "class"  => "class"
-                  case "trait"  => "trait"
-                  case "object" => "object"
-                  case "enum"   => "enum"
-                  case other     => other
-
                 val baseLines = List(
                   indent(level + 2)(s"- name: $m"),
                   indent(level + 3)(s"id: ${q(memberId)}"),
-                  indent(level + 3)(s"subtitle: ${q(kindLabel)}"),
+                  indent(level + 3)(s"subtitle: ${q(meta.decl)}"),
                   indent(level + 3)(s"icon: ${q(iconForMemberKind(meta.kind))}")
                 )
 
+                val descLines =
+                  meta.doc.map(_.trim).filter(_.nonEmpty).toVector ++
+                  meta.publicDefs.take(20)
+
                 val withDescription =
-                  meta.doc match
-                    case Some(d) => baseLines :+ indent(level + 3)(s"description: ${q(d)}")
-                    case None    => baseLines
+                  if descLines.isEmpty then baseLines
+                  else baseLines :+ indent(level + 3)(s"description: ${q(descLines.mkString("\n"))}")
 
                 withDescription ++ List(
                   indent(level + 3)(s"color: ${q("Black")}"),
@@ -515,7 +804,7 @@ object GenerateIlograph:
 
     val packagesPerspectives =
       projects.sortBy(_.id.toLowerCase).flatMap { p =>
-        val graph = packageGraphs.getOrElse(p.id, PackageGraph(Set.empty, Map.empty, Map.empty, Map.empty))
+        val graph = packageGraphs.getOrElse(p.id, PackageGraph(Set.empty, Map.empty, Map.empty, Map.empty, Map.empty, Nil))
         val tree = buildPackageTree(graph.packages)
         val projColor = projectColors.getOrElse(p.id, "#7f7f7f")
         val edges =
@@ -586,6 +875,33 @@ object GenerateIlograph:
             ).mkString("\n")
           }
 
+        val implementEdges =
+          graph.memberImplements.toList
+            .flatMap { case (from, tos) => tos.toList.map(to => (from, to)) }
+            .sortBy { case (a, b) => (a, b) }
+
+        val implementRels =
+          implementEdges.map { case (from, to) =>
+            List(
+              indent(3)(s"- from: ${q(from)}"),
+              indent(4)(s"to: ${q(to)}"),
+              indent(4)(s"label: ${q("implemented by")}")
+            ).mkString("\n")
+          }
+
+        val companionEdges =
+          graph.memberCompanions
+            .sortBy { case (a, b) => (a, b) }
+
+        val companionRels =
+          companionEdges.map { case (from, to) =>
+            List(
+              indent(3)(s"- from: ${q(from)}"),
+              indent(4)(s"to: ${q(to)}"),
+              indent(4)(s"label: ${q("companion")}")
+            ).mkString("\n")
+          }
+
         val rels =
           edges.map { case (from, to) =>
             List(
@@ -595,7 +911,7 @@ object GenerateIlograph:
             ).mkString("\n")
           }
 
-        perspectiveHeader ++ overrides ++ relationsHeader ++ declareRels ++ callRels ++ rels
+        perspectiveHeader ++ overrides ++ relationsHeader ++ declareRels ++ implementRels ++ companionRels ++ callRels ++ rels
       }
 
     (header ++ resources ++ projectResources ++ packageResourcesHeader ++ packageResources ++ perspectivesHeader ++ projectsPerspectiveHeader ++ projectRelations ++ packagesPerspectives)
