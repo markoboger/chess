@@ -10,6 +10,7 @@ resources:
   - name: EmBe Chess
     subtitle: Environment
     color: navy
+    icon: Networking/workstation.svg
     children:
       - name: TUI
         subtitle: TextUI
@@ -17,14 +18,20 @@ resources:
         children:
           - name: Scala root
             subtitle: src/main/scala/chess
+            icon: Networking/api.svg
             children:
               - name: chess.ChessTuiApp
                 subtitle: main
+                icon: Networking/api.svg
               - name: chess.aview.richTui.TuiShell
                 subtitle: shell runner
+                icon: Networking/workstation.svg
               - name: chess.aview.richTui.BoardRenderer
+                icon: Networking/desktop.svg
               - name: chess.aview.richTui.ConsoleEncoding
+                icon: Networking/api.svg
               - name: chess.aview.richTui.TerminalPalette
+                icon: Networking/desktop.svg
 
       - name: GUI
         subtitle: ScalaFX
@@ -33,13 +40,18 @@ resources:
         children:
           - name: Scala root
             subtitle: src/main/scala/chess
+            icon: Networking/api.svg
             children:
               - name: chess.ChessGuiApp
                 subtitle: main
+                icon: Networking/api.svg
               - name: chess.aview.ChessGUI
                 subtitle: ScalaFX UI
+                icon: Networking/desktop.svg
               - name: chess.aview.ConsoleView
+                icon: Networking/workstation.svg
               - name: chess.aview.SessionMovePublicationGate
+                icon: Networking/gateway.svg
 
       - name: WebUI
         subtitle: Vue
@@ -48,39 +60,61 @@ resources:
         children:
           - name: main.ts
             subtitle: Vue bootstrap
+            icon: Networking/web.svg
           - name: App.vue
             subtitle: root component
+            icon: Networking/web.svg
           - name: API clients
+            icon: Networking/api.svg
             children:
               - name: client.ts
                 subtitle: Axios base client
+                icon: Networking/api.svg
               - name: game-api.ts
                 subtitle: REST to Gateway
+                icon: Networking/gateway.svg
               - name: matchrunner-api.ts
                 subtitle: REST to Match Runner
+                icon: Networking/api.svg
               - name: stockfish-api.ts
                 subtitle: analysis fetch
+                icon: Networking/api.svg
           - name: Stores
             subtitle: Pinia
+            icon: Networking/database.svg
             children:
               - name: game.ts
                 subtitle: game state and WebSocket client
+                icon: Networking/websocket.svg
               - name: analysis.ts
                 subtitle: analysis cache
+                icon: Networking/database.svg
               - name: ui.ts
                 subtitle: theme and mobile menu
+                icon: Networking/desktop.svg
               - name: opening.ts
+                icon: Networking/database.svg
               - name: puzzle.ts
+                icon: Networking/database.svg
           - name: UI components
+            icon: Networking/desktop.svg
             children:
               - name: ChessBoard.vue
+                icon: Networking/desktop.svg
               - name: NavBar.vue
+                icon: Networking/desktop.svg
               - name: GameControls.vue
+                icon: Networking/desktop.svg
               - name: BoardInfoPanel.vue
+                icon: Networking/desktop.svg
               - name: NewGameDialog.vue
+                icon: Networking/desktop.svg
               - name: BrowseExperimentsDialog.vue
+                icon: Networking/desktop.svg
               - name: PuzzlePanel.vue
+                icon: Networking/desktop.svg
               - name: OpeningBadge.vue
+                icon: Networking/desktop.svg
 
       - name: Docker Compose Runtime
         subtitle: docker-compose.yml
@@ -103,30 +137,48 @@ resources:
             children:
               - name: chess.microservices.game.GameServer
                 subtitle: IOApp.Simple
+                icon: Networking/api.svg
               - name: chess.microservices.game.GameRoutes
                 subtitle: http4s routes
+                icon: Networking/gateway.svg
               - name: chess.application.game.GameSessionService
                 subtitle: app service
+                icon: Networking/api.svg
               - name: chess.realtime.HttpGameEventPublisher
                 subtitle: event publisher client
+                icon: Networking/websocket.svg
               - name: Persistence layer
                 subtitle: data module
+                icon: Networking/database.svg
                 children:
                   - name: chess.persistence.GameRepository
+                    icon: Networking/database.svg
                   - name: chess.persistence.OpeningRepository
+                    icon: Networking/database.svg
                   - name: chess.persistence.postgres.PostgresGameRepository
+                    icon: Networking/database.svg
                   - name: chess.persistence.postgres.PostgresOpeningRepository
+                    icon: Networking/database.svg
                   - name: chess.persistence.mongodb.MongoGameRepository
+                    icon: Networking/database.svg
                   - name: chess.persistence.mongodb.MongoOpeningRepository
+                    icon: Networking/database.svg
                   - name: chess.persistence.memory.InMemoryOpeningRepository
+                    icon: Networking/database.svg
               - name: Core domain
                 subtitle: core module
+                icon: Networking/api.svg
                 children:
                   - name: chess.model.Board
+                    icon: Networking/api.svg
                   - name: chess.model.MoveResult
+                    icon: Networking/api.svg
                   - name: chess.model.GameEvent
+                    icon: Networking/api.svg
                   - name: chess.controller.io.FenIO
+                    icon: Networking/gateway.svg
                   - name: chess.controller.io.PgnIO
+                    icon: Networking/gateway.svg
 
           - name: api-gateway
             subtitle: Scala http4s port 8080
@@ -135,12 +187,16 @@ resources:
             children:
               - name: chess.microservices.gateway.GatewayServer
                 subtitle: IOApp.Simple
+                icon: Networking/gateway.svg
               - name: chess.microservices.gateway.GatewayRoutes
                 subtitle: proxy routes
+                icon: Networking/gateway.svg
               - name: chess.microservices.gateway.ServiceProxy
                 subtitle: HTTP proxy helper
+                icon: Networking/gateway.svg
               - name: chess.microservices.gateway.GatewayConfig
                 subtitle: env config
+                icon: Networking/api.svg
 
           - name: vue-ui
             subtitle: nginx port 3000
@@ -154,16 +210,24 @@ resources:
             children:
               - name: chess.matchrunner.MatchRunnerServer
                 subtitle: IOApp.Simple
+                icon: Networking/api.svg
               - name: chess.matchrunner.http.ExperimentRoutes
                 subtitle: experiments routes
+                icon: Networking/gateway.svg
               - name: chess.matchrunner.http.HealthRoutes
+                icon: Networking/gateway.svg
               - name: chess.matchrunner.application.ExperimentRunner
+                icon: Networking/api.svg
               - name: chess.matchrunner.data.postgres.PostgresMatchRunnerRepository
+                icon: Networking/database.svg
               - name: chess.matchrunner.http.HttpChessApiClient
                 subtitle: client to game-service
+                icon: Networking/api.svg
               - name: chess.matchrunner.csv.CsvExporter
+                icon: Networking/api.svg
               - name: chess.matchrunner.tui.MatchRunnerShell
                 subtitle: interactive TUI
+                icon: Networking/workstation.svg
 
       - name: Realtime Service
         subtitle: realtime module port 8083
@@ -172,12 +236,16 @@ resources:
         children:
           - name: chess.realtime.GameEventServer
             subtitle: IOApp.Simple
+            icon: Networking/websocket.svg
           - name: chess.realtime.GameEventRoutes
             subtitle: ingest and WebSocket routes
+            icon: Networking/gateway.svg
           - name: chess.realtime.InMemoryGameEventHub
             subtitle: pub sub hub
+            icon: Networking/websocket.svg
           - name: chess.realtime.GameEventJson
             subtitle: codecs
+            icon: Networking/api.svg
 
 perspectives:
   - name: Dependencies

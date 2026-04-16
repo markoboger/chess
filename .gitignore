@@ -49,6 +49,9 @@ metals.sbt
 project/metals.sbt
 frontend/.vite/
 .sonar/test-exec.xml
+out/
+.scala-build/
+docs/ilo_*.yaml
 
 # Local secrets
 .env
