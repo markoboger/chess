@@ -83,8 +83,6 @@ workspace "Chess Application" "Chess platform with a docker-compose runtime, ses
 
         realtimeModule -> appModule "Implements publishing around app-level game session events" "In-process calls"
         realtimeService -> realtimeModule "Runs the standalone realtime server from the realtime module" "Process entrypoint"
-        gameService -> srcModule "Runs the root microservice entrypoints and route wiring" "Process entrypoint"
-        desktopApp -> srcModule "Runs the desktop GUI from the root runtime layer" "Process entrypoint"
 
         deploymentEnvironment "Docker Compose" {
             deploymentNode "chess-network" "Docker bridge network defined in docker-compose.yml" "Docker bridge network" {
@@ -220,7 +218,6 @@ workspace "Chess Application" "Chess platform with a docker-compose runtime, ses
 
         dynamic chessSystem "L4_GameServiceInternalModules" {
             title "Level 4 - Game service in-process wiring (module calls)"
-            gameService -> srcModule "Entry point + HTTP routes"
             srcModule -> appModule "Session orchestration + strategies"
             appModule -> coreModule "Rules + notation"
             appModule -> dataModule "Repositories"
