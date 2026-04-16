@@ -191,7 +191,8 @@ Recommended GitHub secrets for database-backed workflows:
 - `POSTGRES_PASSWORD`
 - `MONGO_USER`
 - `MONGO_PASSWORD`
-- optionally `MONGO_URI`
+- `POSTGRES_JDBC_URL` (used by `seeder`)
+- `MONGO_URI` (used by `seeder`)
 
 GitHub setup:
 1. open the repository on GitHub

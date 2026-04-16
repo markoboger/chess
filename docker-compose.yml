@@ -49,7 +49,6 @@ services:
     environment:
       - PORT=8081
       - CHESS_DB=mongodb
-      - MONGO_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017
       - MONGO_DATABASE=${MONGO_DATABASE:-chess}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}

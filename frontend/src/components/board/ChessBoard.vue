@@ -132,7 +132,7 @@ import { useAnalysisStore } from '../../stores/analysis'
 
 const gameStore = useGameStore()
 const analysisStore = useAnalysisStore()
-const arrowMarkerId = useId().replace(/[:]/g, '')
+const arrowMarkerId = useId().replace(/:/g, '')
 
 /** Milliseconds — keep in sync with `.flying-piece` transition */
 const FLY_MS = 200

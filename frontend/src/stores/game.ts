@@ -889,7 +889,7 @@ export const useGameStore = defineStore('game', () => {
       void applyMove(selectedSquare.value, square).then(ok => {
         if (ok) triggerComputerMoveIfNeeded()
       })
-    } else if (piece && piece.color === currentTurn) {
+    } else if (piece?.color === currentTurn) {
       selectedSquare.value = square
       if (showLegalMoves.value) {
         const moves = viewChess.value.moves({ square: square as ChessSquare, verbose: true }) as VerboseMove[]

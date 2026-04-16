@@ -18,7 +18,7 @@
                   ↻ Refresh
                 </button>
               </div>
-              <ul class="browse-list" role="listbox" aria-label="Experiments">
+              <ul class="browse-list" aria-label="Experiments">
                 <li
                   v-for="(e, i) in experiments"
                   :key="e.id"
@@ -34,7 +34,7 @@
               <div class="col-head">
                 <span class="col-label">Games</span>
               </div>
-              <ul class="browse-list" role="listbox" aria-label="Games in experiment">
+              <ul class="browse-list" aria-label="Games in experiment">
                 <li
                   v-for="(r, i) in runs"
                   :key="r.id"

@@ -115,19 +115,10 @@ object SeedOpeningsApp extends IOApp:
       end <- IO.monotonic
     yield (end - start).toMillis
 
-  private def pgUrl =
-    s"jdbc:postgresql://${sys.env.getOrElse("POSTGRES_HOST", "localhost")}:${sys.env.getOrElse("POSTGRES_PORT", "5432")}/${sys.env
-        .getOrElse("POSTGRES_DATABASE", "chess")}"
+  private def pgUrl = requiredEnv("POSTGRES_JDBC_URL")
   private def pgUser = requiredEnv("POSTGRES_USER")
   private def pgPass = requiredEnv("POSTGRES_PASSWORD")
-  private def mongoUri =
-    sys.env.get("MONGO_URI").getOrElse {
-      val host = sys.env.getOrElse("MONGO_HOST", "localhost")
-      val port = sys.env.getOrElse("MONGO_PORT", "27017")
-      val user = requiredEnv("MONGO_USER")
-      val pass = requiredEnv("MONGO_PASSWORD")
-      s"mongodb://$user:$pass@$host:$port"
-    }
+  private def mongoUri = requiredEnv("MONGO_URI")
   private def mongoDb = sys.env.getOrElse("MONGO_DATABASE", "chess")
 
   private def requiredEnv(name: String): String =

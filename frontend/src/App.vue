@@ -41,17 +41,19 @@ function handleGameStarted() {
   showNewGameDialog.value = false
 }
 
-function handleExperimentReplayed() {
+function activateGameView() {
   activeView.value = 'game'
   puzzleStore.reset()
   gameStore.puzzleMode = false
 }
 
+function handleExperimentReplayed() {
+  activateGameView()
+}
+
 /** Return to the main board after import, opening pick, etc. (does not reset the position). */
 function showGameFromNav() {
-  activeView.value = 'game'
-  puzzleStore.reset()
-  gameStore.puzzleMode = false
+  activateGameView()
 }
 
 onMounted(async () => {
