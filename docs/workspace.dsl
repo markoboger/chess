@@ -217,7 +217,7 @@ workspace "Chess Application" "Chess platform with a docker-compose runtime, ses
             autoLayout
         }
 
-        dynamic chessSystem "L4_GameServiceInternalModules" {
+        dynamic gameService "L4_GameServiceInternalModules" {
             title "Level 4 - Game service in-process wiring (module calls)"
             srcModule -> appModule "Session orchestration + strategies"
             appModule -> coreModule "Rules + notation"
