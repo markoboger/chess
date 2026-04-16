@@ -49,6 +49,7 @@ workspace "Chess Application" "Chess platform with a docker-compose runtime, ses
         vueUi -> apiGateway "Creates games, joins sessions, reads state, posts moves, and looks up openings" "HTTP/JSON"
         apiGateway -> gameService "Proxies session and opening requests" "HTTP/JSON"
         vueUi -> realtimeService "Subscribes to live session updates after joining a game" "WebSocket /ws/:gameId"
+        realtimeService -> vueUi "Pushes live session updates (e.g., move_applied)" "WebSocket /ws/:gameId"
 
         gameService -> postgres "Reads and writes games/openings" "JDBC / Doobie"
         gameService -> mongodb "Reads and writes games/openings" "MongoDB driver / mongo4cats"
