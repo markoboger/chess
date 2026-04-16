@@ -101,6 +101,8 @@ The codebase is split into a few clear modules:
 
 The high-level architecture model is documented in [docs/workspace.dsl](/Users/markoboger/workspace/chess/docs/workspace.dsl).
 
+An interactive diagram of the SBT projects (Ilograph) is here: [app.ilograph.com — Projects](https://app.ilograph.com/@Marko%2520Boger/included%2520icons/Projects).
+
 ## Features
 
 - full chess move validation
