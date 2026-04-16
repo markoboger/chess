@@ -93,7 +93,7 @@ workspace "Chess Application" "Chess platform with a docker-compose runtime, ses
                     containerInstance vueUi
                 }
 
-                deploymentNode "api-gateway" "Gateway container" "Built from Dockerfile.api-gateway" {
+                deploymentNode "api-gateway" "Gateway container" "Built from Dockerfile.gateway" {
                     containerInstance apiGateway
                 }
 
@@ -176,6 +176,18 @@ workspace "Chess Application" "Chess platform with a docker-compose runtime, ses
             title "Level 2 - Local Applications and Standalone Services Outside Docker Compose"
         }
 
+        container chessSystem "L2_AnalysisAndExperimentsApi" {
+            include player
+            include developer
+            include vueUi
+            include desktopApp
+            include matchRunner
+            include gameService
+            include postgres
+            autoLayout
+            title "Level 2 - Analysis & Experiments (Match Runner REST API)"
+        }
+
         deployment chessSystem "Docker Compose" "Deployment_DockerCompose" {
             include vueUi
             include apiGateway
@@ -184,6 +196,38 @@ workspace "Chess Application" "Chess platform with a docker-compose runtime, ses
             include mongodb
             autoLayout
             title "Deployment - Docker Compose (matches docker-compose.yml exactly)"
+        }
+
+        dynamic chessSystem "L4_WebMoveFlow" {
+            title "Level 4 - Web UI move submission (HTTP + live updates)"
+            player -> vueUi "Moves a piece"
+            vueUi -> apiGateway "POST /games/:id/moves"
+            apiGateway -> gameService "POST /games/:id/moves"
+            gameService -> postgres "Persist move + state"
+            gameService -> realtimeService "POST /events"
+            realtimeService -> vueUi "WebSocket /ws/:gameId (move_applied)"
+            autoLayout
+        }
+
+        dynamic chessSystem "L4_ExperimentRunAndBrowse" {
+            title "Level 4 - Experiments: run, store, browse (Match Runner)"
+            developer -> matchRunner "Start experiment (REST or TUI)"
+            matchRunner -> gameService "Create games + poll state"
+            matchRunner -> postgres "Store experiments + runs"
+            desktopApp -> matchRunner "Browse experiments (REST :8084)"
+            autoLayout
+        }
+
+        dynamic chessSystem "L4_GameServiceInternalModules" {
+            title "Level 4 - Game service in-process wiring (module calls)"
+            gameService -> srcModule "Entry point + HTTP routes"
+            srcModule -> appModule "Session orchestration + strategies"
+            appModule -> coreModule "Rules + notation"
+            appModule -> dataModule "Repositories"
+            dataModule -> postgres "Relational persistence"
+            dataModule -> mongodb "Document persistence"
+            srcModule -> realtimeModule "Publish events"
+            autoLayout
         }
 
         styles {
