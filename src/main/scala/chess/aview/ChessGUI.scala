@@ -55,6 +55,16 @@ import scala.util.{Try, Success, Failure}
 class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   controller.add(this)
 
+  private val StrategyDeepeningOpeningEndgame = "deepening-opening-endgame"
+
+  private val EvalColorGood   = "#27ae60"
+  private val EvalColorBad    = "#c0392b"
+  private val EvalColorNeutral = "#888888"
+  private val EvalLabelStyleBase = "-fx-font-size: 12px; -fx-font-family: monospace;"
+
+  private val FxHintStyle = "-fx-font-size:11px; -fx-text-fill:#888;"
+  private val FxPrimaryButtonStyle = "-fx-background-color:#629924; -fx-text-fill:white; -fx-font-weight:bold;"
+
   private[aview] var selectedSquare: Option[Square] = None
   private[aview] var boardFlipped: Boolean = false
   private var boardSquares: Array[Array[Rectangle]] =
@@ -404,10 +414,11 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
           case Some(n)          => s"M${-n}"
           case None             => f"${result.evalPawns}%+.2f"
         evalLabel.text = s"Stockfish (d${result.depth}): $evalStr"
-        val barColor = if (result.evalPawns > 0.5) "#27ae60"
-          else if (result.evalPawns < -0.5) "#c0392b"
-          else "#888888"
-        evalLabel.style = s"-fx-text-fill: $barColor; -fx-font-size: 12px; -fx-font-family: monospace;"
+        val barColor =
+          if (result.evalPawns > 0.5) EvalColorGood
+          else if (result.evalPawns < -0.5) EvalColorBad
+          else EvalColorNeutral
+        evalLabel.style = s"-fx-text-fill: $barColor; $EvalLabelStyleBase"
       }
       // Draw best-move arrow
       if (arrowCanvas != null && result.bestFrom.length == 2 && result.bestTo.length == 2) {
@@ -627,7 +638,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     case "opening-continuation-endgame"     => new OpeningContinuationStrategy(openings, new IterativeDeepeningEndgameStrategy())
     case "opening-intelligence"             => new OpeningBookStrategy(openings)
     case "opening-intelligence-endgame"     => new OpeningBookStrategy(openings, new IterativeDeepeningEndgameStrategy())
-    case "deepening-opening-endgame"        => new DeepeningOpeningEndgameStrategy(openings)
+    case StrategyDeepeningOpeningEndgame    => new DeepeningOpeningEndgameStrategy(openings)
     case _                                  => new DeepeningOpeningEndgameStrategy(openings)
   }
 
@@ -635,11 +646,11 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
   private[aview] def showNewGameDialog(): Unit = {
     var whiteHuman = true; var blackHuman = true
-    var whiteStrat = "deepening-opening-endgame"; var blackStrat = "deepening-opening-endgame"
+    var whiteStrat = StrategyDeepeningOpeningEndgame; var blackStrat = StrategyDeepeningOpeningEndgame
     var clockMs: Option[Long] = None; var incMs: Option[Long] = None
     var playAsWhite = true
 
-    val stratIds     = Array("deepening-opening-endgame","opening-continuation","opening-continuation-endgame","opening-intelligence","opening-intelligence-endgame","random","greedy","material-balance","piece-square","minimax","endgame-minimax","quiescence","iterative-deepening","iterative-deepening-endgame")
+    val stratIds     = Array(StrategyDeepeningOpeningEndgame,"opening-continuation","opening-continuation-endgame","opening-intelligence","opening-intelligence-endgame","random","greedy","material-balance","piece-square","minimax","endgame-minimax","quiescence","iterative-deepening","iterative-deepening-endgame")
     val stratLabels  = Array("Deepening+Opening+Endgame ★","Opening Continuation","Opening Continuation+EG","Opening Intelligence","Opening Intelligence+EG","Random","Greedy","Material Balance","Piece-Square","Minimax (d=3)","Endgame Minimax (d=3)","Quiescence (d=3)","Iterative Deepening","ID+Endgame")
     val clockPresets = Array(
       ("No Limit", None, None), ("Bullet 1+0", Some(60_000L), Some(0L)),
@@ -704,7 +715,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     playAsRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT)
 
     val fenLbl = new javafx.scene.control.Label("Starting FEN (optional)")
-    fenLbl.setStyle("-fx-font-size:11px; -fx-text-fill:#888;")
+    fenLbl.setStyle(FxHintStyle)
     val fenField = new javafx.scene.control.TextField()
     fenField.setPromptText("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     fenField.setStyle("-fx-font-family:monospace; -fx-font-size:11px;"); fenField.setPrefWidth(440)
@@ -713,7 +724,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     cancelBtn.setOnAction(_ => dlg.close())
     val startBtn = new javafx.scene.control.Button("Start Game")
     startBtn.setDefaultButton(true)
-    startBtn.setStyle("-fx-background-color:#629924; -fx-text-fill:white; -fx-font-weight:bold;")
+    startBtn.setStyle(FxPrimaryButtonStyle)
     startBtn.setOnAction(_ => {
       dlg.close()
       val startFen = Option(fenField.getText.trim).filter(_.nonEmpty)
@@ -827,7 +838,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     cancelBtn.setOnAction(_ => dlg.close())
     val joinBtn = new javafx.scene.control.Button("Join Game")
     joinBtn.setDefaultButton(true)
-    joinBtn.setStyle("-fx-background-color:#629924; -fx-text-fill:white; -fx-font-weight:bold;")
+    joinBtn.setStyle(FxPrimaryButtonStyle)
     joinBtn.setOnAction(_ => {
       val id = idField.getText.trim
       if (id.nonEmpty) {
@@ -859,7 +870,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     val btnRow = new javafx.scene.layout.HBox(8, cancelBtn, joinBtn)
     btnRow.setAlignment(javafx.geometry.Pos.CENTER_RIGHT)
     val idLbl = new javafx.scene.control.Label("Or paste Session ID")
-    idLbl.setStyle("-fx-font-size:11px; -fx-text-fill:#888;")
+    idLbl.setStyle(FxHintStyle)
     val root = new javafx.scene.layout.VBox(10)
     root.setPadding(new javafx.geometry.Insets(20)); root.setPrefWidth(440)
     root.getChildren.addAll(hdr, listView, new javafx.scene.control.Separator(), idLbl, idField, new javafx.scene.control.Separator(), btnRow)
@@ -891,7 +902,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     var runs: Vector[RunEntry]        = Vector.empty
 
     val statusLbl = new javafx.scene.control.Label("Loading experiments…")
-    statusLbl.setStyle("-fx-font-size:11px; -fx-text-fill:#888;")
+    statusLbl.setStyle(FxHintStyle)
 
     def parseExperiments(json: String): Vector[ExpEntry] = {
       val idRx     = """"id"\s*:\s*"([^"]+)"""".r
@@ -1001,7 +1012,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
 
     val replayBtn = new javafx.scene.control.Button("Replay Game")
     replayBtn.setDefaultButton(true)
-    replayBtn.setStyle("-fx-background-color:#629924; -fx-text-fill:white; -fx-font-weight:bold;")
+    replayBtn.setStyle(FxPrimaryButtonStyle)
     replayBtn.setDisable(true)
     runListView.getSelectionModel.selectedIndexProperty().addListener((_, _, idx) => {
       replayBtn.setDisable(idx.intValue() < 0 || idx.intValue() >= runs.size)
@@ -1345,7 +1356,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         } else {
           style = "-fx-font-size: 12px; -fx-padding: 5px 12px; -fx-background-color: #ecf0f1; -fx-text-fill: #333;"
           evalLabel.text = "Analysis off"
-          evalLabel.style = "-fx-text-fill: #888888; -fx-font-size: 12px; -fx-font-family: monospace;"
+          evalLabel.style = s"-fx-text-fill: $EvalColorNeutral; $EvalLabelStyleBase"
           clearArrow()
           updatePgnDisplay()
         }

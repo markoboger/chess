@@ -28,6 +28,12 @@ final case class TuiShellSnapshot(
 final class TuiShell:
   private val AnsiPattern = raw"\u001B\[[;\d]*m".r
   private val SidebarValueLimit = 44
+  private val EmptyPlaceholder = "<empty>"
+  private val MsgUndo = "Undid last move."
+  private val MsgRedo = "Redid move."
+  private val MsgBack = "Moved one step backward in history."
+  private val MsgForward = "Moved one step forward in history."
+  private val MsgNoSession = "No active session."
   private val StrategyCatalog = Vector(
     "opening-continuation" -> "Opening Continuation",
     "random" -> "Random",
@@ -188,7 +194,7 @@ final class TuiShell:
 
   private def renderPgn(controller: GameController): String =
     val pgn = renderAnnotatedPgn(controller)
-    s"${header("PGN")}\n  ${if pgn.isBlank then "<empty>" else pgn}"
+    s"${header("PGN")}\n  ${if pgn.isBlank then EmptyPlaceholder else pgn}"
 
   private def renderMenuOverlay(menu: TuiMenu): String =
     val title = header(s"${menu.title} Menu")
@@ -271,16 +277,16 @@ final class TuiShell:
         promptGameMode()
         true
       case "u" =>
-        withController(_.undo(), "Undid last move.")
+        withController(_.undo(), MsgUndo)
         true
       case "r" =>
-        withController(_.redo(), "Redid move.")
+        withController(_.redo(), MsgRedo)
         true
       case "b" =>
-        withController(_.backward(), "Moved one step backward in history.")
+        withController(_.backward(), MsgBack)
         true
       case "f" =>
-        withController(_.forward(), "Moved one step forward in history.")
+        withController(_.forward(), MsgForward)
         true
       case "l" =>
         flipped = !flipped
@@ -303,15 +309,15 @@ final class TuiShell:
         val arg = rest.headOption.getOrElse("")
         cmd.toLowerCase match
           case "q" | "quit" | "exit" => running = false
-          case "u" | "undo"          => withController(_.undo(), "Undid last move.")
-          case "redo" | "r"          => withController(_.redo(), "Redid move.")
-          case "back" | "b"          => withController(_.backward(), "Moved one step backward in history.")
-          case "forward" | "f"       => withController(_.forward(), "Moved one step forward in history.")
+          case "u" | "undo"          => withController(_.undo(), MsgUndo)
+          case "redo" | "r"          => withController(_.redo(), MsgRedo)
+          case "back" | "b"          => withController(_.backward(), MsgBack)
+          case "forward" | "f"       => withController(_.forward(), MsgForward)
           case "start" | "begin"     => withController(_.goToMove(0), "Jumped to the beginning.")
           case "end"                 => withController(ctrl => ctrl.goToMove(ctrl.boardStates.length - 1), "Jumped to the latest position.")
           case "flip"                => flipped = !flipped; statusMessage = s"Board flipped: $flipped"
           case "fen"                 => if arg.nonEmpty then importFenFrom(arg) else statusFromController(ctrl => s"Current FEN: ${ctrl.getBoardAsFEN}")
-          case "pgn"                 => if arg.nonEmpty then importPgnFrom(arg) else statusFromController(ctrl => s"Current PGN: ${if ctrl.pgnText.isBlank then "<empty>" else ctrl.pgnText}")
+          case "pgn"                 => if arg.nonEmpty then importPgnFrom(arg) else statusFromController(ctrl => s"Current PGN: ${if ctrl.pgnText.isBlank then EmptyPlaceholder else ctrl.pgnText}")
           case "json"                => if arg.nonEmpty then importJsonFrom(arg) else exportJson()
           case "writefen"            => exportText("FEN", ctrl => ctrl.getBoardAsFEN, ".fen")
           case "writepgn"            => exportText("PGN", ctrl => ctrl.pgnText, ".pgn")
@@ -331,7 +337,7 @@ final class TuiShell:
       case "1" => promptGameMode()
       case "2" => createGameWithFen()
       case "3" => statusFromController(ctrl => s"Current FEN: ${ctrl.getBoardAsFEN}")
-      case "4" => statusFromController(ctrl => s"Current PGN: ${if ctrl.pgnText.isBlank then "<empty>" else ctrl.pgnText}")
+      case "4" => statusFromController(ctrl => s"Current PGN: ${if ctrl.pgnText.isBlank then EmptyPlaceholder else ctrl.pgnText}")
       case "5" => promptAiStrategy()
       case "6" =>
         flipped = !flipped
@@ -343,15 +349,15 @@ final class TuiShell:
     choice.trim match
       case "1" => applyPgnMove()
       case "2" => applyCoordinateMove()
-      case "3" => withController(_.undo(), "Undid last move.")
-      case "4" => withController(_.redo(), "Redid move.")
+      case "3" => withController(_.undo(), MsgUndo)
+      case "4" => withController(_.redo(), MsgRedo)
       case _   => return false
     true
 
   private[richTui] def historyMenu(choice: String): Boolean =
     choice.trim match
-      case "1" => withController(_.backward(), "Moved one step backward in history.")
-      case "2" => withController(_.forward(), "Moved one step forward in history.")
+      case "1" => withController(_.backward(), MsgBack)
+      case "2" => withController(_.forward(), MsgForward)
       case "3" => withController(_.goToMove(0), "Jumped to the beginning.")
       case "4" => withController(ctrl => ctrl.goToMove(ctrl.boardStates.length - 1), "Jumped to the latest position.")
       case "5" =>
@@ -496,7 +502,7 @@ final class TuiShell:
   private def deleteCurrentSession(): Unit =
     activeGameId match
       case None =>
-        statusMessage = "No active session."
+        statusMessage = MsgNoSession
       case Some(gameId) =>
         if sessionService.deleteGame(gameId).unsafeRunSync() then
           activeGameId = None
@@ -527,7 +533,7 @@ final class TuiShell:
   private def showHistoryOverlay(): Unit =
     activeController match
       case None =>
-        statusMessage = "No active session."
+        statusMessage = MsgNoSession
       case Some(controller) =>
         val lines =
           if controller.pgnMoves.isEmpty then Vector("<no moves yet>")
@@ -621,7 +627,7 @@ final class TuiShell:
 
   private def computeAiMoveWith(strategyId: String): Unit =
     activeGameId match
-      case None => statusMessage = "No active session."
+      case None => statusMessage = MsgNoSession
       case Some(gameId) =>
         sessionService.computeAiMove(gameId, strategyId).unsafeRunSync() match
           case Right(Some(move)) =>
@@ -676,12 +682,12 @@ final class TuiShell:
         action(controller)
         if successMessage.nonEmpty then statusMessage = successMessage
       case None =>
-        statusMessage = "No active session."
+        statusMessage = MsgNoSession
 
   private def statusFromController(render: GameController => String): Unit =
     activeController match
       case Some(controller) => statusMessage = render(controller)
-      case None             => statusMessage = "No active session."
+      case None             => statusMessage = MsgNoSession
 
   private def activeController: Option[GameController] =
     activeGameId.flatMap(gameId => sessionService.getGame(gameId).unsafeRunSync())
