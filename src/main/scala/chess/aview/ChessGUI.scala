@@ -606,7 +606,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       onAction = _ => currentSessionId.foreach { id =>
         val c = new ClipboardContent(); c.putString(id)
         Clipboard.getSystemClipboard.setContent(c)
-        delegate.setGraphic(lucideIcon(IconCheck, 13, javafx.scene.paint.Color.web("#27ae60")))
+        delegate.setGraphic(lucideIcon(IconCheck, 13, javafx.scene.paint.Color.web(EvalColorGood)))
         val t = new Thread(() => { Thread.sleep(1500); Platform.runLater(() => delegate.setGraphic(lucideIcon(IconCopy, 13))) })
         t.setDaemon(true); t.start()
       }
@@ -1252,7 +1252,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     runButton = new Button("Run") {
       prefWidth = 120
       style =
-        "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold;"
+        s"-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: $EvalColorGood; -fx-text-fill: white; -fx-font-weight: bold;"
       delegate.setGraphic(lucideIcon(IconPlay, 14, javafx.scene.paint.Color.WHITE))
       contentDisplay = scalafx.scene.control.ContentDisplay.Left
       onAction = _ => {
@@ -1400,7 +1400,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     val panelNormalStyle =
       "-fx-border-color: #cccccc; -fx-border-width: 0 0 0 1;"
     val panelDropStyle =
-      "-fx-border-color: #27ae60; -fx-border-width: 2; -fx-background-color: rgba(39,174,96,0.05);"
+      s"-fx-border-color: $EvalColorGood; -fx-border-width: 2; -fx-background-color: rgba(39,174,96,0.05);"
 
     val controlPanel = new VBox(10) {
       padding = Insets(20)
@@ -1474,7 +1474,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       pauseButton.text = "Continue"
       pauseButton.delegate.setGraphic(lucideIcon(IconPlay, 14, javafx.scene.paint.Color.WHITE))
       pauseButton.style =
-        "-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold;"
+        s"-fx-font-size: 13px; -fx-padding: 10px; -fx-background-color: $EvalColorGood; -fx-text-fill: white; -fx-font-weight: bold;"
     } else {
       pauseButton.text = "Pause"
       pauseButton.delegate.setGraphic(lucideIcon(IconPause, 14, javafx.scene.paint.Color.WHITE))
@@ -1515,10 +1515,10 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   }
 
   private def moveQualityColor(annotation: String): String = annotation match
-    case "??" => "#c0392b"   // crimson – blunder
+    case "??" => EvalColorBad   // crimson – blunder
     case "?"  => "#e67e22"   // orange  – mistake
     case "?!" => "#f1c40f"   // amber   – dubious
-    case _    => "#27ae60"   // green   – good
+    case _    => EvalColorGood  // green   – good
 
   private def updatePgnDisplay(): Unit = {
     pgnDisplay.children.clear()
@@ -1613,7 +1613,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         val content = new ClipboardContent()
         content.putString(controller.getBoardAsFEN)
         Clipboard.getSystemClipboard.setContent(content)
-        delegate.setGraphic(lucideIcon(IconCheck, 13, javafx.scene.paint.Color.web("#27ae60")))
+        delegate.setGraphic(lucideIcon(IconCheck, 13, javafx.scene.paint.Color.web(EvalColorGood)))
         new Thread(() => {
           Thread.sleep(1500)
           Platform.runLater(() => delegate.setGraphic(lucideIcon(IconCopy, 13)))
@@ -1912,7 +1912,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
       squareRect.fill = selectedSquare match {
         case Some(sel) if sel == sq => Color.web("#baca44")
         case _ if kingInDanger.contains(sq) =>
-          if (isCheckmate) Color.web("#c0392b") else Color.web("#e74c3c")
+          if (isCheckmate) Color.web(EvalColorBad) else Color.web("#e74c3c")
         case _ if lastMoveSquares.contains(sq) => lastMoveColor
         case _                                 => baseColor
       }
