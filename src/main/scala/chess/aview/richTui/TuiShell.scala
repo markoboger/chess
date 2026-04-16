@@ -58,6 +58,41 @@ final class TuiShell:
   private var pendingPrompt: Option[PendingPrompt] = None
   private var infoOverlay: Option[InfoOverlay] = None
 
+  private val ColonCommands: Map[String, String => Unit] = Map(
+    "q" -> (_ => running = false),
+    "quit" -> (_ => running = false),
+    "exit" -> (_ => running = false),
+    "u" -> (_ => withController(_.undo(), MsgUndo)),
+    "undo" -> (_ => withController(_.undo(), MsgUndo)),
+    "redo" -> (_ => withController(_.redo(), MsgRedo)),
+    "r" -> (_ => withController(_.redo(), MsgRedo)),
+    "back" -> (_ => withController(_.backward(), MsgBack)),
+    "b" -> (_ => withController(_.backward(), MsgBack)),
+    "forward" -> (_ => withController(_.forward(), MsgForward)),
+    "f" -> (_ => withController(_.forward(), MsgForward)),
+    "start" -> (_ => withController(_.goToMove(0), "Jumped to the beginning.")),
+    "begin" -> (_ => withController(_.goToMove(0), "Jumped to the beginning.")),
+    "end" -> (_ => withController(ctrl => ctrl.goToMove(ctrl.boardStates.length - 1), "Jumped to the latest position.")),
+    "flip" -> (_ => { flipped = !flipped; statusMessage = s"Board flipped: $flipped" }),
+    "fen" -> (arg => if arg.nonEmpty then importFenFrom(arg) else statusFromController(ctrl => s"Current FEN: ${ctrl.getBoardAsFEN}")),
+    "pgn" -> (arg => if arg.nonEmpty then importPgnFrom(arg) else statusFromController(ctrl => s"Current PGN: ${if ctrl.pgnText.isBlank then EmptyPlaceholder else ctrl.pgnText}")),
+    "json" -> (arg => if arg.nonEmpty then importJsonFrom(arg) else exportJson()),
+    "writefen" -> (_ => exportText("FEN", ctrl => ctrl.getBoardAsFEN, ".fen")),
+    "writepgn" -> (_ => exportText("PGN", ctrl => ctrl.pgnText, ".pgn")),
+    "writejson" -> (_ => exportJson()),
+    "new" -> (_ => createGame()),
+    "join" -> (arg => joinSessionById(arg)),
+    "sessions" -> (_ => listSessions()),
+    "ls" -> (_ => listSessions()),
+    "del" -> (_ => deleteCurrentSession()),
+    "delete" -> (_ => deleteCurrentSession()),
+    "ai" -> (arg => runAiCommand(arg)),
+    "menu" -> (_ => statusMessage = "Use menu digits 1-6 from the main prompt."),
+    "m" -> (_ => statusMessage = "Use menu digits 1-6 from the main prompt."),
+    "cancel" -> (_ => { pendingPrompt = None; infoOverlay = None; statusMessage = "Cancelled pending input." }),
+    "help" -> (_ => helpMenu())
+  )
+
   private[richTui] def snapshot: TuiShellSnapshot =
     TuiShellSnapshot(
       activeGameId = activeGameId,
@@ -307,30 +342,9 @@ final class TuiShell:
       case Nil => ()
       case cmd :: rest =>
         val arg = rest.headOption.getOrElse("")
-        cmd.toLowerCase match
-          case "q" | "quit" | "exit" => running = false
-          case "u" | "undo"          => withController(_.undo(), MsgUndo)
-          case "redo" | "r"          => withController(_.redo(), MsgRedo)
-          case "back" | "b"          => withController(_.backward(), MsgBack)
-          case "forward" | "f"       => withController(_.forward(), MsgForward)
-          case "start" | "begin"     => withController(_.goToMove(0), "Jumped to the beginning.")
-          case "end"                 => withController(ctrl => ctrl.goToMove(ctrl.boardStates.length - 1), "Jumped to the latest position.")
-          case "flip"                => flipped = !flipped; statusMessage = s"Board flipped: $flipped"
-          case "fen"                 => if arg.nonEmpty then importFenFrom(arg) else statusFromController(ctrl => s"Current FEN: ${ctrl.getBoardAsFEN}")
-          case "pgn"                 => if arg.nonEmpty then importPgnFrom(arg) else statusFromController(ctrl => s"Current PGN: ${if ctrl.pgnText.isBlank then EmptyPlaceholder else ctrl.pgnText}")
-          case "json"                => if arg.nonEmpty then importJsonFrom(arg) else exportJson()
-          case "writefen"            => exportText("FEN", ctrl => ctrl.getBoardAsFEN, ".fen")
-          case "writepgn"            => exportText("PGN", ctrl => ctrl.pgnText, ".pgn")
-          case "writejson"           => exportJson()
-          case "new"                 => createGame()
-          case "join"                => joinSessionById(arg)
-          case "sessions" | "ls"     => listSessions()
-          case "del" | "delete"      => deleteCurrentSession()
-          case "ai"                  => runAiCommand(arg)
-          case "menu" | "m"          => statusMessage = "Use menu digits 1-6 from the main prompt."
-          case "cancel"              => pendingPrompt = None; infoOverlay = None; statusMessage = "Cancelled pending input."
-          case "help"                => helpMenu()
-          case _                     => statusMessage = s"Unknown :command '$cmd'. Try :help."
+        ColonCommands.get(cmd.toLowerCase) match
+          case Some(action) => action(arg.trim)
+          case None         => statusMessage = s"Unknown :command '$cmd'. Try :help."
 
   private[richTui] def gameMenu(choice: String): Boolean =
     choice.trim match

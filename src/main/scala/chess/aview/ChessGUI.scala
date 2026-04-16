@@ -60,6 +60,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
   private val EvalColorGood   = "#27ae60"
   private val EvalColorBad    = "#c0392b"
   private val EvalColorNeutral = "#888888"
+  private val ActiveMoveColor = "#1565C0"
   private val EvalLabelStyleBase = "-fx-font-size: 12px; -fx-font-family: monospace;"
 
   private val FxHintStyle = "-fx-font-size:11px; -fx-text-fill:#888;"
@@ -1520,6 +1521,28 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     case "?!" => "#f1c40f"   // amber   – dubious
     case _    => EvalColorGood  // green   – good
 
+  private def annotationForMoveIndex(i: Int, fens: Vector[String]): String =
+    if (!analysisEnabled || fens.length <= i + 1) ""
+    else
+      val fenBefore = fens(i)
+      val fenAfter  = fens(i + 1)
+      (analysisCache.get(fenBefore), analysisCache.get(fenAfter)) match
+        case (Some(before), Some(after)) =>
+          moveAnnotation(before.evalPawns, after.evalPawns, whiteMove = i % 2 == 0)
+        case _ => ""
+
+  private def baseColorForPgnMove(isActive: Boolean, annotation: String): Color =
+    if (isActive) Color.web(ActiveMoveColor)
+    else if (annotation.nonEmpty) Color.web(moveQualityColor(annotation))
+    else Color.Black
+
+  private def appendMoveNumberIfNeeded(i: Int): Unit =
+    if (i % 2 == 0) {
+      pgnDisplay.children.add(new Text(s"${i / 2 + 1}. ") {
+        font = Font.font("monospace", FontWeight.Normal, 13)
+      })
+    }
+
   private def updatePgnDisplay(): Unit = {
     pgnDisplay.children.clear()
     val moves = controller.pgnMoves
@@ -1529,28 +1552,12 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
     var activeNode = Option.empty[Text]
 
     moves.zipWithIndex.foreach { case (move, i) =>
-      if (i % 2 == 0) {
-        pgnDisplay.children.add(new Text(s"${i / 2 + 1}. ") {
-          font = Font.font("monospace", FontWeight.Normal, 13)
-        })
-      }
+      appendMoveNumberIfNeeded(i)
 
-      // Compute annotation if we have eval for both surrounding positions
-      val annotation: String =
-        if (!analysisEnabled || fens.length <= i + 1) ""
-        else {
-          val fenBefore = fens(i)
-          val fenAfter  = fens(i + 1)
-          (analysisCache.get(fenBefore), analysisCache.get(fenAfter)) match
-            case (Some(before), Some(after)) =>
-              moveAnnotation(before.evalPawns, after.evalPawns, whiteMove = i % 2 == 0)
-            case _ => ""
-        }
+      val annotation = annotationForMoveIndex(i, fens)
 
       val isActive = i == activeIdx
-      val baseColor = if (isActive) Color.web("#1565C0")
-        else if (annotation.nonEmpty) Color.web(moveQualityColor(annotation))
-        else Color.Black
+      val baseColor = baseColorForPgnMove(isActive, annotation)
 
       val moveText = new Text(move) {
         font = Font.font(
@@ -1561,7 +1568,7 @@ class ChessGUI(val controller: GameController) extends Observer[MoveResult] {
         fill = baseColor
         style = "-fx-cursor: hand;"
 
-        onMouseEntered = _ => if (!isActive) fill = Color.web("#1565C0")
+        onMouseEntered = _ => if (!isActive) fill = Color.web(ActiveMoveColor)
         onMouseExited  = _ => fill = baseColor
         onMouseClicked = _ => {
           controller.goToMove(i + 1)
