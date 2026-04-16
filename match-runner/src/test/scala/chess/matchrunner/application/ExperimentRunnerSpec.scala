@@ -7,12 +7,14 @@ import chess.matchrunner.data.MatchRunnerRepository
 import chess.matchrunner.domain.{Experiment, ExperimentStatus, MatchRun}
 import chess.matchrunner.http.{ChessApiClient, CreateGameResponse, GameStateResponse}
 import chess.model.GameSettings
+import org.scalatest.OptionValues
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.UUID
+import scala.concurrent.duration.*
 
-final class ExperimentRunnerSpec extends AnyWordSpec with Matchers:
+final class ExperimentRunnerSpec extends AnyWordSpec with Matchers with OptionValues:
 
   "ExperimentRunner" should {
     "run a complete passive batch and persist finished runs" in {
@@ -158,7 +160,91 @@ final class ExperimentRunnerSpec extends AnyWordSpec with Matchers:
       runs.head.errorMessage shouldBe Some("engine crashed")
     }
 
+    "startAsync should return immediately and complete in the background" in {
+      val repo = new InMemoryMatchRunnerRepository
+      val client = new StubChessApiClient(
+        createResponses = List(Right(CreateGameResponse("ga1", "fen", GameSettings(whiteIsHuman = false, blackIsHuman = false, backendAutoplay = true)))),
+        gameStates = Map("ga1" -> List(Right(GameStateResponse("ga1", "fen-f", "1. e4", "Stalemate! The game is a draw.", GameSettings()))))
+      )
+      val runner = new ExperimentRunner(client, repo, config = MatchRunnerConfig(8084, "http://game-service:8081", 0L, 100L, "postgres", 5432, "chess", "user", "pass"))
+
+      val experiment = runner.startAsync(ExperimentRequest("async", None, "random", "random", 1)).unsafeRunSync()
+      experiment.status shouldBe ExperimentStatus.Running
+
+      awaitStatus(repo, experiment.id, ExperimentStatus.Completed)
+      repo.findExperiment(experiment.id).unsafeRunSync().value.status.shouldBe(ExperimentStatus.Completed)
+    }
+
+    "startAsync should run mirroredPairs as a second batch" in {
+      val repo = new InMemoryMatchRunnerRepository
+      val client = new StubChessApiClient(
+        createResponses = List(
+          Right(CreateGameResponse("gm1", "fen", GameSettings(whiteIsHuman = false, blackIsHuman = false, backendAutoplay = true))),
+          Right(CreateGameResponse("gm2", "fen", GameSettings(whiteIsHuman = false, blackIsHuman = false, backendAutoplay = true)))
+        ),
+        gameStates = Map(
+          "gm1" -> List(Right(GameStateResponse("gm1", "fen-f", "", "Draw by threefold repetition.", GameSettings()))),
+          "gm2" -> List(Right(GameStateResponse("gm2", "fen-f", "", "Checkmate! White wins!", GameSettings())))
+        )
+      )
+      val runner = new ExperimentRunner(client, repo, config = MatchRunnerConfig(8084, "http://game-service:8081", 0L, 100L, "postgres", 5432, "chess", "user", "pass"))
+
+      val experiment = runner.startAsync(
+        ExperimentRequest("mirrored", None, "minimax", "random", games = 1, mirroredPairs = true)
+      ).unsafeRunSync()
+
+      awaitStatus(repo, experiment.id, ExperimentStatus.Completed)
+      val runs = repo.listRuns(experiment.id).unsafeRunSync()
+      runs.map(_.chessGameId).toSet shouldBe Set("gm1", "gm2")
+    }
+
+    "should time out via Temporal.timeoutTo when polling never reaches a terminal state" in {
+      val repo = new InMemoryMatchRunnerRepository
+      val client = new StubChessApiClient(
+        createResponses = List(Right(CreateGameResponse("gt1", "fen", GameSettings(whiteIsHuman = false, blackIsHuman = false, backendAutoplay = true)))),
+        gameStates = Map(
+          "gt1" -> List(
+            Right(GameStateResponse("gt1", "fen-x", "", "White to move", GameSettings())),
+            Right(GameStateResponse("gt1", "fen-x", "", "Black to move", GameSettings()))
+          )
+        )
+      )
+      val runner = new ExperimentRunner(
+        client,
+        repo,
+        config = MatchRunnerConfig(8084, "http://game-service:8081", pollIntervalMs = 50L, matchTimeoutMs = 1L, "postgres", 5432, "chess", "user", "pass")
+      )
+
+      val experiment = runner.runExperiment(ExperimentRequest("timeoutTo", None, "random", "random", 1)).unsafeRunSync()
+      experiment.status shouldBe ExperimentStatus.Failed
+      val runs = repo.listRuns(experiment.id).unsafeRunSync()
+      runs.head.errorMessage shouldBe Some("Timed out while waiting for backend game completion")
+    }
+
+    "should mark unknown checkmate message as an unexpected terminal status" in {
+      val repo = new InMemoryMatchRunnerRepository
+      val client = new StubChessApiClient(
+        createResponses = List(Right(CreateGameResponse("gu1", "fen", GameSettings(whiteIsHuman = false, blackIsHuman = false, backendAutoplay = true)))),
+        gameStates = Map("gu1" -> List(Right(GameStateResponse("gu1", "fen-f", "", "Checkmate!", GameSettings()))))
+      )
+      val runner = new ExperimentRunner(client, repo, config = MatchRunnerConfig(8084, "http://game-service:8081", 0L, 100L, "postgres", 5432, "chess", "user", "pass"))
+      val experiment = runner.runExperiment(ExperimentRequest("unexpected", None, "random", "random", 1)).unsafeRunSync()
+      val runs = repo.listRuns(experiment.id).unsafeRunSync()
+      runs.head.errorMessage.value.should(include("Unexpected terminal status:"))
+    }
+
   }
+
+  private def awaitStatus(repo: MatchRunnerRepository[IO], id: UUID, status: ExperimentStatus): Unit =
+    def loop(remaining: Int): IO[Unit] =
+      if remaining <= 0 then IO.unit
+      else
+        repo.findExperiment(id).flatMap {
+          case Some(e) if e.status == status => IO.unit
+          case _ => IO.sleep(10.millis) *> loop(remaining - 1)
+        }
+
+    loop(100).unsafeRunSync()
 
   private final class InMemoryMatchRunnerRepository extends MatchRunnerRepository[IO]:
     private var experiments: Map[UUID, Experiment] = Map.empty
