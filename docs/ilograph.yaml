@@ -1,0 +1,231 @@
+ilograph: 1
+
+resources:
+  - name: Player
+    subtitle: Chess Player
+    color: Blue
+    style: plural
+    icon: Networking/user.svg
+
+  - name: EmBe Chess
+    subtitle: Environment
+    color: navy
+    children:
+      - name: TUI
+        subtitle: TextUI
+        icon: Networking/workstation.svg
+        children:
+          - name: Scala root
+            subtitle: src/main/scala/chess
+            children:
+              - name: chess.ChessTuiApp
+                subtitle: main
+              - name: chess.aview.richTui.TuiShell
+                subtitle: shell runner
+              - name: chess.aview.richTui.BoardRenderer
+              - name: chess.aview.richTui.ConsoleEncoding
+              - name: chess.aview.richTui.TerminalPalette
+
+      - name: GUI
+        subtitle: ScalaFX
+        color: Firebrick
+        icon: Networking/desktop.svg
+        children:
+          - name: Scala root
+            subtitle: src/main/scala/chess
+            children:
+              - name: chess.ChessGuiApp
+                subtitle: main
+              - name: chess.aview.ChessGUI
+                subtitle: ScalaFX UI
+              - name: chess.aview.ConsoleView
+              - name: chess.aview.SessionMovePublicationGate
+
+      - name: WebUI
+        subtitle: Vue
+        color: Aqua
+        icon: Networking/laptop.svg
+        children:
+          - name: main.ts
+            subtitle: Vue bootstrap
+          - name: App.vue
+            subtitle: root component
+          - name: API clients
+            children:
+              - name: client.ts
+                subtitle: Axios base client
+              - name: game-api.ts
+                subtitle: REST to Gateway
+              - name: matchrunner-api.ts
+                subtitle: REST to Match Runner
+              - name: stockfish-api.ts
+                subtitle: analysis fetch
+          - name: Stores
+            subtitle: Pinia
+            children:
+              - name: game.ts
+                subtitle: game state and WebSocket client
+              - name: analysis.ts
+                subtitle: analysis cache
+              - name: ui.ts
+                subtitle: theme and mobile menu
+              - name: opening.ts
+              - name: puzzle.ts
+          - name: UI components
+            children:
+              - name: ChessBoard.vue
+              - name: NavBar.vue
+              - name: GameControls.vue
+              - name: BoardInfoPanel.vue
+              - name: NewGameDialog.vue
+              - name: BrowseExperimentsDialog.vue
+              - name: PuzzlePanel.vue
+              - name: OpeningBadge.vue
+
+      - name: Docker Compose Runtime
+        subtitle: docker-compose.yml
+        icon: Networking/docker.svg
+        children:
+          - name: postgres
+            subtitle: postgres:16-alpine port 5432
+            color: Purple
+            icon: Networking/database.svg
+
+          - name: mongodb
+            subtitle: mongo:7.0 port 27017
+            color: Purple
+            icon: Networking/database.svg
+
+          - name: game-service
+            subtitle: Scala http4s port 8081
+            color: Green
+            icon: Networking/api.svg
+            children:
+              - name: chess.microservices.game.GameServer
+                subtitle: IOApp.Simple
+              - name: chess.microservices.game.GameRoutes
+                subtitle: http4s routes
+              - name: chess.application.game.GameSessionService
+                subtitle: app service
+              - name: chess.realtime.HttpGameEventPublisher
+                subtitle: event publisher client
+              - name: Persistence layer
+                subtitle: data module
+                children:
+                  - name: chess.persistence.GameRepository
+                  - name: chess.persistence.OpeningRepository
+                  - name: chess.persistence.postgres.PostgresGameRepository
+                  - name: chess.persistence.postgres.PostgresOpeningRepository
+                  - name: chess.persistence.mongodb.MongoGameRepository
+                  - name: chess.persistence.mongodb.MongoOpeningRepository
+                  - name: chess.persistence.memory.InMemoryOpeningRepository
+              - name: Core domain
+                subtitle: core module
+                children:
+                  - name: chess.model.Board
+                  - name: chess.model.MoveResult
+                  - name: chess.model.GameEvent
+                  - name: chess.controller.io.FenIO
+                  - name: chess.controller.io.PgnIO
+
+          - name: api-gateway
+            subtitle: Scala http4s port 8080
+            color: Green
+            icon: Networking/gateway.svg
+            children:
+              - name: chess.microservices.gateway.GatewayServer
+                subtitle: IOApp.Simple
+              - name: chess.microservices.gateway.GatewayRoutes
+                subtitle: proxy routes
+              - name: chess.microservices.gateway.ServiceProxy
+                subtitle: HTTP proxy helper
+              - name: chess.microservices.gateway.GatewayConfig
+                subtitle: env config
+
+          - name: vue-ui
+            subtitle: nginx port 3000
+            color: Aqua
+            icon: Networking/web.svg
+
+          - name: match-runner-service
+            subtitle: Scala http4s port 8084
+            color: Green
+            icon: Networking/api.svg
+            children:
+              - name: chess.matchrunner.MatchRunnerServer
+                subtitle: IOApp.Simple
+              - name: chess.matchrunner.http.ExperimentRoutes
+                subtitle: experiments routes
+              - name: chess.matchrunner.http.HealthRoutes
+              - name: chess.matchrunner.application.ExperimentRunner
+              - name: chess.matchrunner.data.postgres.PostgresMatchRunnerRepository
+              - name: chess.matchrunner.http.HttpChessApiClient
+                subtitle: client to game-service
+              - name: chess.matchrunner.csv.CsvExporter
+              - name: chess.matchrunner.tui.MatchRunnerShell
+                subtitle: interactive TUI
+
+      - name: Realtime Service
+        subtitle: realtime module port 8083
+        color: Green
+        icon: Networking/websocket.svg
+        children:
+          - name: chess.realtime.GameEventServer
+            subtitle: IOApp.Simple
+          - name: chess.realtime.GameEventRoutes
+            subtitle: ingest and WebSocket routes
+          - name: chess.realtime.InMemoryGameEventHub
+            subtitle: pub sub hub
+          - name: chess.realtime.GameEventJson
+            subtitle: codecs
+
+perspectives:
+  - name: Dependencies
+    relations:
+      - from: Player
+        to: WebUI
+        label: plays in browser
+
+      - from: Player
+        to: GUI
+        label: plays locally
+
+      - from: Player
+        to: TUI
+        label: plays locally
+
+      - from: WebUI
+        to: api-gateway
+        label: HTTP JSON via axios
+
+      - from: api-gateway
+        to: game-service
+        label: HTTP proxy to game endpoints and openings
+
+      - from: game-service
+        to: postgres
+        label: persistence via JDBC Doobie
+
+      - from: game-service
+        to: mongodb
+        label: persistence via Mongo driver
+
+      - from: match-runner-service
+        to: game-service
+        label: HTTP JSON create games and poll state
+
+      - from: match-runner-service
+        to: postgres
+        label: persistence via JDBC Doobie
+
+      - from: WebUI
+        to: match-runner-service
+        label: HTTP JSON browse experiments
+
+      - from: WebUI
+        to: Realtime Service
+        label: WebSocket subscribe per gameId
+
+      - from: game-service
+        to: Realtime Service
+        label: HTTP publish events
