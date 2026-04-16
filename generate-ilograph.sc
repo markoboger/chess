@@ -25,6 +25,8 @@ final case class PackageGraph(
     memberCalls: Map[String, Set[String]],         // memberId -> memberId (inferred from constructor param types)
     memberImplements: Map[String, Set[String]]     // parent memberId -> child memberId (inferred from extends/with)
     ,
+    memberObserves: Map[String, Set[String]]       // observer memberId -> observed memberId (from extends Observer[T])
+    ,
     memberCompanions: List[(String, String)]       // (type memberId -> companion object memberId)
 )
 
@@ -34,6 +36,7 @@ object GenerateIlograph:
       edges: Map[String, Set[String]],
       members: Map[String, Map[String, MemberMeta]],
       inherits: Map[String, Set[String]], // memberId -> qualified/unqualified parent type tokens
+      observes: Map[String, Set[String]], // memberId -> raw observed type strings (inside Observer[...])
       companions: List[(String, String)], // (type memberId -> companion object memberId)
       scalaFiles: List[Path]
   )
@@ -111,12 +114,14 @@ object GenerateIlograph:
       scans.map { case (pid, scan) =>
         val memberCalls = scanMemberCalls(scan.scalaFiles, scan.packages, globalIndex)
         val memberImplements = resolveImplements(scan.inherits, globalIndex)
+        val memberObserves = resolveObserves(scan.observes, globalIndex)
         pid -> PackageGraph(
           packages = scan.packages,
           edges = scan.edges,
           members = scan.members,
           memberCalls = memberCalls,
           memberImplements = memberImplements,
+          memberObserves = memberObserves,
           memberCompanions = scan.companions
         )
       }
@@ -229,11 +234,26 @@ object GenerateIlograph:
             }
       }
 
+    val observesRaw =
+      scalaFiles.foldLeft(Map.empty[String, Set[String]]) { (acc, p) =>
+        val text = normalizeSourceText(Files.readString(p, StandardCharsets.UTF_8))
+        val pkgOpt = PackageRe.findFirstMatchIn(text).map(_.group(1))
+        pkgOpt match
+          case None => acc
+          case Some(pkg) =>
+            discoverObserverObservedTypes(text).foldLeft(acc) { case (acc2, (name, targets)) =>
+              val fromId = memberResourceId(pkg, name)
+              if targets.isEmpty then acc2
+              else acc2.updated(fromId, acc2.getOrElse(fromId, Set.empty) ++ targets)
+            }
+      }
+
     ProjectScanData(
       packages = declaredPkgs,
       edges = edges,
       members = membersByPkg,
       inherits = inheritsRaw,
+      observes = observesRaw,
       companions = companions.toList.distinct,
       scalaFiles = scalaFiles
     )
@@ -440,7 +460,8 @@ object GenerateIlograph:
     // Capture everything after `extends` on the same line (continuations handled separately)
     """(?m)^\s*(?:final\s+|sealed\s+|abstract\s+|case\s+|private\s+|protected\s+|open\s+|transparent\s+|inline\s+)*\b(?:class|trait|object|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\b[^\n]*\bextends\s+([^\n]+)$""".r
 
-  private def discoverInherits(text: String): Map[String, Set[String]] =
+  /** `(simpleMemberName, full extends/with clause)` for each type that has an `extends` clause. */
+  private def extendsClauseEntries(text: String): List[(String, String)] =
     val cleaned = stripScalaComments(text)
     val lines = cleaned.linesIterator.toVector
 
@@ -464,15 +485,68 @@ object GenerateIlograph:
         else done = true
       b.toString
 
-    val tokenRe = """[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*""".r
-
     InheritsClauseRe
       .findAllMatchIn(cleaned)
-      .flatMap { m =>
+      .map { m =>
         val name = m.group(1)
         val clauseLine = m.group(2)
         val lineIdx = cleaned.substring(0, m.start).count(_ == '\n')
         val clause = collectClause(lineIdx, clauseLine)
+        (name, clause)
+      }
+      .toList
+
+  /** Type argument strings inside `Observer[ ... ]` (supports nested brackets). */
+  private def extractObserverTypeArgInners(clause: String): Set[String] =
+    val buf = scala.collection.mutable.ArrayBuffer.empty[String]
+    var i = 0
+    while i < clause.length do
+      val idx = clause.indexOf("Observer", i)
+      if idx < 0 then i = clause.length
+      else
+        val boundaryBefore =
+          idx == 0 || {
+            val c = clause.charAt(idx - 1)
+            !c.isLetterOrDigit && c != '_'
+          }
+        val opensBracket = idx + 8 < clause.length && clause.charAt(idx + 8) == '['
+        if boundaryBefore && opensBracket then
+          var j = idx + 9
+          var depth = 1
+          val startArg = j
+          while j < clause.length && depth > 0 do
+            clause.charAt(j) match
+              case '[' => depth += 1; j += 1
+              case ']' =>
+                depth -= 1
+                j += 1
+              case _ => j += 1
+          if depth == 0 then
+            val inner = clause.substring(startArg, j - 1).trim
+            if inner.nonEmpty then buf += inner
+            i = j
+          else i = idx + 1
+        else i = idx + 1
+    buf.toSet
+
+  /** Tokens to drop from `extends` parent inference — they are type parameters, not super-types. */
+  private def tokensStrippedForObserverArgs(observerInners: Set[String]): Set[String] =
+    observerInners.foldLeft(Set.empty[String]) { (acc, inner) =>
+      val noGenerics = !inner.contains('[')
+      val exact = if noGenerics && inner.nonEmpty then acc + inner else acc
+      val simple =
+        if noGenerics && inner.contains('.') then exact + inner.split('.').lastOption.getOrElse("")
+        else exact
+      simple.filter(_.nonEmpty)
+    }
+
+  private def discoverInherits(text: String): Map[String, Set[String]] =
+    val tokenRe = """[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*""".r
+
+    extendsClauseEntries(text)
+      .flatMap { case (name, clause) =>
+        val observerInners = extractObserverTypeArgInners(clause)
+        val stripped = tokensStrippedForObserverArgs(observerInners)
 
         val tokens = tokenRe.findAllIn(clause).toList
         val parents =
@@ -480,9 +554,19 @@ object GenerateIlograph:
             .map(_.trim)
             .filter(t => t.nonEmpty && !IgnoredTypeNames.contains(t))
             .filterNot(t => t == name)
+            .filterNot(stripped.contains)
             .toSet
 
         if parents.isEmpty then None else Some(name -> parents)
+      }
+      .toMap
+
+  /** Per member (simple name): raw type strings used as `Observer[ ... ]` type arguments (for `observes`). */
+  private def discoverObserverObservedTypes(text: String): Map[String, Set[String]] =
+    extendsClauseEntries(text)
+      .flatMap { case (name, clause) =>
+        val inners = extractObserverTypeArgInners(clause)
+        if inners.isEmpty then None else Some(name -> inners)
       }
       .toMap
 
@@ -494,6 +578,22 @@ object GenerateIlograph:
         toks.flatMap(t => resolveTypeToMemberId(t, idx)).map(parentId => (parentId, childId))
       }
 
+    pairs
+      .groupBy(_._1)
+      .view
+      .mapValues(_.map(_._2).toSet)
+      .toMap
+
+  /** observer memberId -> observed memberId(s) */
+  private def resolveObserves(observesRaw: Map[String, Set[String]], idx: MemberIndex): Map[String, Set[String]] =
+    val pairs =
+      observesRaw.toList.flatMap { case (observerId, rawTypes) =>
+        rawTypes.toList
+          .map(_.trim)
+          .filter(_.nonEmpty)
+          .flatMap(resolveTypeToMemberId(_, idx))
+          .map(observedId => observerId -> observedId)
+      }
     pairs
       .groupBy(_._1)
       .view
@@ -712,7 +812,10 @@ object GenerateIlograph:
 
     val packageResources =
       projects.sortBy(_.id.toLowerCase).flatMap { p =>
-        val graph = packageGraphs.getOrElse(p.id, PackageGraph(Set.empty, Map.empty, Map.empty, Map.empty, Map.empty, Nil))
+        val graph = packageGraphs.getOrElse(
+          p.id,
+          PackageGraph(Set.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Nil)
+        )
         val pkgs = graph.packages.toList.sorted
         val full = projectColors.getOrElse(p.id, "#7f7f7f")
         val shell = lightenHex(full, 0.82)
@@ -804,7 +907,10 @@ object GenerateIlograph:
 
     val packagesPerspectives =
       projects.sortBy(_.id.toLowerCase).flatMap { p =>
-        val graph = packageGraphs.getOrElse(p.id, PackageGraph(Set.empty, Map.empty, Map.empty, Map.empty, Map.empty, Nil))
+        val graph = packageGraphs.getOrElse(
+          p.id,
+          PackageGraph(Set.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Nil)
+        )
         val tree = buildPackageTree(graph.packages)
         val projColor = projectColors.getOrElse(p.id, "#7f7f7f")
         val edges =
@@ -889,6 +995,20 @@ object GenerateIlograph:
             ).mkString("\n")
           }
 
+        val observeEdges =
+          graph.memberObserves.toList
+            .flatMap { case (from, tos) => tos.toList.map(to => (from, to)) }
+            .sortBy { case (a, b) => (a, b) }
+
+        val observeRels =
+          observeEdges.map { case (from, to) =>
+            List(
+              indent(3)(s"- from: ${q(from)}"),
+              indent(4)(s"to: ${q(to)}"),
+              indent(4)(s"label: ${q("observes")}")
+            ).mkString("\n")
+          }
+
         val companionEdges =
           graph.memberCompanions
             .sortBy { case (a, b) => (a, b) }
@@ -911,7 +1031,7 @@ object GenerateIlograph:
             ).mkString("\n")
           }
 
-        perspectiveHeader ++ overrides ++ relationsHeader ++ declareRels ++ implementRels ++ companionRels ++ callRels ++ rels
+        perspectiveHeader ++ overrides ++ relationsHeader ++ declareRels ++ implementRels ++ observeRels ++ companionRels ++ callRels ++ rels
       }
 
     (header ++ resources ++ projectResources ++ packageResourcesHeader ++ packageResources ++ perspectivesHeader ++ projectsPerspectiveHeader ++ projectRelations ++ packagesPerspectives)
