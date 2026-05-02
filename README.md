@@ -6,6 +6,8 @@
 
 A modular Scala chess application used for software architecture teaching. The repository contains a playable desktop app, HTTP services, a Vue frontend, persistence adapters for MongoDB and PostgreSQL, realtime event delivery, benchmarks, and lecture material.
 
+Now using webhook. 
+
 ## Quick Start
 
 ### Desktop App
