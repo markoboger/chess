@@ -141,6 +141,29 @@ lazy val MatchRunner = project
   )
   .settings(windowsTestcontainersSettings)
 
+lazy val LichessBot = project
+  .in(file("lichess-bot"))
+  .enablePlugins(JavaAppPackaging)
+  .dependsOn(Core, App)
+  .settings(
+    name := "Chess-Lichess-Bot",
+    scalaVersion := "3.5.0",
+    Compile / mainClass := Some("chess.lichess.LichessBotMain"),
+    libraryDependencies ++= Seq(
+      "org.typelevel" %% "cats-effect" % "3.5.4",
+      "co.fs2" %% "fs2-core" % "3.11.0",
+      "org.http4s" %% "http4s-dsl" % "0.23.30",
+      "org.http4s" %% "http4s-client" % "0.23.30",
+      "org.http4s" %% "http4s-ember-client" % "0.23.30",
+      "org.http4s" %% "http4s-circe" % "0.23.30",
+      "io.circe" %% "circe-core" % "0.14.10",
+      "io.circe" %% "circe-generic" % "0.14.10",
+      "io.circe" %% "circe-parser" % "0.14.10",
+      "org.scalatest" %% "scalatest" % "3.2.19" % Test
+    ),
+    publish / skip := true
+  )
+
 lazy val Data = project
   .in(file("data"))
   .dependsOn(Core, App)
@@ -173,7 +196,7 @@ lazy val Data = project
 lazy val Chess = project
   .in(file("."))
   .enablePlugins(JavaAppPackaging)
-  .aggregate(Core, App, Realtime, MatchRunner, Data)
+  .aggregate(Core, App, Realtime, MatchRunner, Data, LichessBot)
   .dependsOn(Core, App, Realtime, MatchRunner, Data)
   .settings(
     name := "Chess",
