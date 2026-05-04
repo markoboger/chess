@@ -39,20 +39,15 @@ kubectl apply -f deploy/k8s/base/namespace.yaml
 
 ### 2a. Secrets (PostgreSQL + MongoDB)
 
-Do **not** commit real passwords. Create the secret from literals (or from a local `.env` you keep out of git):
+Do **not** commit real passwords. If you already maintain a **repo-root `.env`** (see [`.env.example`](../../.env.example)), apply the Kubernetes secret from it:
 
 ```bash
-kubectl create secret generic chess-db-secrets -n chess \
-  --from-literal=postgres-user='YOUR_PG_USER' \
-  --from-literal=postgres-password='YOUR_PG_PASSWORD' \
-  --from-literal=postgres-database='chess' \
-  --from-literal=mongo-user='YOUR_MONGO_USER' \
-  --from-literal=mongo-password='YOUR_MONGO_PASSWORD' \
-  --from-literal=mongo-database='chess' \
-  --dry-run=client -o yaml | kubectl apply -f -
+./deploy/k8s/apply-secrets-from-env.sh
 ```
 
-If the secret already exists, delete it first: `kubectl delete secret chess-db-secrets -n chess`.
+That reads `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DATABASE`, `MONGO_USER`, `MONGO_PASSWORD`, and `MONGO_DATABASE`, and creates/updates `chess-db-secrets` with the key names the YAML manifests expect.
+
+**Manual alternative** (no `.env`): see [deploy/k8s/base/secrets.example.md](base/secrets.example.md). If the secret already exists and you need a clean recreate: `kubectl delete secret chess-db-secrets -n chess`.
 
 ### 2b. Workloads and Ingress
 
@@ -117,7 +112,7 @@ Then (same order as local: namespace → secret → manifests):
 
 ```bash
 kubectl apply -f deploy/k8s/base/namespace.yaml
-# create chess-db-secrets as in section 2
+./deploy/k8s/apply-secrets-from-env.sh   # or create the secret manually (section 2)
 kubectl apply -f deploy/k8s/base/mongodb.yaml \
   -f deploy/k8s/base/postgres.yaml \
   -f deploy/k8s/base/game-service.yaml \
@@ -146,6 +141,7 @@ k3d cluster delete chess
 | File | Role |
 |------|------|
 | `namespace.yaml` | Namespace `chess` |
+| `apply-secrets-from-env.sh` | Create `chess-db-secrets` from repo `.env` |
 | `secrets.example.md` | Reminder for secret keys (no real secrets) |
 | `mongodb.yaml` | MongoDB Deployment + Service |
 | `postgres.yaml` | PostgreSQL Deployment + Service + PVC |
