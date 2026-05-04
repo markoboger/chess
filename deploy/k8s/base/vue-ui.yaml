@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vue-ui
+  namespace: chess
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vue-ui
+  template:
+    metadata:
+      labels:
+        app: vue-ui
+    spec:
+      containers:
+        - name: vue-ui
+          image: chess-vue-ui:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vue-ui
+  namespace: chess
+spec:
+  selector:
+    app: vue-ui
+  ports:
+    - port: 80
+      targetPort: 80
