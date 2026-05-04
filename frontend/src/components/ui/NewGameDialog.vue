@@ -12,6 +12,16 @@
           <!-- ── New Game tab ───────────────────────────────────────────── -->
           <div v-if="tab === 'new'" class="tab-body">
 
+            <div class="section">
+              <div class="section-label">Quick start</div>
+              <div class="quick-start-row">
+                <button type="button" class="quick-btn" @click="presetWatchBotMatch">Watch bot vs bot</button>
+                <button type="button" class="quick-btn" @click="presetPlayVsBot('white')">Play as White vs bot</button>
+                <button type="button" class="quick-btn" @click="presetPlayVsBot('black')">Play as Black vs bot</button>
+              </div>
+              <p v-if="serverDrivenWatch" class="quick-hint">Engines move on the game server; this tab follows the game over the network.</p>
+            </div>
+
             <!-- Player setup -->
             <div class="section">
               <div class="section-label">Players</div>
@@ -142,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { COMPUTER_STRATEGIES, CLOCK_PRESETS, type ComputerStrategyId, type ClockMode, type PlayerColor } from '../../stores/game'
 import { useGameStore } from '../../stores/game'
 import { gameApi, type GameSummary } from '../../api/game-api'
@@ -166,6 +176,30 @@ const playAs = ref<PlayerColor>('white')
 
 const creating = ref(false)
 const newError = ref<string | null>(null)
+
+/** When true, next start sends `backendAutoplay` so the server runs both engines (spectator watch). */
+const serverAutoplayForCreate = ref(false)
+
+const serverDrivenWatch = computed(
+  () => serverAutoplayForCreate.value && !whiteIsHuman.value && !blackIsHuman.value
+)
+
+function presetWatchBotMatch() {
+  whiteIsHuman.value = false
+  blackIsHuman.value = false
+  serverAutoplayForCreate.value = true
+}
+
+function presetPlayVsBot(as: 'white' | 'black') {
+  serverAutoplayForCreate.value = false
+  if (as === 'white') {
+    whiteIsHuman.value = true
+    blackIsHuman.value = false
+  } else {
+    whiteIsHuman.value = false
+    blackIsHuman.value = true
+  }
+}
 
 // Join game
 const joinSessionId = ref('')
@@ -201,7 +235,7 @@ function sessionMode(s: GameSummary): string {
   const w = s.settings?.whiteIsHuman ?? true
   const b = s.settings?.blackIsHuman ?? true
   if (w && b) return 'HvH'
-  if (!w && !b) return 'CvC'
+  if (!w && !b) return s.settings?.backendAutoplay ? 'CvC (watch)' : 'CvC'
   return w ? 'H(W) v C' : 'C v H(B)'
 }
 
@@ -216,6 +250,7 @@ watch(() => props.visible, (v) => {
     selectedClock.value = gameStore.clockMode
     startFen.value = ''
     playAs.value = 'white'
+    serverAutoplayForCreate.value = false
     newError.value = null
     joinSessionId.value = ''
     joinError.value = null
@@ -247,6 +282,9 @@ async function startGame() {
     blackStrategy: blackStrategy.value,
     clockInitialMs: clock.kind === 'timed' ? clock.initialMs : undefined,
     clockIncrementMs: clock.kind === 'timed' ? clock.incrementMs : undefined,
+    ...(serverAutoplayForCreate.value && !whiteIsHuman.value && !blackIsHuman.value
+      ? { backendAutoplay: true as const }
+      : {}),
   }
 
   // Determine playAs: for HvH use dialog choice; for HvC derive from human side
@@ -345,6 +383,38 @@ async function doJoin() {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.quick-start-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quick-btn {
+  flex: 1 1 auto;
+  min-width: 130px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-panel-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.quick-btn:hover {
+  background: var(--color-hover-bg);
+  border-color: var(--color-accent);
+}
+
+.quick-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-panel-muted2);
 }
 
 /* ── Sections ───────────────────────────────────────────────────────── */

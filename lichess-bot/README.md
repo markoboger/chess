@@ -60,7 +60,7 @@ sbt "LichessBot/test"
 sbt "testOnly chess.lichess.LichessIntegrationSpec"
 ```
 
-They assert: authenticated **`GET /api/account`** returns an id, and **`GET /api/stream/event`** yields at least one NDJSON line with a `type` field (90s timeout).
+They assert: authenticated **`GET /api/account`** returns an `id` (JSON entity decode), and **`GET /api/account/playing`** returns JSON with a `nowPlaying` array (fast; unlike `/api/stream/event`, which may stay silent for minutes when nothing happens).
 
 ## Packaging
 

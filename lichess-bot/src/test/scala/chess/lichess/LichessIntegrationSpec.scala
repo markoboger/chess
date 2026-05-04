@@ -3,7 +3,6 @@ package chess.lichess
 import cats.effect.IO
 import cats.effect.syntax.temporal.*
 import cats.effect.unsafe.implicits.global
-import io.circe.Json
 import org.scalatest.Assertions.assume
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -28,16 +27,10 @@ final class LichessIntegrationSpec extends AnyFlatSpec with Matchers:
     id.trim shouldBe id
   }
 
-  it should "open the bot event stream and receive at least one NDJSON object within 90 seconds" in {
+  it should "return JSON from GET /api/account/playing (auth + quick JSON endpoint)" in {
     assume(tokenPresent, "Set LICHESS_TOKEN to run Lichess integration tests")
-    val first: Json = withClient { api =>
-      api.botEventStream
-        .take(1)
-        .compile
-        .lastOrError
-        .timeout(90.seconds)
-    }
-    first.hcursor.get[String]("type").toOption should not be empty
+    val n = withClient(_.fetchNowPlayingCount.timeout(30.seconds))
+    n should be >= 0
   }
 
 end LichessIntegrationSpec

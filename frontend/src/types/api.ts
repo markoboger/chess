@@ -5,6 +5,8 @@ export interface GameSettings {
   blackStrategy: string
   clockInitialMs?: number
   clockIncrementMs?: number
+  /** When true, the game service advances AI turns; the browser only observes via WebSocket. */
+  backendAutoplay?: boolean
 }
 
 export interface CreateGameRequest {

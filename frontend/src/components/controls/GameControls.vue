@@ -52,7 +52,7 @@
       >
         <Play :size="15" /> Run
       </button>
-      <button v-if="gameMode === 'cvc'" class="btn-pause" @click="gameStore.togglePause()">
+      <button v-if="gameMode === 'cvc' && !serverDrivenCvC" class="btn-pause" @click="gameStore.togglePause()">
         <template v-if="paused"><Play :size="15" /> Continue</template>
         <template v-else><Pause :size="15" /> Pause</template>
       </button>
@@ -82,7 +82,11 @@ import {
 const emit = defineEmits<{ 'new-game': [] }>()
 
 const gameStore = useGameStore()
-const { gameMode, paused } = storeToRefs(gameStore)
+const { gameMode, paused, backendAutoplay } = storeToRefs(gameStore)
+
+const serverDrivenCvC = computed(
+  () => gameMode.value === 'cvc' && backendAutoplay.value
+)
 const analysisStore = useAnalysisStore()
 const pgnScrollRef = ref<HTMLElement | null>(null)
 

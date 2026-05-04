@@ -18,6 +18,8 @@ import scala.concurrent.duration.*
 /** HTTP + NDJSON helpers for the Lichess Bot API. */
 final class LichessClient(cfg: LichessBotConfig, client: Client[IO]):
 
+  private val max429Retries = 5
+
   private val apiRoot: Uri =
     val s = cfg.baseUri.trim
     Uri.unsafeFromString(if s.endsWith("/") then s.dropRight(1) else s)
@@ -31,33 +33,60 @@ final class LichessClient(cfg: LichessBotConfig, client: Client[IO]):
   private def authed(req: Request[IO]): Request[IO] =
     req.putHeaders(bearerHeaders)
 
-  /** Run request, read body as string (best-effort), retry on HTTP 429 with backoff. */
-  private def runAuthedWithRetry(req: Request[IO], max429Retries: Int = 5): IO[(Status, String)] =
-    def attempt(n: Int): IO[(Status, String)] =
+  /** Run authed request; on HTTP 429, sleep 60s and retry up to [[max429Retries]] times. */
+  private def runAuthedWith429Retry[A](req: Request[IO])(use: Response[IO] => IO[A]): IO[A] =
+    def attempt(n: Int): IO[A] =
       client.run(authed(req)).use { resp =>
-        resp.as[String].attempt.flatMap { bodyEither =>
-          val body = bodyEither.getOrElse("")
-          if resp.status.code == 429 && n < max429Retries then
-            IO.println(s"[lichess] HTTP 429, sleeping 60s (retry ${n + 1}/$max429Retries)") >>
-              IO.sleep(60.seconds) >>
-              attempt(n + 1)
-          else IO.pure((resp.status, body))
-        }
+        if resp.status.code == 429 && n < max429Retries then
+          IO.println(s"[lichess] HTTP 429, sleeping 60s (retry ${n + 1}/$max429Retries)") >>
+            IO.sleep(60.seconds) >>
+            attempt(n + 1)
+        else use(resp)
       }
     attempt(0)
 
-  /** Bot account id (lowercase) from `GET /api/account`. */
+  /** Run request, read body as string (best-effort), retry on HTTP 429 with backoff. */
+  private def runAuthedWithRetry(req: Request[IO]): IO[(Status, String)] =
+    runAuthedWith429Retry(req) { resp =>
+      resp.as[String].attempt.map(body => (resp.status, body.getOrElse("")))
+    }
+
+  /** Bot account id (lowercase) from `GET /api/account`. Uses JSON entity decoding (string body can be empty with some clients). */
   def fetchAccountId: IO[String] =
     val uri = apiRoot / "api" / "account"
     val req = Request[IO](Method.GET, uri)
-    runAuthedWithRetry(req).flatMap { case (st, body) =>
-      if st.isSuccess then
-        IO.fromEither(
-          parseJson(body)
-            .flatMap(_.hcursor.get[String]("id"))
-            .leftMap(e => new RuntimeException(e.getMessage))
-        )
-      else IO.raiseError(new RuntimeException(s"GET /api/account failed: HTTP $st body=$body"))
+    runAuthedWith429Retry(req) { resp =>
+      if !resp.status.isSuccess then
+        resp.as[String].attempt.flatMap { body =>
+          IO.raiseError(
+            new RuntimeException(s"GET /api/account failed: HTTP ${resp.status} ${body.getOrElse("")}")
+          )
+        }
+      else
+        resp.as[Json].flatMap { json =>
+          IO.fromEither(
+            json.hcursor
+              .get[String]("id")
+              .leftMap(e => new RuntimeException(s"account JSON: ${e.getMessage}"))
+          )
+        }
+    }
+
+  /** Number of games in progress (`GET /api/account/playing`). Always returns quickly; good connectivity check. */
+  def fetchNowPlayingCount: IO[Int] =
+    val uri = apiRoot / "api" / "account" / "playing"
+    val req = Request[IO](Method.GET, uri)
+    runAuthedWith429Retry(req) { resp =>
+      if !resp.status.isSuccess then
+        resp.as[String].attempt.flatMap { body =>
+          IO.raiseError(
+            new RuntimeException(s"GET /api/account/playing failed: HTTP ${resp.status} ${body.getOrElse("")}")
+          )
+        }
+      else
+        resp.as[Json].map { json =>
+          json.hcursor.downField("nowPlaying").focus.flatMap(_.asArray).map(_.length).getOrElse(0)
+        }
     }
 
   def acceptChallenge(challengeId: String): IO[Unit] =

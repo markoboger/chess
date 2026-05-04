@@ -200,6 +200,9 @@ export const useGameStore = defineStore('game', () => {
   const whiteComputerStrategy = ref<ComputerStrategyId>('deepening-opening-endgame')
   const blackComputerStrategy = ref<ComputerStrategyId>('deepening-opening-endgame')
 
+  /** When true, AI plies are applied on the server (see [[GameSettings.backendAutoplay]]). */
+  const backendAutoplay = ref(false)
+
   // ── Puzzle mode ──────────────────────────────────────────────────────
   const puzzleMode = ref(false)
   const puzzlePendingMove = ref<{ from: string; to: string; promotion?: string } | null>(null)
@@ -402,6 +405,7 @@ export const useGameStore = defineStore('game', () => {
 
   // ── Computer player ───────────────────────────────────────────────────
   function isComputerTurn(): boolean {
+    if (backendAutoplay.value) return false
     if (gameMode.value === 'hvh') return false
     if (gameMode.value === 'cvc') return true
     // hvc: one side is computer — use whiteIsHuman/blackIsHuman to know which
@@ -424,11 +428,18 @@ export const useGameStore = defineStore('game', () => {
   function applySettingsToStore(settings?: GameSettings) {
     whiteIsHuman.value = settings?.whiteIsHuman ?? true
     blackIsHuman.value = settings?.blackIsHuman ?? true
+    backendAutoplay.value = settings?.backendAutoplay ?? false
     gameMode.value = deriveGameMode(whiteIsHuman.value, blackIsHuman.value)
     if (!settings) return
     whiteComputerStrategy.value = defaultStrategy(settings.whiteStrategy)
     blackComputerStrategy.value = defaultStrategy(settings.blackStrategy)
     clockMode.value = clockModeFromSettings(settings)
+  }
+
+  /** HvH always; or any session where the server runs AI moves so the UI should subscribe to WS. */
+  function usesRealtimeUpdates(): boolean {
+    if (whiteIsHuman.value && blackIsHuman.value) return true
+    return backendAutoplay.value && (!whiteIsHuman.value || !blackIsHuman.value)
   }
 
   function syncFromGameState(
@@ -470,7 +481,7 @@ export const useGameStore = defineStore('game', () => {
 
   function scheduleReconnect(id: string, generation: number) {
     if (intentionalWsClose || generation !== gameGeneration || gameId.value !== id) return
-    if (!(whiteIsHuman.value && blackIsHuman.value)) return
+    if (!usesRealtimeUpdates()) return
     clearReconnectTimer()
     const delay = Math.min(1000 * (2 ** reconnectAttempts), 10000)
     reconnectAttempts += 1
@@ -669,6 +680,7 @@ export const useGameStore = defineStore('game', () => {
     computerScheduled.value = false
     moveInFlight.value = false
     disconnectWebSocket()
+    backendAutoplay.value = false
     try {
       const createPayload =
         startFen || settings
@@ -717,8 +729,7 @@ export const useGameStore = defineStore('game', () => {
       resetClock()
       syncStatusFromChess()
       if (!options?.skipComputerKickoff) triggerComputerMoveIfNeeded()
-      // Connect WebSocket for HvH sessions to receive opponent moves
-      if (response.gameId && whiteIsHuman.value && blackIsHuman.value) {
+      if (response.gameId && usesRealtimeUpdates()) {
         connectWebSocket(response.gameId)
       }
     } catch {
@@ -735,6 +746,7 @@ export const useGameStore = defineStore('game', () => {
     gameGeneration++
     computerScheduled.value = false
     disconnectWebSocket()
+    backendAutoplay.value = false
     try {
       const response = await gameApi.getGameState(sessionId)
       gameId.value = response.gameId
@@ -1241,6 +1253,7 @@ export const useGameStore = defineStore('game', () => {
     computerScheduled,
     whiteComputerStrategy,
     blackComputerStrategy,
+    backendAutoplay,
     currentComputerStrategy,
     setComputerStrategy,
     setGameMode,
