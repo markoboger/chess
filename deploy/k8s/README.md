@@ -12,13 +12,22 @@ These manifests mirror `docker-compose.yml`: MongoDB, PostgreSQL, game-service, 
 
 ## 1. Local cluster with k3d
 
-Create a cluster and map host port **9080** to the built-in Traefik ingress controller (port 80 inside the cluster):
+From the **repo root**, enable the bundled k3d config (port **9080** → ingress **80**, `--wait`), then create the cluster **with no extra flags**:
+
+**If you use [direnv](https://direnv.net/):** run `direnv allow` once, then:
 
 ```bash
-k3d cluster create chess \
-  --port "9080:80@loadbalancer:0" \
-  --wait
+k3d cluster create chess
 ```
+
+**Otherwise** set `K3D_CONFIG` once per shell (or put it in `~/.zshrc` with an absolute path):
+
+```bash
+export K3D_CONFIG="$PWD/deploy/k3d/chess-cluster.yaml"
+k3d cluster create chess
+```
+
+Details: `deploy/k3d/README.md`. Equivalent helper: `./deploy/k3d/cluster-create.sh`.
 
 ## 2. Namespace, secrets, and manifests
 

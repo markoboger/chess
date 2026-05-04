@@ -1,0 +1,14 @@
+# k3d Simple config: used when K3D_CONFIG points here (see deploy/k3d/README.md).
+# Then:  k3d cluster create chess
+# (no extra CLI flags needed for port mapping or --wait)
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: chess
+ports:
+  - port: 9080:80
+    nodeFilters:
+      - loadbalancer
+options:
+  k3d:
+    wait: true
