@@ -48,6 +48,20 @@ REST calls retry on **HTTP 429** (sleep 60s, up to 5 times). NDJSON streams reco
 - **Standard** chess positions from the usual start; move list is replayed with internal rules.
 - Variants (Crazyhouse, etc.) are **not** supported until explicitly mapped.
 
+## Testing
+
+- **Unit tests** (`UciSpec`) always run: `sbt "LichessBot/test"`.
+- **Integration tests** (`LichessIntegrationSpec`) need a real token; without `LICHESS_TOKEN` they are **canceled** (suite still green for CI):
+
+```bash
+export LICHESS_TOKEN='lip_xxxxxxxx'
+sbt "LichessBot/test"
+# or only integration:
+sbt "testOnly chess.lichess.LichessIntegrationSpec"
+```
+
+They assert: authenticated **`GET /api/account`** returns an id, and **`GET /api/stream/event`** yields at least one NDJSON line with a `type` field (90s timeout).
+
 ## Packaging
 
 `sbt LichessBot/stage` produces `lichess-bot/target/universal/stage/` with the same layout as other packaged apps.
