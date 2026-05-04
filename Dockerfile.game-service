@@ -7,14 +7,19 @@ WORKDIR /app
 COPY build.sbt .
 COPY project project/
 
-# Download dependencies
-RUN SBT_OPTS="-Dsbt.watch.mode=polling" sbt update
+# Download dependencies (`-Dsbt.coursier=false`: Coursier expands OpenJFX POMs to `linux-aarch64` on ARM64 Linux; those jars are not on Maven Central for 21.0.x)
+RUN SBT_OPTS="-Dsbt.watch.mode=polling -Dsbt.coursier=false" sbt update
 
-# Copy source code
+# Multi-module sbt layout (root `Chess` aggregates these)
+COPY core core/
+COPY app app/
+COPY realtime realtime/
+COPY data data/
+COPY match-runner match-runner/
 COPY src src/
 
 # Build the application
-RUN SBT_OPTS="-Dsbt.watch.mode=polling" sbt compile stage
+RUN SBT_OPTS="-Dsbt.watch.mode=polling -Dsbt.coursier=false" sbt compile stage
 
 # Runtime image
 FROM eclipse-temurin:21-jre-jammy

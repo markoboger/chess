@@ -11,13 +11,13 @@ COPY project project/
 COPY core core/
 
 # Download dependencies
-RUN SBT_OPTS="-Dsbt.watch.mode=polling" sbt update
+RUN SBT_OPTS="-Dsbt.watch.mode=polling -Dsbt.coursier=false" sbt update
 
 # Copy source code
 COPY match-runner match-runner/
 
 # Build the application
-RUN SBT_OPTS="-Dsbt.watch.mode=polling" sbt "MatchRunner/compile" "MatchRunner/stage"
+RUN SBT_OPTS="-Dsbt.watch.mode=polling -Dsbt.coursier=false" sbt "MatchRunner/compile" "MatchRunner/stage"
 
 # Runtime image
 FROM eclipse-temurin:21-jre-jammy

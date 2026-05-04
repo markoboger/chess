@@ -8,13 +8,17 @@ COPY build.sbt .
 COPY project project/
 
 # Download dependencies
-RUN SBT_OPTS="-Dsbt.watch.mode=polling" sbt update
+RUN SBT_OPTS="-Dsbt.watch.mode=polling -Dsbt.coursier=false" sbt update
 
-# Copy source code
+COPY core core/
+COPY app app/
+COPY realtime realtime/
+COPY data data/
+COPY match-runner match-runner/
 COPY src src/
 
 # Build the application
-RUN SBT_OPTS="-Dsbt.watch.mode=polling" sbt compile stage
+RUN SBT_OPTS="-Dsbt.watch.mode=polling -Dsbt.coursier=false" sbt compile stage
 
 # Runtime image
 FROM eclipse-temurin:21-jre-jammy
