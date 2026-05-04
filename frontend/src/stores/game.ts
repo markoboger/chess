@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { Chess } from 'chess.js'
 import type { Move, PieceSymbol, Square } from 'chess.js'
 import type { GameStatus, Turn } from '../types/game'
@@ -78,6 +78,9 @@ const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 /** Gap before each scheduled computer move (`makeComputerMove` uses setTimeout). Slightly longer in CvC so double‑AI play stays readable. */
 const COMPUTER_MOVE_DELAY_CVC_MS = 200
 const COMPUTER_MOVE_DELAY_HVC_MS = 120
+
+/** When watching server-driven CvC, space out WebSocket `move_applied` handling so each ply paints (otherwise many events in one tick look like a jump). */
+const WATCH_SERVER_WS_STEP_MS = 320
 
 function deriveGameMode(whiteIsHuman: boolean, blackIsHuman: boolean): GameMode {
   if (whiteIsHuman && blackIsHuman) return 'hvh'
@@ -184,6 +187,10 @@ export const useGameStore = defineStore('game', () => {
   let reconnectAttempts = 0
   let intentionalWsClose = false
 
+  /** Buffered `move_applied` messages for server-driven CvC watch (see [[scheduleWatchWsConsumer]]). */
+  let watchWsMoveBuffer: MoveAppliedMessage[] = []
+  let watchWsConsumerRunning = false
+
   // Generation counter — incremented on every new game; lets stale setTimeout callbacks self-cancel
   let gameGeneration = 0
 
@@ -246,6 +253,36 @@ export const useGameStore = defineStore('game', () => {
     }
     if (paused.value) return 'Paused'
     return turnColor.value === 'white' ? 'White to move' : 'Black to move'
+  })
+
+  function strategyDisplayName(id: ComputerStrategyId): string {
+    return COMPUTER_STRATEGIES.find((s) => s.id === id)?.label ?? id
+  }
+
+  /** One-line caption for the white pieces (You vs Bot vs Human). */
+  const whiteSideLabel = computed(() => {
+    if (puzzleMode.value) return '♔ White'
+    if (whiteIsHuman.value) {
+      if (gameMode.value === 'hvh') return '♔ White · Human'
+      if (myColor.value === 'white') return '♔ White · You'
+      if (myColor.value === 'spectator') return '♔ White · Human'
+      return '♔ White · Human'
+    }
+    const bot = strategyDisplayName(whiteComputerStrategy.value)
+    return `♔ White · Bot (${bot})`
+  })
+
+  /** One-line caption for the black pieces (You vs Bot vs Human). */
+  const blackSideLabel = computed(() => {
+    if (puzzleMode.value) return '♚ Black'
+    if (blackIsHuman.value) {
+      if (gameMode.value === 'hvh') return '♚ Black · Human'
+      if (myColor.value === 'black') return '♚ Black · You'
+      if (myColor.value === 'spectator') return '♚ Black · Human'
+      return '♚ Black · Human'
+    }
+    const bot = strategyDisplayName(blackComputerStrategy.value)
+    return `♚ Black · Bot (${bot})`
   })
 
   // ── Captured pieces & material balance ───────────────────────────────
@@ -500,13 +537,7 @@ export const useGameStore = defineStore('game', () => {
     ws.onopen = () => {
       reconnectAttempts = 0
     }
-    ws.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data as string) as MoveAppliedMessage
-        if (msg.eventType === 'heartbeat' || msg.eventType !== 'move_applied') return
-        applyRemoteMove(msg)
-      } catch { /* ignore malformed messages */ }
-    }
+    ws.onmessage = handleWsMoveEvent
     ws.onerror = () => { /* silent — server may not be running */ }
     ws.onclose = () => {
       if (!intentionalWsClose && generation === gameGeneration && gameId.value === id) {
@@ -519,6 +550,7 @@ export const useGameStore = defineStore('game', () => {
   function disconnectWebSocket() {
     intentionalWsClose = true
     clearReconnectTimer()
+    clearWatchWsMoveBuffer()
     if (wsConnection) { wsConnection.close(); wsConnection = null }
   }
 
@@ -561,6 +593,58 @@ export const useGameStore = defineStore('game', () => {
     syncStatusFromChess()
     switchClock()
     triggerComputerMoveIfNeeded()
+  }
+
+  function isServerDrivenCvCWatch(): boolean {
+    return backendAutoplay.value && gameMode.value === 'cvc'
+  }
+
+  function clearWatchWsMoveBuffer(): void {
+    watchWsMoveBuffer.length = 0
+  }
+
+  /** Drain buffered server moves one ply at a time so the board can repaint between plies. */
+  function scheduleWatchWsConsumer(): void {
+    if (watchWsConsumerRunning) return
+    watchWsConsumerRunning = true
+    const gen = gameGeneration
+    void (async () => {
+      try {
+        while (gen === gameGeneration && !intentionalWsClose && isServerDrivenCvCWatch()) {
+          if (watchWsMoveBuffer.length === 0) break
+          const msg = watchWsMoveBuffer.shift()!
+          applyRemoteMove(msg)
+          await nextTick()
+          if (watchWsMoveBuffer.length === 0) break
+          await new Promise<void>((r) => setTimeout(r, WATCH_SERVER_WS_STEP_MS))
+        }
+      } finally {
+        watchWsConsumerRunning = false
+        if (
+          watchWsMoveBuffer.length > 0 &&
+          gen === gameGeneration &&
+          !intentionalWsClose &&
+          isServerDrivenCvCWatch()
+        ) {
+          scheduleWatchWsConsumer()
+        }
+      }
+    })()
+  }
+
+  function handleWsMoveEvent(ev: MessageEvent): void {
+    try {
+      const msg = JSON.parse(ev.data as string) as MoveAppliedMessage
+      if (msg.eventType === 'heartbeat' || msg.eventType !== 'move_applied') return
+      if (isServerDrivenCvCWatch()) {
+        watchWsMoveBuffer.push(msg)
+        scheduleWatchWsConsumer()
+      } else {
+        applyRemoteMove(msg)
+      }
+    } catch {
+      /* ignore malformed messages */
+    }
   }
 
   function setComputerStrategy(side: ComputerSide, strategy: ComputerStrategyId) {
@@ -1284,6 +1368,8 @@ export const useGameStore = defineStore('game', () => {
     isDraw,
     isGameOver,
     statusText,
+    whiteSideLabel,
+    blackSideLabel,
     capturedPieces,
     kingSquare,
     pieceSymbols,

@@ -1,5 +1,11 @@
 <template>
   <div class="board-info-panel">
+    <!-- Who is You vs Bot / engines (hidden in puzzle mode) -->
+    <div v-if="!gameStore.puzzleMode" class="player-roles">
+      <div class="player-role-line player-role-white">{{ gameStore.whiteSideLabel }}</div>
+      <div class="player-role-line player-role-black">{{ gameStore.blackSideLabel }}</div>
+    </div>
+
     <!-- Clock + Captured pieces -->
     <div class="clock-captures-panel">
       <div class="captures-side">
@@ -129,6 +135,27 @@ function copySession() {
 <style scoped>
 .board-info-panel {
   border-top: 1px solid var(--color-border);
+}
+
+.player-roles {
+  padding: 8px 12px 10px;
+  background: var(--color-muted-bg);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.player-role-line {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+.player-role-white {
+  color: var(--color-text);
+}
+.player-role-black {
+  color: var(--color-text-secondary);
 }
 
 /* Clock + Captures panel */
