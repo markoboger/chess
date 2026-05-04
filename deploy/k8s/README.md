@@ -2,6 +2,12 @@
 
 These manifests mirror `docker-compose.yml`: MongoDB, PostgreSQL, game-service, api-gateway, Vue UI (nginx), and match-runner.
 
+**Fastest local path (one script):** from repo root, with k3d cluster `chess` already created and `K3D_CONFIG` set (see `deploy/k3d/README.md`):
+
+```bash
+./deploy/k3d/up.sh
+```
+
 **Target server (your uni):** `141.37.74.153` — use the same YAML on k3s; only networking (Ingress / ports) and image registry differ from k3d.
 
 ## Prerequisites

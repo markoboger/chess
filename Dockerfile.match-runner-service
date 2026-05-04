@@ -7,6 +7,9 @@ WORKDIR /app
 COPY build.sbt .
 COPY project project/
 
+# MatchRunner depends on Core (subproject)
+COPY core core/
+
 # Download dependencies
 RUN SBT_OPTS="-Dsbt.watch.mode=polling" sbt update
 
