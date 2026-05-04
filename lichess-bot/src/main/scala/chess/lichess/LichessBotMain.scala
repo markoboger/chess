@@ -41,9 +41,33 @@ object LichessBotMain extends IOApp.Simple:
             _ <- IO.println(
               s"[lichess] Connected as account id=$myId (autoAccept=${cfg.autoAcceptChallenges}, onlyBots=${cfg.onlyBotChallengers})"
             )
+            _ <- IO.whenA(cfg.challengeUsernames.nonEmpty)(
+              IO.println(
+                s"[lichess] Outgoing challenges: ${cfg.challengeUsernames.mkString(", ")} (${cfg.challengeClockLimitSec}+${cfg.challengeClockIncrementSec}, rated=${cfg.challengeRated})"
+              ) >> sendOutgoingChallenges(cfg, api)
+            )
+            _ <- (cfg.challengeEveryMinutes, cfg.challengeUsernames.nonEmpty) match
+              case (Some(mins), true) =>
+                def rechallengeTick: IO[Unit] =
+                  IO.sleep(mins.minutes) >> sendOutgoingChallenges(cfg, api) >> rechallengeTick
+                IO.println(s"[lichess] Re-challenge every $mins min (first repeat after initial sleep)") >>
+                  rechallengeTick.start.void
+              case _ =>
+                IO.unit
             _ <- eventLoop(cfg, api, myId)
           yield ()
         }
+
+  /** `POST /api/challenge/{username}` for each configured opponent (with small delay between calls). */
+  private def sendOutgoingChallenges(cfg: LichessBotConfig, api: LichessClient): IO[Unit] =
+    cfg.challengeUsernames.traverse_ { u =>
+      IO.println(s"[lichess] Challenging @$u …") >>
+        api.createUserChallenge(u).flatMap {
+          case Left(err)  => IO.println(s"[lichess] @$u: $err")
+          case Right(_) => IO.println(s"[lichess] @$u: challenge issued (wait for accept / gameStart)")
+        } >>
+        IO.sleep(2.seconds)
+    }
 
   /** Reconnecting event stream loop (Lichess may close idle streams). */
   private def eventLoop(cfg: LichessBotConfig, api: LichessClient, myId: String): IO[Unit] =
@@ -52,7 +76,11 @@ object LichessBotMain extends IOApp.Simple:
         .evalMap(handleBotEvent(cfg, api, myId, _))
         .compile
         .drain
-        .handleErrorWith(e => IO.println(s"[lichess] event stream error: $e") >> IO.sleep(5.seconds)) >> step
+        .handleErrorWith { e =>
+          val wait =
+            if Option(e.getMessage).exists(_.contains("429")) then 60.seconds else 5.seconds
+          IO.println(s"[lichess] event stream error: $e") >> IO.sleep(wait)
+        } >> step
     step
 
   private def handleBotEvent(cfg: LichessBotConfig, api: LichessClient, myId: String, json: Json): IO[Unit] =
@@ -100,12 +128,22 @@ object LichessBotMain extends IOApp.Simple:
     val strategy = BotStrategy(cfg.strategyId, cfg.maxThinkMs)
     val computer = new ComputerPlayer(strategy)
     Ref.of[IO, Option[Color]](colorHint).flatMap { colorRef =>
-      api
-        .botGameStream(gameId)
-        .evalMap(json => handleGameJson(cfg, api, myUserId, gameId, colorRef, computer, json))
-        .compile
-        .drain
-        .handleErrorWith(e => IO.println(s"[lichess] game $gameId: $e"))
+      def playRound: IO[Unit] =
+        api
+          .botGameStream(gameId)
+          .evalMap(json => handleGameJson(cfg, api, myUserId, gameId, colorRef, computer, json))
+          .compile
+          .drain
+          .attempt
+          .flatMap {
+            case Right(_) =>
+              IO.println(s"[lichess] game $gameId: stream ended (game finished or server closed connection)")
+            case Left(e) =>
+              val wait =
+                if Option(e.getMessage).exists(_.contains("429")) then 60.seconds else 5.seconds
+              IO.println(s"[lichess] game $gameId: $e") >> IO.sleep(wait) >> playRound
+          }
+      playRound
     }
 
   private def handleGameJson(

@@ -19,8 +19,10 @@ export LICHESS_TOKEN='lip_xxxxxxxx'
 # export LICHESS_MIN_THINK_MS=100
 # export LICHESS_MAX_THINK_MS=5000
 
-sbt "LichessBot/runMain chess.lichess.LichessBotMain"
+/opt/homebrew/bin/sbt "LichessBot/runMain chess.lichess.LichessBotMain"
 ```
+
+If your shell’s `sbt` comes from Coursier and is broken, use Homebrew’s binary as above, or run `cs install --force sbt`.
 
 ## Environment variables
 
@@ -33,6 +35,13 @@ sbt "LichessBot/runMain chess.lichess.LichessBotMain"
 | `LICHESS_ONLY_BOT_CHALLENGERS` | no | If `1`, accept only bot challengers; humans are declined. |
 | `LICHESS_USER_AGENT` | no | Sent on every request (Lichess prefers a descriptive UA). |
 | `LICHESS_MIN_THINK_MS` / `LICHESS_MAX_THINK_MS` | no | Bounds for search time derived from Lichess clocks. |
+| `LICHESS_CHALLENGE_USERNAMES` | no | Comma-separated Lichess **usernames** to open a seek against (`POST /api/challenge/{username}`) once at startup. |
+| `LICHESS_CHALLENGE_RATED` | no | Set to `1` for rated outgoing challenges (default unrated). |
+| `LICHESS_CHALLENGE_CLOCK_SEC` | no | Initial clock seconds (default `300`). |
+| `LICHESS_CHALLENGE_INC_SEC` | no | Increment seconds (default `0`). |
+| `LICHESS_CHALLENGE_EVERY_MINUTES` | no | If set with `LICHESS_CHALLENGE_USERNAMES`, repeat those challenges on this interval (first repeat after one full interval). |
+
+REST calls retry on **HTTP 429** (sleep 60s, up to 5 times). NDJSON streams reconnect via the outer event/game loops after errors.
 
 ## Scope
 
