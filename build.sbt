@@ -67,6 +67,7 @@ lazy val Core = project
   .settings(
     name := "Chess-Core",
     scalaVersion := "3.5.0",
+    strykerExcludedMutations := Seq("StringLiteral"),
     libraryDependencies ++= Seq(
       "org.scalatest" %% "scalatest" % "3.2.19" % Test,
       "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0",

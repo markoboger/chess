@@ -1,7 +1,7 @@
 package chess.controller.io.pgn
 
 import chess.controller.io.fen.RegexFenParser
-import chess.model.{Board, Piece, Role, Color, Square, File, Rank}
+import chess.model.{Board, Piece, Role, Color, Square, File, Rank, PromotableRole}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import scala.util.{Success, Failure, Try}
@@ -139,6 +139,28 @@ final class PGNParserSpec extends AnyWordSpec with Matchers:
       // Both Nb1 and Nf3 can reach d2; Nbd2 must resolve to b1
       val result = PGNParser.parseMove("Nbd2", board, isWhiteToMove = true)
       result shouldBe Success((Square("b1"), Square("d2")))
+    }
+
+    "render promotion notation in algebraic moves" in {
+      val boardBefore =
+        RegexFenParser.parseFEN("k7/4P3/8/8/8/8/8/4K3").get
+      val from = Square("e7")
+      val to   = Square("e8")
+      val boardAfter = boardBefore.move(from, to, Some(PromotableRole.Queen)).get
+
+      // The promoted queen also gives check to the king on a8.
+      PGNParser.toAlgebraic(from, to, boardBefore, boardAfter, isWhite = true) shouldBe "e8=Q+"
+    }
+
+    "use isWhite to compute check suffix for black moves" in {
+      // Black rook drops to e2 giving check on e-file.
+      val boardBefore =
+        RegexFenParser.parseFEN("k3r3/8/8/8/8/8/8/4K3").get
+      val from = Square("e8")
+      val to   = Square("e2")
+      val boardAfter = boardBefore.move(from, to).get
+
+      PGNParser.toAlgebraic(from, to, boardBefore, boardAfter, isWhite = false) shouldBe "Re2+"
     }
   }
 
