@@ -1,0 +1,18 @@
+# k3d on the university host (141.37.123.133): k3s inside Docker, Traefik on host :9080.
+# Usage from repo root on the server:
+#   export K3D_CONFIG="$PWD/deploy/k3d/chess-cluster.server.yaml"
+#   k3d cluster create chess
+#   ./deploy/k3d/up.sh
+#
+# App URL: http://141.37.123.133:9080/
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: chess
+ports:
+  - port: 9080:80
+    nodeFilters:
+      - loadbalancer
+options:
+  k3d:
+    wait: true

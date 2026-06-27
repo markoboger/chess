@@ -1,38 +1,58 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Puzzle } from 'lucide-vue-next'
+import { Puzzle, Trophy } from 'lucide-vue-next'
 import NavBar from './components/layout/NavBar.vue'
 import ChessBoard from './components/board/ChessBoard.vue'
 import BoardInfoPanel from './components/controls/BoardInfoPanel.vue'
 import GameControls from './components/controls/GameControls.vue'
 import OpeningBadge from './components/game/OpeningBadge.vue'
 import PuzzlePanel from './components/game/PuzzlePanel.vue'
+import TournamentPanel from './components/tournament/TournamentPanel.vue'
 import NewGameDialog from './components/ui/NewGameDialog.vue'
 import BrowseExperimentsDialog from './components/ui/BrowseExperimentsDialog.vue'
 import { useGameStore } from './stores/game'
 import { usePuzzleStore } from './stores/puzzle'
 import { useOpeningStore } from './stores/opening'
+import { useTournamentBrowseStore } from './stores/tournamentBrowse'
 
 const gameStore = useGameStore()
 const puzzleStore = usePuzzleStore()
 const openingStore = useOpeningStore()
+const browseStore = useTournamentBrowseStore()
 
-const activeView = ref<'game' | 'puzzles'>('game')
+const activeView = ref<'game' | 'puzzles' | 'tournaments'>('game')
 const showNewGameDialog = ref(false)
 const showBrowseExperimentsDialog = ref(false)
 
 function togglePuzzles() {
-  activeView.value = activeView.value === 'puzzles' ? 'game' : 'puzzles'
-  if (activeView.value === 'game') {
+  if (activeView.value === 'puzzles') {
+    activeView.value = 'game'
     puzzleStore.reset()
     gameStore.puzzleMode = false
     gameStore.resetGame()
+  } else {
+    browseStore.deactivate()
+    activeView.value = 'puzzles'
+    gameStore.stopTournamentLiveWatch()
+  }
+}
+
+function toggleTournaments() {
+  if (activeView.value === 'tournaments') {
+    activeView.value = 'game'
+    browseStore.deactivate()
+  } else {
+    puzzleStore.reset()
+    gameStore.puzzleMode = false
+    activeView.value = 'tournaments'
+    browseStore.activate()
   }
 }
 
 function handleNewGame() {
   puzzleStore.reset()
   gameStore.puzzleMode = false
+  browseStore.deactivate()
   activeView.value = 'game'
   showNewGameDialog.value = true
 }
@@ -41,14 +61,16 @@ function handleGameStarted() {
   showNewGameDialog.value = false
 }
 
+function handleExperimentReplayed() {
+  browseStore.deactivate()
+  activateGameView()
+}
+
 function activateGameView() {
   activeView.value = 'game'
   puzzleStore.reset()
   gameStore.puzzleMode = false
-}
-
-function handleExperimentReplayed() {
-  activateGameView()
+  browseStore.deactivate()
 }
 
 /** Return to the main board after import, opening pick, etc. (does not reset the position). */
@@ -57,22 +79,32 @@ function showGameFromNav() {
 }
 
 onMounted(async () => {
-  // URL-based join: ?session=<id>
   const params = new URLSearchParams(globalThis.location?.search ?? '')
   const sessionParam = params.get('session')
+  const tournamentParam = params.get('tournament')
+  const gameParam = params.get('game')
+
   if (sessionParam) {
     await gameStore.joinGame(sessionParam.trim())
-    // Clean the URL without a page reload
     globalThis.history?.replaceState({}, '', globalThis.location?.pathname ?? '')
   } else {
     await gameStore.createGame()
   }
-  openingStore.init()   // pre-load opening map in background
+
+  if (tournamentParam && gameParam) {
+    activeView.value = 'tournaments'
+    await browseStore.openGameFromUrl(tournamentParam, gameParam)
+    globalThis.history?.replaceState({}, '', globalThis.location?.pathname ?? '')
+  }
+
+  openingStore.init()
   globalThis.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
   gameStore.stopPolling()
+  gameStore.stopTournamentLiveWatch()
+  browseStore.deactivate()
   globalThis.removeEventListener('keydown', handleKeydown)
 })
 
@@ -108,6 +140,7 @@ function handleKeydown(e: KeyboardEvent) {
       :active-view="activeView"
       @new-game="handleNewGame"
       @toggle-puzzles="togglePuzzles"
+      @toggle-tournaments="toggleTournaments"
       @browse-experiments="showBrowseExperimentsDialog = true"
       @show-game="showGameFromNav"
     />
@@ -125,7 +158,7 @@ function handleKeydown(e: KeyboardEvent) {
     />
 
     <main class="app-main">
-      <div class="game-row">
+      <div class="game-row" :class="{ 'tournaments-mode': activeView === 'tournaments' }">
         <!-- Left: board + info -->
         <div class="left-card">
           <div class="board-area">
@@ -138,7 +171,8 @@ function handleKeydown(e: KeyboardEvent) {
         <div class="sidebar-wrapper">
           <div class="sidebar-card">
             <Transition name="panel" mode="out-in">
-              <PuzzlePanel v-if="activeView === 'puzzles'" key="puzzles" @puzzle-loaded="() => {}" />
+              <TournamentPanel v-if="activeView === 'tournaments'" key="tournaments" />
+              <PuzzlePanel v-else-if="activeView === 'puzzles'" key="puzzles" @puzzle-loaded="() => {}" />
               <GameControls
                 v-else
                 :key="`game-${gameStore.gameId}`"
@@ -150,7 +184,11 @@ function handleKeydown(e: KeyboardEvent) {
       </div>
 
       <div class="opening-row">
-        <OpeningBadge v-if="!puzzleStore.active" />
+        <OpeningBadge v-if="activeView === 'game' && !puzzleStore.active" />
+        <span v-else-if="activeView === 'tournaments'" class="tournament-mode-badge">
+          <Trophy :size="14" :stroke-width="2" class="tournament-badge-ico" aria-hidden="true" />
+          Tournament mode · board shows selected game
+        </span>
         <span v-else-if="puzzleStore.puzzle" class="puzzle-mode-badge">
           <Puzzle :size="14" :stroke-width="2" class="puzzle-badge-ico" aria-hidden="true" />
           Puzzle mode · Find the best move
@@ -195,6 +233,11 @@ body {
 .game-row {
   display: grid;
   grid-template-columns: auto 320px;
+  align-items: stretch;
+}
+
+.game-row.tournaments-mode {
+  grid-template-columns: auto min(400px, 38vw);
 }
 
 .left-card {
@@ -234,9 +277,28 @@ body {
   color: var(--color-puzzle-mode-text);
 }
 
+.tournament-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(184, 134, 11, 0.15);
+  border: 1px solid rgba(184, 134, 11, 0.35);
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.tournament-badge-ico {
+  color: #b8860b;
+}
+
 /* ── Sidebar ──────────────────────────────────────────────────────── */
 .sidebar-wrapper {
   position: relative;
+  min-height: 0;
+  align-self: stretch;
 }
 
 .sidebar-card {

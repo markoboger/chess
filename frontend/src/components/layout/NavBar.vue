@@ -191,6 +191,16 @@
             </button>
           </div>
         </div>
+        <!-- Tournaments -->
+        <button
+          type="button"
+          class="nav-btn nav-btn-tournaments"
+          :class="{ 'nav-btn-active': activeView === 'tournaments' }"
+          @click="emit('toggle-tournaments')"
+        >
+          <Trophy :size="16" :stroke-width="2" class="nav-ico" aria-hidden="true" />
+          <span>Tournaments</span>
+        </button>
       </nav>
 
       <!-- Right side: theme toggle -->
@@ -321,6 +331,12 @@
         </div>
 
         <div class="drawer-section">
+          <button type="button" class="drawer-item tournaments-item" @click="emit('toggle-tournaments'); mobileOpen=false">
+            <Trophy :size="16" :stroke-width="2" class="dd-ico" /> Tournaments
+          </button>
+        </div>
+
+        <div class="drawer-section">
           <div class="drawer-label">Experiments</div>
           <button type="button" class="drawer-item" @click="openBrowseExperiments; mobileOpen=false">
             <ListTree :size="16" :stroke-width="2" class="dd-ico" /> Browse experiment games…
@@ -393,12 +409,14 @@ import {
   Sun,
   Moon,
   ListTree,
+  Trophy,
 } from 'lucide-vue-next'
 
-const props = defineProps<{ activeView?: 'game' | 'puzzles' }>()
+const props = defineProps<{ activeView?: 'game' | 'puzzles' | 'tournaments' }>()
 const emit = defineEmits<{
   'new-game': []
   'toggle-puzzles': []
+  'toggle-tournaments': []
   'browse-experiments': []
   'show-game': []
 }>()
@@ -685,6 +703,15 @@ function copyPgn() {
 
 .nav-btn-puzzles {
   margin-left: 4px;
+}
+
+.nav-btn-tournaments {
+  margin-left: 2px;
+}
+
+.nav-btn-active.nav-btn-tournaments {
+  background: rgba(184, 134, 11, 0.35) !important;
+  color: #fff8e7 !important;
 }
 
 .chevron {
@@ -996,6 +1023,11 @@ function copyPgn() {
 
 .puzzles-item {
   color: #a8d96b;
+  font-weight: 600;
+}
+
+.tournaments-item {
+  color: #e8c872;
   font-weight: 600;
 }
 

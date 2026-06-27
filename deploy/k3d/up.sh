@@ -14,8 +14,21 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CLUSTER="${K3D_CLUSTER_NAME:-chess}"
 cd "$ROOT"
 
-# linux/amd64 for CHESS_K3D_DOCKERFILE_BUILD=1 only (matches compose)
+# linux/amd64 for server / cross-build (matches compose JVM platform)
 PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
+
+# Vite build args for vue-ui (tournament + API URLs baked into static bundle)
+VITE_API_URL="${VITE_API_URL:-/api}"
+VITE_TOURNAMENT_API_URL="${VITE_TOURNAMENT_API_URL:-http://141.37.123.132:8086}"
+VITE_REALTIME_WS_URL="${VITE_REALTIME_WS_URL:-}"
+VITE_MATCH_RUNNER_URL="${VITE_MATCH_RUNNER_URL:-/match-runner}"
+
+vue_build_args=(
+  --build-arg "VITE_API_URL=$VITE_API_URL"
+  --build-arg "VITE_TOURNAMENT_API_URL=$VITE_TOURNAMENT_API_URL"
+  --build-arg "VITE_REALTIME_WS_URL=$VITE_REALTIME_WS_URL"
+  --build-arg "VITE_MATCH_RUNNER_URL=$VITE_MATCH_RUNNER_URL"
+)
 
 need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "Missing command: $1" >&2; exit 1; }; }
 need_cmd kubectl
@@ -44,10 +57,11 @@ if [[ "${CHESS_K3D_DOCKERFILE_BUILD:-}" == "1" ]]; then
   echo "==> Docker build from Dockerfiles ($PLATFORM)"
   docker build --platform "$PLATFORM" -t chess-game-service:local -f Dockerfile.game-service .
   docker build --platform "$PLATFORM" -t chess-api-gateway:local -f Dockerfile.gateway .
-  docker build --platform "$PLATFORM" -t chess-vue-ui:local -f Dockerfile.vue-ui .
+  docker build --platform "$PLATFORM" "${vue_build_args[@]}" -t chess-vue-ui:local -f Dockerfile.vue-ui .
   docker build --platform "$PLATFORM" -t chess-match-runner:local -f Dockerfile.match-runner-service .
 else
   echo "==> docker compose build (see docker-compose.yml platform for JVM services)"
+  export VITE_API_URL VITE_TOURNAMENT_API_URL VITE_REALTIME_WS_URL VITE_MATCH_RUNNER_URL
   docker compose build game-service api-gateway vue-ui match-runner-service
   docker tag chess-game-service:latest chess-game-service:local
   docker tag chess-api-gateway:latest chess-api-gateway:local
@@ -63,4 +77,5 @@ kubectl rollout restart deployment -n chess
 
 echo ""
 echo "Done. Watch: kubectl get pods -n chess -w"
-echo "Open:    http://127.0.0.1:9080/"
+HOST_IP="${CHESS_PUBLIC_HOST:-127.0.0.1}"
+echo "Open:    http://${HOST_IP}:9080/"

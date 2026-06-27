@@ -1,5 +1,25 @@
 <template>
   <div class="board-info-panel">
+    <!-- Tournament live spectate -->
+    <div v-if="gameStore.tournamentLiveActive || gameStore.tournamentWatchLabel" class="tournament-bar">
+      <span v-if="gameStore.tournamentLiveActive" class="live-dot" aria-hidden="true" />
+      <span class="tournament-bar-text">
+        {{ gameStore.tournamentLiveActive ? 'Live' : 'Tournament' }}
+        <template v-if="gameStore.tournamentWatchLabel"> · {{ gameStore.tournamentWatchLabel }}</template>
+        <template v-if="gameStore.tournamentWatchStatus && !gameStore.tournamentLiveActive">
+          · {{ gameStore.tournamentWatchStatus }}
+        </template>
+      </span>
+      <button
+        v-if="gameStore.tournamentLiveActive"
+        type="button"
+        class="tournament-stop"
+        @click="gameStore.stopTournamentLiveWatch()"
+      >
+        Stop live
+      </button>
+    </div>
+
     <!-- Who is You vs Bot / engines (hidden in puzzle mode) -->
     <div v-if="!gameStore.puzzleMode" class="player-roles">
       <div class="player-role-line player-role-white">{{ gameStore.whiteSideLabel }}</div>
@@ -135,6 +155,50 @@ function copySession() {
 <style scoped>
 .board-info-panel {
   border-top: 1px solid var(--color-border);
+}
+
+.tournament-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(45, 106, 79, 0.12);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 12px;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2d6a4f;
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.tournament-bar-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.tournament-stop {
+  border: none;
+  background: var(--color-control-hover);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 .player-roles {

@@ -61,3 +61,15 @@ Inside Docker, the OS is **Linux**. On **Apple Silicon**, the default architectu
 ```bash
 k3d cluster delete chess
 ```
+
+## University server (141.37.123.133)
+
+k3s runs **inside k3d** (not standalone k3s on the host). See **[SERVER.md](./SERVER.md)**:
+
+```bash
+sudo ./deploy/k3d/install-host-deps.sh   # once
+cp .env.example .env && $EDITOR .env
+./deploy/k3d/bootstrap-server.sh
+```
+
+App: **http://141.37.123.133:9080/**

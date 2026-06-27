@@ -7,6 +7,10 @@ import type { GameSettings } from '../types/api'
 import { useOpeningStore } from './opening'
 import { gameApi } from '../api/game-api'
 import { log } from '../utils/log'
+import { replayUciMoves } from '../utils/uci'
+import { streamNdjson } from '../api/tournament-stream'
+import { tournamentApi } from '../api/tournament-api'
+import { useTournamentStore } from './tournament'
 
 function formatClockTime(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000))
@@ -81,6 +85,15 @@ const COMPUTER_MOVE_DELAY_HVC_MS = 120
 
 /** When watching server-driven CvC, space out WebSocket `move_applied` handling so each ply paints (otherwise many events in one tick look like a jump). */
 const WATCH_SERVER_WS_STEP_MS = 320
+const TOURNAMENT_LIVE_STEP_MS = 320
+
+const TERMINAL_TOURNAMENT_STATUSES = new Set([
+  'checkmate',
+  'stalemate',
+  'draw',
+  'resigned',
+  'timeout',
+])
 
 function deriveGameMode(whiteIsHuman: boolean, blackIsHuman: boolean): GameMode {
   if (whiteIsHuman && blackIsHuman) return 'hvh'
@@ -173,6 +186,20 @@ export const useGameStore = defineStore('game', () => {
   const showLegalMoves = ref(true)
   const boardFlipped = ref(false)
 
+  /** When spectating a tournament game, show bot names instead of You/Bot strategy labels. */
+  const tournamentWhiteName = ref<string | null>(null)
+  const tournamentBlackName = ref<string | null>(null)
+  const tournamentLiveActive = ref(false)
+  const tournamentWatchLabel = ref<string | null>(null)
+  const tournamentWatchStatus = ref<string | null>(null)
+
+  let tournamentWatchAbort: AbortController | null = null
+  let tournamentPollTimer: ReturnType<typeof setInterval> | null = null
+  let tournamentKnownUci = ''
+  let tournamentLivePliesBuffer: string[] = []
+  let tournamentLiveConsumerRunning = false
+  let tournamentLiveGeneration = 0
+
   // ── Session / multiplayer ────────────────────────────────────────────
   // Which side the local player controls in the current session
   const myColor = ref<PlayerColor>('white')
@@ -261,6 +288,7 @@ export const useGameStore = defineStore('game', () => {
 
   /** One-line caption for the white pieces (You vs Bot vs Human). */
   const whiteSideLabel = computed(() => {
+    if (tournamentWhiteName.value) return `♔ White · ${tournamentWhiteName.value}`
     if (puzzleMode.value) return '♔ White'
     if (whiteIsHuman.value) {
       if (gameMode.value === 'hvh') return '♔ White · Human'
@@ -274,6 +302,7 @@ export const useGameStore = defineStore('game', () => {
 
   /** One-line caption for the black pieces (You vs Bot vs Human). */
   const blackSideLabel = computed(() => {
+    if (tournamentBlackName.value) return `♚ Black · ${tournamentBlackName.value}`
     if (puzzleMode.value) return '♚ Black'
     if (blackIsHuman.value) {
       if (gameMode.value === 'hvh') return '♚ Black · Human'
@@ -1187,6 +1216,293 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  /** Local replay of a tournament game from UCI moves (no game-service session). */
+  function replayTournamentUci(
+    movesUci: string,
+    options: { whiteName: string; blackName: string; startPosition?: string }
+  ): boolean {
+    stopTournamentLiveWatch()
+    error.value = null
+    const { states, sans, error: uciErr } = replayUciMoves(movesUci, options.startPosition)
+    if (uciErr || states.length === 0) {
+      error.value = uciErr ?? 'No moves to replay.'
+      return false
+    }
+
+    disconnectWebSocket()
+    puzzleMode.value = false
+    tournamentWhiteName.value = options.whiteName
+    tournamentBlackName.value = options.blackName
+    gameId.value = null
+    chess.value = new Chess(states[states.length - 1])
+    boardStates.value = states
+    pgnMoves.value = sans
+    currentIndex.value = states.length - 1
+    redoStates.value = []
+    redoMoves.value = []
+    gameOverByTimeout.value = false
+    resetClock()
+    selectedSquare.value = null
+    legalMoves.value = []
+    pendingPromotion.value = null
+    gameMode.value = 'cvc'
+    whiteIsHuman.value = false
+    blackIsHuman.value = false
+    myColor.value = 'spectator'
+    boardFlipped.value = false
+    paused.value = false
+    syncStatusFromChess()
+    updateLastMoveFromIndex()
+    return true
+  }
+
+  function clearTournamentSpectator() {
+    tournamentWhiteName.value = null
+    tournamentBlackName.value = null
+    tournamentWatchLabel.value = null
+    tournamentWatchStatus.value = null
+  }
+
+  function stopTournamentLiveWatch(): void {
+    tournamentLiveGeneration += 1
+    tournamentLiveActive.value = false
+    tournamentLivePliesBuffer.length = 0
+    tournamentKnownUci = ''
+    if (tournamentWatchAbort) {
+      tournamentWatchAbort.abort()
+      tournamentWatchAbort = null
+    }
+    if (tournamentPollTimer) {
+      clearInterval(tournamentPollTimer)
+      tournamentPollTimer = null
+    }
+  }
+
+  function splitUciMoves(movesUci: string): string[] {
+    return movesUci.trim().split(/\s+/).filter(Boolean)
+  }
+
+  function queueTournamentPlies(allUci: string): void {
+    const plies = splitUciMoves(allUci)
+    const known = splitUciMoves(tournamentKnownUci)
+    if (plies.length <= known.length) return
+    const fresh = plies.slice(known.length)
+    tournamentKnownUci = plies.join(' ')
+    tournamentLivePliesBuffer.push(...fresh)
+    scheduleTournamentLiveConsumer()
+  }
+
+  function applySingleUciPly(uci: string): boolean {
+    if (uci.length < 4) return false
+    const from = uci.slice(0, 2)
+    const to = uci.slice(2, 4)
+    const promotion = uci.length >= 5 ? uci[4] : undefined
+    try {
+      const m = chess.value.move({ from, to, promotion })
+      if (!m) return false
+      boardStates.value.push(chess.value.fen())
+      pgnMoves.value.push(m.san)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  function scheduleTournamentLiveConsumer(): void {
+    if (tournamentLiveConsumerRunning) return
+    tournamentLiveConsumerRunning = true
+    const gen = tournamentLiveGeneration
+    void (async () => {
+      try {
+        while (gen === tournamentLiveGeneration && tournamentLiveActive.value) {
+          if (tournamentLivePliesBuffer.length === 0) break
+          const uci = tournamentLivePliesBuffer.shift()!
+          const follow = currentIndex.value === boardStates.value.length - 1
+          if (!applySingleUciPly(uci)) break
+          if (follow) currentIndex.value = boardStates.value.length - 1
+          syncStatusFromChess()
+          updateLastMoveFromIndex()
+          await nextTick()
+          if (tournamentLivePliesBuffer.length === 0) break
+          await new Promise<void>((r) => setTimeout(r, TOURNAMENT_LIVE_STEP_MS))
+        }
+      } finally {
+        tournamentLiveConsumerRunning = false
+        if (
+          tournamentLivePliesBuffer.length > 0 &&
+          gen === tournamentLiveGeneration &&
+          tournamentLiveActive.value
+        ) {
+          scheduleTournamentLiveConsumer()
+        }
+      }
+    })()
+  }
+
+  function syncTournamentBoardFromFen(fen: string): void {
+    if (!fen.trim() || fen === boardStates.value[currentIndex.value]) return
+    try {
+      chess.value = new Chess(fen)
+      boardStates.value = [fen]
+      pgnMoves.value = []
+      currentIndex.value = 0
+      redoStates.value = []
+      redoMoves.value = []
+      tournamentKnownUci = ''
+      syncStatusFromChess()
+      selectedSquare.value = null
+      legalMoves.value = []
+      lastMove.value = null
+    } catch {
+      /* ignore invalid fen */
+    }
+  }
+
+  function handleTournamentGameStreamEvent(event: Record<string, unknown>): void {
+    const typ = String(event.type ?? '')
+    if (typ === 'heartbeat') return
+    if (typ === 'gameEnd') {
+      const st = String(event.status ?? 'finished')
+      tournamentWatchStatus.value = st
+      tournamentLiveActive.value = false
+      stopTournamentLiveWatch()
+      return
+    }
+    if (typ === 'gameState') {
+      const moves = String(event.moves ?? '')
+      const statusRaw = String(event.status ?? '')
+      if (statusRaw && TERMINAL_TOURNAMENT_STATUSES.has(statusRaw)) {
+        tournamentWatchStatus.value = statusRaw
+      }
+      if (moves) {
+        queueTournamentPlies(moves)
+      } else {
+        const fen = String(event.fen ?? '')
+        syncTournamentBoardFromFen(fen)
+      }
+      return
+    }
+    if (typ === 'move') {
+      const uci = String(event.uci ?? '')
+      if (uci) {
+        const known = splitUciMoves(tournamentKnownUci)
+        const next = [...known, uci].join(' ')
+        queueTournamentPlies(next)
+      }
+      const statusRaw = String(event.status ?? '')
+      if (statusRaw && TERMINAL_TOURNAMENT_STATUSES.has(statusRaw)) {
+        tournamentWatchStatus.value = statusRaw
+      }
+    }
+  }
+
+  function startTournamentPoll(tournamentId: string, gameId: string): void {
+    if (tournamentPollTimer) clearInterval(tournamentPollTimer)
+    tournamentPollTimer = setInterval(() => {
+      void (async () => {
+        if (!tournamentLiveActive.value) return
+        try {
+          const state = await tournamentApi.getGame(tournamentId, gameId)
+          if (state.moves?.trim()) {
+            queueTournamentPlies(state.moves)
+          } else if (state.fen) {
+            syncTournamentBoardFromFen(state.fen)
+          }
+          if (state.status && TERMINAL_TOURNAMENT_STATUSES.has(state.status)) {
+            tournamentWatchStatus.value = state.status
+            stopTournamentLiveWatch()
+          }
+        } catch {
+          /* ignore transient poll errors */
+        }
+      })()
+    }, 3000)
+  }
+
+  async function startTournamentLiveWatch(
+    tournamentId: string,
+    gameId: string,
+    options: {
+      whiteName: string
+      blackName: string
+      startPosition?: string
+      tournamentName?: string
+      token?: string | null
+    }
+  ): Promise<boolean> {
+    stopTournamentLiveWatch()
+    error.value = null
+
+    let initialMoves = ''
+    try {
+      const state = await tournamentApi.getGame(tournamentId, gameId)
+      initialMoves = state.moves ?? ''
+      options = {
+        ...options,
+        whiteName: state.white?.name ?? options.whiteName,
+        blackName: state.black?.name ?? options.blackName,
+        startPosition: state.startPosition ?? options.startPosition,
+      }
+      if (state.status && TERMINAL_TOURNAMENT_STATUSES.has(state.status)) {
+        tournamentWatchStatus.value = state.status
+      }
+    } catch {
+      error.value = 'Could not load game state.'
+      return false
+    }
+
+    const ok = replayTournamentUci(initialMoves, {
+      whiteName: options.whiteName,
+      blackName: options.blackName,
+      startPosition: options.startPosition,
+    })
+    if (!ok) return false
+
+    tournamentKnownUci = initialMoves.trim()
+    tournamentLiveGeneration += 1
+    tournamentLiveActive.value = true
+    tournamentWatchLabel.value =
+      options.tournamentName != null
+        ? `${options.tournamentName} · ${options.whiteName} vs ${options.blackName}`
+        : `${options.whiteName} vs ${options.blackName}`
+    tournamentWatchStatus.value = tournamentWatchStatus.value ?? 'live'
+
+    const gen = tournamentLiveGeneration
+    const abort = new AbortController()
+    tournamentWatchAbort = abort
+
+    void (async () => {
+      let token = options.token ?? null
+      if (!token) {
+        try {
+          token = await useTournamentStore().ensureSpectatorToken()
+        } catch {
+          startTournamentPoll(tournamentId, gameId)
+          return
+        }
+      }
+      try {
+        await streamNdjson(`/api/tournament/${tournamentId}/game/${gameId}/stream`, {
+          token,
+          signal: abort.signal,
+          onLine: (line) => {
+            if (gen !== tournamentLiveGeneration) return
+            handleTournamentGameStreamEvent(line)
+          },
+        })
+      } catch (e) {
+        if (gen !== tournamentLiveGeneration) return
+        if ((e as Error).name === 'AbortError') return
+        log.warn('Tournament game stream failed; falling back to polling.', e)
+        startTournamentPoll(tournamentId, gameId)
+      }
+    })()
+
+    startTournamentPoll(tournamentId, gameId)
+
+    return true
+  }
+
   async function loadPgnString(pgnStr: string): Promise<boolean> {
     try {
       const c = new Chess()
@@ -1298,6 +1614,8 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function resetGame() {
+    stopTournamentLiveWatch()
+    clearTournamentSpectator()
     gameMode.value = 'hvh'
     paused.value = false
     disconnectWebSocket()
@@ -1400,6 +1718,15 @@ export const useGameStore = defineStore('game', () => {
     loadPgnString,
     loadPgnOrFen,
     replayBrowsedExperimentPgn,
+    replayTournamentUci,
+    startTournamentLiveWatch,
+    stopTournamentLiveWatch,
+    clearTournamentSpectator,
+    tournamentWhiteName,
+    tournamentBlackName,
+    tournamentLiveActive,
+    tournamentWatchLabel,
+    tournamentWatchStatus,
     formatTime: formatClockTime,
   }
 })
